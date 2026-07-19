@@ -228,7 +228,7 @@ export default function ArticlesPage() {
     return filteredArticles.slice(start, end)
   }, [filteredArticles, currentPage])
 
-  // ✅ PERBAIKAN: useEffect untuk reset page
+  // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1)
   }, [searchTerm, selectedCategory, sortBy])
@@ -369,7 +369,8 @@ export default function ArticlesPage() {
                   </p>
                   <div className="flex items-center gap-2 mt-4 text-xs text-emerald-400/80 font-medium">
                     <span>Baca selengkapnya</span>
-                    <Icon name="arrowUpRight" className="w-3.5 h-3.5 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                    {/* ✅ MENGGUNAKAN arrowRight (TIDAK PAKAI arrowUpRight) */}
+                    <Icon name="arrowRight" className="w-3.5 h-3.5 transition-transform duration-300 group-hover:translate-x-1" />
                   </div>
                 </div>
               </Link>

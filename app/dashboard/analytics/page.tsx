@@ -429,7 +429,8 @@ export default function AnalyticsPage() {
                     : 'bg-white/[0.03] text-white/50 hover:text-white/80 border border-white/[0.05]'
                 }`}
               >
-                <Icon name="folder" className="w-3 h-3 inline mr-1" /> Group
+                {/* PERBAIKAN: Ganti 'folder' dengan 'grid' */}
+                <Icon name="grid" className="w-3 h-3 inline mr-1" /> Group
               </button>
               <button
                 onClick={() => setViewMode('form')}

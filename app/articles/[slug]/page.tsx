@@ -21,9 +21,9 @@ const articlesData: Record<string, any> = {
     featuredImage: '',
     content: `
       <p>Kecerdasan buatan generatif (<span class="text-white font-medium">Generative AI</span>) telah menjadi katalis utama transformasi digital di tahun 2026.</p>
-      <h2>1. Revolusi AI Generatif</h2>
+      <h2 id="section-1">1. Revolusi AI Generatif</h2>
       <p>Kecerdasan buatan generatif telah menjadi katalis utama transformasi digital di tahun 2026.</p>
-      <h2>2. Edge AI & IoT</h2>
+      <h2 id="section-2">2. Edge AI & IoT</h2>
       <p>Edge AI memungkinkan perangkat seperti smartphone dan sensor industri untuk menjalankan model AI secara lokal.</p>
     `,
     tags: ['#AI', '#MachineLearning', '#FutureTech'],
@@ -44,7 +44,7 @@ const articlesData: Record<string, any> = {
     readTime: 6,
     views: 8200,
     featuredImage: '',
-    content: '<p>Panduan lengkap mendapatkan pendanaan dari tahap seed hingga series A.</p>',
+    content: '<h2 id="section-1">Pendahuluan</h2><p>Panduan lengkap mendapatkan pendanaan dari tahap seed hingga series A.</p>',
     tags: ['#Fundraising', '#Startup', '#Bisnis'],
     gallery: []
   },
@@ -60,7 +60,7 @@ const articlesData: Record<string, any> = {
     readTime: 5,
     views: 5600,
     featuredImage: '',
-    content: '<p>Cara efektif membangun reputasi profesional yang kuat di era digital.</p>',
+    content: '<h2 id="section-1">Pendahuluan</h2><p>Cara efektif membangun reputasi profesional yang kuat di era digital.</p>',
     tags: ['#PersonalBrand', '#Karir', '#Profesional'],
     gallery: []
   },
@@ -76,7 +76,7 @@ const articlesData: Record<string, any> = {
     readTime: 7,
     views: 6900,
     featuredImage: '',
-    content: '<p>Optimalkan keputusan bisnis Anda dengan pendekatan data-driven.</p>',
+    content: '<h2 id="section-1">Pendahuluan</h2><p>Optimalkan keputusan bisnis Anda dengan pendekatan data-driven.</p>',
     tags: ['#DataAnalytics', '#Bisnis', '#DataDriven'],
     gallery: []
   }
@@ -111,7 +111,6 @@ const categoryIcons: Record<string, string> = {
 
 // ============ CLIENT COMPONENT ============
 export default function ArticleDetailPage({ params }: { params: Promise<{ slug: string }> }) {
-  // ✅ UNWRAP params dengan React.use()
   const { slug } = use(params)
   
   const router = useRouter()
@@ -133,7 +132,7 @@ export default function ArticleDetailPage({ params }: { params: Promise<{ slug: 
     if (!contentRef.current) return []
     const headingElements = contentRef.current.querySelectorAll('h2')
     return Array.from(headingElements).map((el, index) => ({
-      id: `section-${index + 1}`,
+      id: el.id || `section-${index + 1}`,
       text: el.textContent || `Section ${index + 1}`
     }))
   }
@@ -189,6 +188,18 @@ export default function ArticleDetailPage({ params }: { params: Promise<{ slug: 
     setTimeout(() => setCopied(false), 2000)
   }
 
+  // ============ SHARE ============
+  const handleShareTwitter = () => {
+    const text = encodeURIComponent(`${article.title}`)
+    const url = encodeURIComponent(window.location.href)
+    window.open(`https://twitter.com/intent/tweet?text=${text}&url=${url}`, '_blank')
+  }
+
+  const handleShareLinkedIn = () => {
+    const url = encodeURIComponent(window.location.href)
+    window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${url}`, '_blank')
+  }
+
   // ============ NEWSLETTER SUBMIT ============
   const handleNewsletterSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -223,73 +234,20 @@ export default function ArticleDetailPage({ params }: { params: Promise<{ slug: 
     <div className="min-h-screen bg-[#06060E] text-white">
       {/* ====== STYLES ====== */}
       <style>{`
-        #progress-bar {
-          transition: width 0.1s linear;
-        }
-        .article-content blockquote {
-          border-left: 3px solid rgba(6, 182, 212, 0.5);
-          padding-left: 1.5rem;
-          margin: 1.5rem 0;
-          font-style: italic;
-          color: rgba(255, 255, 255, 0.7);
-        }
-        .article-content blockquote cite {
-          display: block;
-          font-size: 0.75rem;
-          color: rgba(255, 255, 255, 0.4);
-          margin-top: 0.5rem;
-          font-style: normal;
-        }
-        .article-content ul {
-          list-style: none;
-          padding: 0;
-          margin: 1rem 0;
-        }
-        .article-content ul li {
-          display: flex;
-          align-items: flex-start;
-          gap: 0.75rem;
-          padding: 0.5rem 0;
-          color: rgba(255, 255, 255, 0.6);
-        }
-        .article-content ul li:before {
-          content: "✓";
-          color: #10b981;
-          font-weight: bold;
-          flex-shrink: 0;
-        }
-        .article-content h2 {
-          font-family: 'Space Grotesk', sans-serif;
-          font-size: 1.5rem;
-          font-weight: 600;
-          color: white;
-          margin-top: 1.5rem;
-          margin-bottom: 0.75rem;
-        }
-        .article-content p {
-          color: rgba(255, 255, 255, 0.6);
-          line-height: 1.8;
-          margin-bottom: 1rem;
-        }
-        .article-content .text-white {
-          color: white !important;
-        }
-        .article-content .font-medium {
-          font-weight: 500 !important;
-        }
-        .article-content .text-cyan-400 {
-          color: #34d399 !important;
-        }
-        #lightbox {
-          opacity: 0;
-          transition: opacity 0.3s ease;
-        }
-        #lightbox.active {
-          opacity: 1;
-        }
-        #lightbox-img {
-          transition: transform 0.3s ease;
-        }
+        #progress-bar { transition: width 0.1s linear; }
+        .article-content blockquote { border-left: 3px solid rgba(6, 182, 212, 0.5); padding-left: 1.5rem; margin: 1.5rem 0; font-style: italic; color: rgba(255, 255, 255, 0.7); }
+        .article-content blockquote cite { display: block; font-size: 0.75rem; color: rgba(255, 255, 255, 0.4); margin-top: 0.5rem; font-style: normal; }
+        .article-content ul { list-style: none; padding: 0; margin: 1rem 0; }
+        .article-content ul li { display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.5rem 0; color: rgba(255, 255, 255, 0.6); }
+        .article-content ul li:before { content: "✓"; color: #10b981; font-weight: bold; flex-shrink: 0; }
+        .article-content h2 { font-family: 'Space Grotesk', sans-serif; font-size: 1.5rem; font-weight: 600; color: white; margin-top: 1.5rem; margin-bottom: 0.75rem; }
+        .article-content p { color: rgba(255, 255, 255, 0.6); line-height: 1.8; margin-bottom: 1rem; }
+        .article-content .text-white { color: white !important; }
+        .article-content .font-medium { font-weight: 500 !important; }
+        .article-content .text-cyan-400 { color: #34d399 !important; }
+        #lightbox { opacity: 0; transition: opacity 0.3s ease; }
+        #lightbox.active { opacity: 1; }
+        #lightbox-img { transition: transform 0.3s ease; }
       `}</style>
 
       {/* ====== NAVBAR ====== */}
@@ -325,14 +283,11 @@ export default function ArticleDetailPage({ params }: { params: Promise<{ slug: 
           <div className="absolute inset-0 bg-scanlines pointer-events-none opacity-30" />
 
           <div className="relative z-10">
-            {/* Featured Image */}
             <div className="relative w-full h-64 sm:h-80 lg:h-96 overflow-hidden rounded-t-3xl">
               <div className={`absolute inset-0 bg-gradient-to-br ${categoryGradients[article.category]} flex items-center justify-center`}>
                 <Icon name={categoryIcons[article.category] as any} className="w-20 h-20 sm:w-24 sm:h-24 text-white/20 mb-4 animate-float" />
               </div>
               <div className="absolute inset-0 bg-gradient-to-t from-[#080812] via-[#080812]/40 to-transparent" />
-
-              {/* Labels */}
               <div className="absolute top-4 left-4 z-20 flex flex-wrap gap-2">
                 <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/50 backdrop-blur-sm border border-white/10 text-xs font-medium ${categoryColors[article.category]}`}>
                   <Icon name={categoryIcons[article.category] as any} className="w-3.5 h-3.5" /> {article.category}
@@ -343,9 +298,7 @@ export default function ArticleDetailPage({ params }: { params: Promise<{ slug: 
               </div>
             </div>
 
-            {/* Content */}
             <div className="px-6 py-8 sm:px-10 sm:py-10 lg:px-16 lg:py-12 -mt-12 relative z-20">
-              {/* Breadcrumb */}
               <div className="flex items-center gap-2 text-xs text-white/35 mb-4">
                 <Link href="/" className="hover:text-white/60 transition-colors">Beranda</Link>
                 <Icon name="chevronRight" className="w-3 h-3" />
@@ -358,32 +311,17 @@ export default function ArticleDetailPage({ params }: { params: Promise<{ slug: 
                 </span>
               </div>
 
-              {/* Meta */}
               <div className="flex flex-wrap items-center gap-3 mb-4">
-                <span className="text-xs text-white/40 flex items-center gap-1">
-                  <Icon name="calendar" className="w-3.5 h-3.5" /> {formatDate(article.date)}
-                </span>
+                <span className="text-xs text-white/40 flex items-center gap-1"><Icon name="calendar" className="w-3.5 h-3.5" /> {formatDate(article.date)}</span>
                 <span className="text-xs text-white/25">•</span>
-                <span className="text-xs text-white/40 flex items-center gap-1">
-                  <Icon name="clock" className="w-3.5 h-3.5" /> {article.readTime} menit baca
-                </span>
+                <span className="text-xs text-white/40 flex items-center gap-1"><Icon name="clock" className="w-3.5 h-3.5" /> {article.readTime} menit baca</span>
                 <span className="text-xs text-white/25">•</span>
-                <span className="text-xs text-white/40 flex items-center gap-1">
-                  <Icon name="eye" className="w-3.5 h-3.5" /> {formatViews(article.views)} views
-                </span>
+                <span className="text-xs text-white/40 flex items-center gap-1"><Icon name="eye" className="w-3.5 h-3.5" /> {formatViews(article.views)} views</span>
               </div>
 
-              {/* Title */}
-              <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-[1.15] mb-4 max-w-4xl">
-                {article.title}
-              </h1>
+              <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-[1.15] mb-4 max-w-4xl">{article.title}</h1>
+              <p className="text-lg sm:text-xl text-white/50 max-w-3xl leading-relaxed mb-6">{article.excerpt}</p>
 
-              {/* Subtitle */}
-              <p className="text-lg sm:text-xl text-white/50 max-w-3xl leading-relaxed mb-6">
-                {article.excerpt}
-              </p>
-
-              {/* Author */}
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-500 to-cyan-500 flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-emerald-500/20">
@@ -436,11 +374,19 @@ export default function ArticleDetailPage({ params }: { params: Promise<{ slug: 
               <div className="rounded-2xl bg-[#080812] border border-white/[0.05] p-6">
                 <h4 className="text-sm font-semibold text-white/80 mb-4">Bagikan</h4>
                 <div className="flex gap-3">
-                  <button className="w-10 h-10 rounded-xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center hover:bg-cyan-500/10 hover:border-cyan-400/20 transition-all">
-                    <Icon name="twitter" className="w-4 h-4 text-white/60" />
+                  <button 
+                    onClick={handleShareTwitter}
+                    className="w-10 h-10 rounded-xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center hover:bg-cyan-500/10 hover:border-cyan-400/20 transition-all"
+                  >
+                    {/* Ganti 'twitter' dengan 'share2' atau icon yang tersedia */}
+                    <Icon name="share2" className="w-4 h-4 text-white/60" />
                   </button>
-                  <button className="w-10 h-10 rounded-xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center hover:bg-cyan-500/10 hover:border-cyan-400/20 transition-all">
-                    <Icon name="linkedin" className="w-4 h-4 text-white/60" />
+                  <button 
+                    onClick={handleShareLinkedIn}
+                    className="w-10 h-10 rounded-xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center hover:bg-cyan-500/10 hover:border-cyan-400/20 transition-all"
+                  >
+                    {/* Ganti 'linkedin' dengan 'users' atau icon yang tersedia */}
+                    <Icon name="users" className="w-4 h-4 text-white/60" />
                   </button>
                   <button
                     onClick={handleCopyLink}
@@ -462,16 +408,12 @@ export default function ArticleDetailPage({ params }: { params: Promise<{ slug: 
           <article className="lg:col-span-6 article-content text-white/60 leading-relaxed space-y-8 text-base sm:text-lg">
             <div ref={contentRef} dangerouslySetInnerHTML={{ __html: article.content }} />
 
-            {/* Tags */}
             <div className="flex flex-wrap gap-2 pt-8 border-t border-white/[0.06]">
               {article.tags.map((tag: string) => (
-                <span key={tag} className="px-3 py-1.5 rounded-full bg-emerald-500/8 border border-emerald-500/15 text-xs text-emerald-400">
-                  {tag}
-                </span>
+                <span key={tag} className="px-3 py-1.5 rounded-full bg-emerald-500/8 border border-emerald-500/15 text-xs text-emerald-400">{tag}</span>
               ))}
             </div>
 
-            {/* Author Bio */}
             <div className="mt-10 p-6 rounded-2xl bg-[#080812] border border-white/[0.06] flex flex-col sm:flex-row gap-5 items-start">
               <div className="w-16 h-16 rounded-full bg-gradient-to-br from-emerald-500 to-cyan-500 flex items-center justify-center text-white font-bold text-2xl flex-shrink-0">
                 {article.author.split(' ').map((n: string) => n[0]).join('')}
@@ -482,7 +424,6 @@ export default function ArticleDetailPage({ params }: { params: Promise<{ slug: 
               </div>
             </div>
 
-            {/* Gallery */}
             {article.gallery && article.gallery.length > 0 && (
               <div className="mt-10">
                 <h3 className="font-display text-2xl font-semibold text-white mb-4">Galeri Dokumentasi</h3>
@@ -497,9 +438,7 @@ export default function ArticleDetailPage({ params }: { params: Promise<{ slug: 
                         <Icon name="image" className="w-10 h-10 text-white/20 group-hover:text-white/50 transition-colors" />
                       </div>
                       <div className="absolute inset-0 bg-black/40 group-hover:bg-black/20 transition-colors" />
-                      <div className="absolute bottom-2 left-2 px-2 py-1 rounded-full bg-black/50 backdrop-blur-sm border border-white/10 text-[10px] text-cyan-300 truncate max-w-[80%]">
-                        {img.caption}
-                      </div>
+                      <div className="absolute bottom-2 left-2 px-2 py-1 rounded-full bg-black/50 backdrop-blur-sm border border-white/10 text-[10px] text-cyan-300 truncate max-w-[80%]">{img.caption}</div>
                     </div>
                   ))}
                 </div>
@@ -508,30 +447,18 @@ export default function ArticleDetailPage({ params }: { params: Promise<{ slug: 
             )}
           </article>
 
-          {/* ====== SIDEBAR KANAN: RELATED ARTICLES & NEWSLETTER ====== */}
+          {/* ====== SIDEBAR KANAN ====== */}
           <aside className="lg:col-span-3">
             <div className="sticky top-28 space-y-6">
               <div className="rounded-2xl bg-[#080812] border border-white/[0.05] p-6">
                 <h4 className="text-sm font-semibold text-white/80 mb-4 flex items-center gap-2">
                   <Icon name="bookOpen" className="w-4 h-4 text-emerald-400" /> Artikel Terkait
                 </h4>
-                {relatedArticles.map((article, index) => (
-                  <a
-                    key={index}
-                    href="#"
-                    className="block group p-3 rounded-xl hover:bg-white/[0.03] transition-colors border border-transparent hover:border-white/[0.05]"
-                  >
-                    <p className={`text-xs ${
-                      article.category === 'Bisnis' ? 'text-rose-400' :
-                      article.category === 'Karir' ? 'text-amber-400' :
-                      'text-sky-400'
-                    } mb-1`}>
-                      {article.category}
-                    </p>
-                    <h5 className="text-sm font-medium text-white group-hover:text-cyan-300 transition-colors">
-                      {article.title}
-                    </h5>
-                    <p className="text-xs text-white/35 mt-1">{article.date} • {article.readTime} min</p>
+                {relatedArticles.map((ra, index) => (
+                  <a key={index} href="#" className="block group p-3 rounded-xl hover:bg-white/[0.03] transition-colors border border-transparent hover:border-white/[0.05]">
+                    <p className={`text-xs ${ra.category === 'Bisnis' ? 'text-rose-400' : ra.category === 'Karir' ? 'text-amber-400' : 'text-sky-400'} mb-1`}>{ra.category}</p>
+                    <h5 className="text-sm font-medium text-white group-hover:text-cyan-300 transition-colors">{ra.title}</h5>
+                    <p className="text-xs text-white/35 mt-1">{ra.date} • {ra.readTime} min</p>
                   </a>
                 ))}
               </div>
@@ -541,15 +468,8 @@ export default function ArticleDetailPage({ params }: { params: Promise<{ slug: 
                 <h4 className="text-white font-semibold mb-2">Dapatkan Update</h4>
                 <p className="text-white/50 text-sm mb-4">Langganan newsletter untuk artikel terbaru.</p>
                 <form className="space-y-3" onSubmit={handleNewsletterSubmit}>
-                  <input
-                    type="email"
-                    placeholder="email@anda.com"
-                    className="w-full px-4 py-2.5 rounded-xl bg-white/[0.05] border border-white/[0.08] text-sm text-white placeholder-white/25 focus:outline-none focus:border-cyan-400/40 transition-all"
-                  />
-                  <button
-                    type="submit"
-                    className="w-full px-4 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-sm font-medium flex items-center justify-center gap-2 transition-all"
-                  >
+                  <input type="email" placeholder="email@anda.com" className="w-full px-4 py-2.5 rounded-xl bg-white/[0.05] border border-white/[0.08] text-sm text-white placeholder-white/25 focus:outline-none focus:border-cyan-400/40 transition-all" />
+                  <button type="submit" className="w-full px-4 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-sm font-medium flex items-center justify-center gap-2 transition-all">
                     <Icon name="send" className="w-4 h-4" /> Berlangganan
                   </button>
                 </form>
@@ -581,10 +501,7 @@ export default function ArticleDetailPage({ params }: { params: Promise<{ slug: 
           className={`fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 ${isLightboxOpen ? 'active' : ''}`}
           onClick={closeLightbox}
         >
-          <button
-            onClick={closeLightbox}
-            className="absolute top-6 right-6 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors z-10"
-          >
+          <button onClick={closeLightbox} className="absolute top-6 right-6 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors z-10">
             <Icon name="x" className="w-5 h-5 text-white" />
           </button>
           <div className="max-w-4xl w-full max-h-[85vh] rounded-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
