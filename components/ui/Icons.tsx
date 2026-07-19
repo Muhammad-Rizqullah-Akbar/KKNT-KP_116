@@ -67,7 +67,7 @@ import {
   Check,
   Loader,
   Move,
-  // Form Builder
+  // ===== Form Builder =====
   GripVertical,
   ArrowUp,
   ArrowDown,
@@ -93,6 +93,62 @@ import {
   Calendar as CalendarIcon,
   Mail as MailIcon,
   Hash as HashIcon,
+  // ===== Tambahan Icon yang Hilang =====
+  Filter,        // Untuk filter
+  Folder,        // Untuk folder/group
+  ArrowUpRight,  // Untuk arrow up right
+  SlidersHorizontal, // Alternatif untuk filter
+  FolderOpen,    // Untuk folder yang terbuka
+  FolderClosed,  // Untuk folder yang tertutup
+  Share,         // Untuk share
+  ExternalLink,  // Untuk link eksternal
+  File,          // Untuk file
+  FileImage,     // Untuk file gambar
+  FileQuestion,  // Untuk file pertanyaan
+  FileSpreadsheet, // Untuk file spreadsheet
+  Home,          // Untuk home
+  HomeIcon,      // Alternatif home
+  MenuIcon,      // Alternatif menu
+  MoreHorizontal, // Untuk more options
+  MoreVertical,  // Untuk more options vertical
+  PlusCircle,    // Untuk tambah dengan circle
+  MinusCircle,   // Untuk kurang dengan circle
+  XCircle,       // Untuk close dengan circle
+  CheckCircle2,  // Untuk check circle
+  AlertTriangle, // Untuk alert triangle
+  InfoIcon,      // Untuk info
+  HelpCircleIcon, // Untuk help circle
+  Loader2,       // Untuk loader animasi
+  RefreshCwIcon, // Untuk refresh
+  RotateCw,      // Untuk rotate clockwise
+  RotateCcwIcon, // Untuk rotate counter-clockwise
+  ZoomIn,        // Untuk zoom in
+  ZoomOut,       // Untuk zoom out
+  Maximize,      // Untuk maximize
+  Minimize,      // Untuk minimize
+  Play,          // Untuk play
+  Pause,         // Untuk pause
+  StopCircle,    // Untuk stop
+  Volume2,       // Untuk volume
+  VolumeX,       // Untuk volume mute
+  Mic,           // Untuk microphone
+  MicOff,        // Untuk microphone off
+  Camera,        // Untuk camera
+  Video,         // Untuk video
+  Monitor,       // Untuk monitor
+  Smartphone,    // Untuk smartphone
+  Tablet,        // Untuk tablet
+  Laptop,        // Untuk laptop
+  Server,        // Untuk server
+  Cloud,         // Untuk cloud
+  CloudOff,      // Untuk cloud off
+  Wifi,          // Untuk wifi
+  WifiOff,       // Untuk wifi off
+  Bluetooth,     // Untuk bluetooth
+  Battery,       // Untuk battery
+  BatteryCharging, // Untuk battery charging
+  Power,         // Untuk power
+  PowerOff,      // Untuk power off
 } from "lucide-react"
 
 export const Icons = {
@@ -179,11 +235,11 @@ export const Icons = {
   grid: Grid,
   grid3x3: Grid3x3,
   star: Star,
-  slider: Sliders,        // ← Sliders (bukan Slider)
+  slider: Sliders,
   upload: Upload,
   heading: Heading,
   layout: LayoutIcon,
-  page: LayoutIcon,        // ← Pakai LayoutIcon sebagai pengganti Page
+  page: LayoutIcon,
   circleDot: CircleDot,
   chevronDown: ChevronDown,
   listChecks: ListChecks,
@@ -191,6 +247,63 @@ export const Icons = {
   calendarIcon: CalendarIcon,
   mailIcon: MailIcon,
   hashIcon: HashIcon,
+
+  // ===== TAMBAHAN ICON YANG HILANG =====
+  filter: Filter,
+  folder: Folder,
+  arrowUpRight: ArrowUpRight,
+  filterAlt: SlidersHorizontal,
+  folderOpen: FolderOpen,
+  folderClosed: FolderClosed,
+  share: Share,
+  externalLink: ExternalLink,
+  file: File,
+  fileImage: FileImage,
+  fileQuestion: FileQuestion,
+  fileSpreadsheet: FileSpreadsheet,
+  home: Home,
+  homeIcon: HomeIcon,
+  menuIcon: MenuIcon,
+  moreHorizontal: MoreHorizontal,
+  moreVertical: MoreVertical,
+  plusCircle: PlusCircle,
+  minusCircle: MinusCircle,
+  xCircle: XCircle,
+  checkCircle2: CheckCircle2,
+  alertTriangle: AlertTriangle,
+  infoIcon: InfoIcon,
+  helpCircleIcon: HelpCircleIcon,
+  loader2: Loader2,
+  refreshCwIcon: RefreshCwIcon,
+  rotateCw: RotateCw,
+  rotateCcwIcon: RotateCcwIcon,
+  zoomIn: ZoomIn,
+  zoomOut: ZoomOut,
+  maximize: Maximize,
+  minimize: Minimize,
+  play: Play,
+  pause: Pause,
+  stopCircle: StopCircle,
+  volume2: Volume2,
+  volumeX: VolumeX,
+  mic: Mic,
+  micOff: MicOff,
+  camera: Camera,
+  video: Video,
+  monitor: Monitor,
+  smartphone: Smartphone,
+  tablet: Tablet,
+  laptop: Laptop,
+  server: Server,
+  cloud: Cloud,
+  cloudOff: CloudOff,
+  wifi: Wifi,
+  wifiOff: WifiOff,
+  bluetooth: Bluetooth,
+  battery: Battery,
+  batteryCharging: BatteryCharging,
+  power: Power,
+  powerOff: PowerOff,
 }
 
 export type IconName = keyof typeof Icons
