@@ -19,16 +19,59 @@ export type IdentifierType = 'none' | 'name' | 'location' | 'email' | 'phone' | 
 
 export type ScoringScheme = 'none' | 'binary' | 'likert' | 'rating' | 'indicator'
 
+// ============================================================
+// FORM STAGE, VALIDATION, SCORING TYPES
+// ============================================================
+
+export interface FormStage {
+  id: string
+  name: string
+  order: number
+  questionIds: string[]
+  includeInScoring: boolean
+}
+
+export interface FormValidation {
+  mode: 'all_required' | 'all_required_except' | 'free'
+  exceptions: string[]
+  allowOverride: boolean
+}
+
+export interface ScoringOverride {
+  points: number
+  defaultPoints: number
+  reason?: string
+}
+
+export interface FormScoring {
+  totalPoints: number
+  mode: 'auto' | 'hybrid' | 'manual'
+  distribution: Record<string, number>
+  overrides: Record<string, ScoringOverride>
+  allowOverride: boolean
+  autoBalance: boolean
+  lastBalancedAt?: string
+}
+
+// ============================================================
+// INDICATOR TYPES
+// ============================================================
+
 export interface IndicatorItem {
   id: string
   label: string
   weight?: number
+  reverse?: boolean
 }
 
 export interface IndicatorScale {
   value: number
   label: string
 }
+
+// ============================================================
+// FLEXIBLE QUESTION
+// ============================================================
 
 export interface FlexibleQuestion {
   id: string
@@ -71,8 +114,9 @@ export interface FlexibleQuestion {
     // Untuk file-upload
     fileTypes?: string[]
     maxFileSize?: number
-    // Untuk single-choice (scoring)
-    correctAnswer?: string
+    // ===== SCORING CONFIG =====
+    // Untuk single-choice
+    correctAnswer?: string | string[]
     scoreCorrect?: number
     scoreIncorrect?: number
     // Untuk signature
@@ -90,13 +134,31 @@ export interface FlexibleQuestion {
     scheme: ScoringScheme
     weight: number
   }
+  
+  stageId: string | null
+  overridePoints: number | null
 }
 
-// ============ DEFAULT CONFIG PER TIPE ============
+// ============================================================
+// DEFAULT CONFIG PER TIPE
+// ============================================================
+
 export const getDefaultConfig = (answerType: AnswerType): FlexibleQuestion['config'] => {
   switch (answerType) {
     case 'single-choice':
+      return { 
+        options: ['Opsi 1', 'Opsi 2', 'Opsi 3'],
+        correctAnswer: 'Opsi 1',
+        scoreCorrect: 1,
+        scoreIncorrect: 0,
+      }
     case 'multiple-choice':
+      return { 
+        options: ['Opsi 1', 'Opsi 2', 'Opsi 3', 'Opsi 4'],
+        correctAnswer: ['Opsi 1', 'Opsi 2'],
+        scoreCorrect: 1,
+        scoreIncorrect: 0,
+      }
     case 'dropdown':
       return { options: ['Opsi 1', 'Opsi 2', 'Opsi 3'] }
     case 'short-text':
@@ -108,9 +170,9 @@ export const getDefaultConfig = (answerType: AnswerType): FlexibleQuestion['conf
     case 'indicator-table':
       return {
         indicators: [
-          { id: 'ind-1', label: 'Pertanyaan 1', weight: 1 },
-          { id: 'ind-2', label: 'Pertanyaan 2', weight: 1 },
-          { id: 'ind-3', label: 'Pertanyaan 3', weight: 1 },
+          { id: 'ind-1', label: 'Pertanyaan 1', weight: 1, reverse: false },
+          { id: 'ind-2', label: 'Pertanyaan 2', weight: 1, reverse: false },
+          { id: 'ind-3', label: 'Pertanyaan 3', weight: 1, reverse: false },
         ],
         indicatorScales: [
           { value: 1, label: 'STS' },
@@ -143,11 +205,16 @@ export const getDefaultConfig = (answerType: AnswerType): FlexibleQuestion['conf
   }
 }
 
-// ============ CREATE FLEXIBLE QUESTION ============
+// ============================================================
+// CREATE FLEXIBLE QUESTION
+// ============================================================
+
 export const createFlexibleQuestion = (
   answerType: AnswerType,
   question?: string
 ): FlexibleQuestion => {
+  const defaultConfig = getDefaultConfig(answerType)
+  
   return {
     id: `q-${Date.now()}`,
     question: question || (
@@ -160,18 +227,23 @@ export const createFlexibleQuestion = (
     order: 0,
     media: { type: 'none' },
     answerType,
-    config: getDefaultConfig(answerType),
+    config: defaultConfig,
     isIdentifier: false,
     identifierType: 'none',
     scoring: { 
       scheme: answerType === 'indicator-table' ? 'indicator' : 
-              answerType === 'single-choice' ? 'binary' : 'none', 
+              answerType === 'single-choice' || answerType === 'multiple-choice' ? 'binary' : 'none', 
       weight: 1 
     },
+    stageId: null,
+    overridePoints: null,
   }
 }
 
-// ============ GET ANSWER TYPE LABEL ============
+// ============================================================
+// GET LABELS
+// ============================================================
+
 export const getAnswerTypeLabel = (type: AnswerType): string => {
   const labels: Record<AnswerType, string> = {
     'single-choice': 'Pilihan Ganda (Single)',
@@ -189,10 +261,13 @@ export const getAnswerTypeLabel = (type: AnswerType): string => {
   return labels[type] || type
 }
 
-// ============ ANSWER TYPES LIST ============
+// ============================================================
+// ANSWER TYPES LIST
+// ============================================================
+
 export const ANSWER_TYPES: { value: AnswerType; label: string; icon: string }[] = [
   { value: 'single-choice', label: 'Pilihan Ganda (Single)', icon: 'circleDot' },
-  { value: 'multiple-choice', label: 'Pilihan Ganda (Multi)', icon: 'squareCheck' },
+  { value: 'multiple-choice', label: 'Pilihan Ganda (Multi)', icon: 'checkSquare' },
   { value: 'dropdown', label: 'Dropdown', icon: 'chevronDown' },
   { value: 'short-text', label: 'Jawaban Singkat', icon: 'type' },
   { value: 'long-text', label: 'Jawaban Panjang', icon: 'alignLeft' },
@@ -204,15 +279,21 @@ export const ANSWER_TYPES: { value: AnswerType; label: string; icon: string }[] 
   { value: 'file-upload', label: 'Upload File', icon: 'upload' },
 ]
 
-// ============ MEDIA TYPES ============
+// ============================================================
+// MEDIA TYPES
+// ============================================================
+
 export const MEDIA_TYPES: { value: MediaType; label: string; icon: string }[] = [
   { value: 'none', label: 'Tanpa Media', icon: 'x' },
   { value: 'image', label: 'Gambar', icon: 'image' },
-  { value: 'video', label: 'Video', icon: 'image' },
+  { value: 'video', label: 'Video', icon: 'video' },
   { value: 'file', label: 'File', icon: 'fileText' },
 ]
 
-// ============ IDENTIFIER TYPES ============
+// ============================================================
+// IDENTIFIER TYPES
+// ============================================================
+
 export const IDENTIFIER_TYPES: { value: IdentifierType; label: string }[] = [
   { value: 'none', label: 'Tidak' },
   { value: 'name', label: '🏷️ Nama Responden' },
@@ -222,7 +303,10 @@ export const IDENTIFIER_TYPES: { value: IdentifierType; label: string }[] = [
   { value: 'custom', label: '🔖 Custom' },
 ]
 
-// ============ SCORING SCHEMES ============
+// ============================================================
+// SCORING SCHEMES
+// ============================================================
+
 export const SCORING_SCHEMES: { value: ScoringScheme; label: string }[] = [
   { value: 'none', label: 'Tidak Dinilai' },
   { value: 'binary', label: '✅ Benar/Salah' },
@@ -231,7 +315,10 @@ export const SCORING_SCHEMES: { value: ScoringScheme; label: string }[] = [
   { value: 'indicator', label: '📋 Indikator' },
 ]
 
-// ============ CATEGORIES ============
+// ============================================================
+// CATEGORIES
+// ============================================================
+
 export const CATEGORIES = [
   { id: 'all', label: 'Semua', icon: 'grid' },
   { id: 'Input', label: 'Input', icon: 'type' },
@@ -242,7 +329,10 @@ export const CATEGORIES = [
   { id: 'Layout', label: 'Layout', icon: 'layout' },
 ]
 
-// ============ ELEMENTS ============
+// ============================================================
+// ELEMENTS
+// ============================================================
+
 export const ELEMENTS = ANSWER_TYPES.map((type) => ({
   id: type.value,
   type: type.value as AnswerType,
@@ -277,4 +367,329 @@ function getDescriptionForAnswerType(type: AnswerType): string {
     'file-upload': 'Upload file',
   }
   return descriptions[type] || ''
+}
+
+// ============================================================
+// HELPER FUNCTIONS
+// ============================================================
+
+/**
+ * Menghitung total bobot dari semua pertanyaan
+ */
+export const calculateTotalWeight = (questions: FlexibleQuestion[]): number => {
+  let total = 0
+  questions.forEach(q => {
+    if (q.answerType === 'indicator-table' && q.config?.indicators) {
+      q.config.indicators.forEach(ind => {
+        total += ind.weight || 1
+      })
+    } else {
+      total += q.scoring?.weight || 1
+    }
+  })
+  return total
+}
+
+/**
+ * Menghitung bobot per stage
+ */
+export const calculateStageWeights = (
+  questions: FlexibleQuestion[],
+  stages: FormStage[]
+): Record<string, number> => {
+  const weights: Record<string, number> = {}
+  
+  stages.forEach(stage => {
+    weights[stage.id] = 0
+  })
+  
+  questions.forEach(q => {
+    const stageId = q.stageId || stages[0]?.id
+    if (stageId && weights[stageId] !== undefined) {
+      let weight = q.scoring?.weight || 1
+      if (q.answerType === 'indicator-table' && q.config?.indicators) {
+        weight = q.config.indicators.reduce((sum, ind) => sum + (ind.weight || 1), 0)
+      }
+      weights[stageId] += weight
+    }
+  })
+  
+  return weights
+}
+
+/**
+ * Mendapatkan daftar stage yang dinilai
+ */
+export const getScoredStages = (stages: FormStage[]): FormStage[] => {
+  return stages.filter(s => s.includeInScoring !== false)
+}
+
+/**
+ * Mendapatkan daftar stage yang TIDAK dinilai
+ */
+export const getUnscoredStages = (stages: FormStage[]): FormStage[] => {
+  return stages.filter(s => s.includeInScoring === false)
+}
+
+/**
+ * Mendapatkan daftar pertanyaan untuk stage tertentu
+ */
+export const getQuestionsByStage = (
+  questions: FlexibleQuestion[],
+  stageId: string
+): FlexibleQuestion[] => {
+  return questions.filter(q => q.stageId === stageId)
+}
+
+/**
+ * Mendapatkan daftar pertanyaan yang dinilai (hanya dari scored stages)
+ */
+export const getScoredQuestions = (
+  questions: FlexibleQuestion[],
+  stages: FormStage[]
+): FlexibleQuestion[] => {
+  const scoredStageIds = getScoredStages(stages).map(s => s.id)
+  return questions.filter(q => 
+    q.stageId && scoredStageIds.includes(q.stageId) &&
+    q.answerType !== 'image' && 
+    q.answerType !== 'file-upload' &&
+    q.answerType !== 'signature'
+  )
+}
+
+/**
+ * Menghitung skor maksimal per pertanyaan
+ */
+export const calculateQuestionMaxScore = (question: FlexibleQuestion): number => {
+  const weight = question.scoring?.weight || 1
+  
+  switch (question.answerType) {
+    case 'single-choice':
+    case 'dropdown':
+    case 'rating':
+    case 'number':
+      return weight
+      
+    case 'multiple-choice': {
+      const correctAnswers = question.config?.correctAnswer
+      if (Array.isArray(correctAnswers)) {
+        return weight
+      }
+      return weight
+    }
+      
+    case 'indicator-table': {
+      const indicators = question.config?.indicators || []
+      let max = 0
+      indicators.forEach(ind => {
+        const w = ind.weight || 1
+        max += 5 * w
+      })
+      return max || 1
+    }
+      
+    default:
+      return 0
+  }
+}
+
+/**
+ * Validasi apakah total distribusi sesuai dengan total points
+ */
+export const validateDistribution = (
+  distribution: Record<string, number>,
+  totalPoints: number
+): { valid: boolean; total: number; diff: number } => {
+  const total = Object.values(distribution).reduce((sum, val) => sum + val, 0)
+  return {
+    valid: Math.abs(total - totalPoints) < 0.01,
+    total,
+    diff: totalPoints - total,
+  }
+}
+
+/**
+ * Generate scoring distribution untuk manual mode
+ */
+export const generateManualDistribution = (
+  questions: FlexibleQuestion[],
+  totalPoints: number
+): Record<string, number> => {
+  const distribution: Record<string, number> = {}
+  const count = questions.length || 1
+  const perQuestion = Math.floor(totalPoints / count)
+  let remainder = totalPoints - (perQuestion * count)
+  
+  questions.forEach((q, index) => {
+    let points = perQuestion
+    if (remainder > 0) {
+      points += 1
+      remainder -= 1
+    }
+    distribution[q.id] = points
+  })
+  
+  return distribution
+}
+
+/**
+ * Generate scoring distribution berdasarkan bobot per stage (Auto-Balance)
+ */
+export const generateAutoDistribution = (
+  questions: FlexibleQuestion[],
+  stages: FormStage[],
+  totalPoints: number
+): Record<string, number> => {
+  const distribution: Record<string, number> = {}
+  const scoredStages = getScoredStages(stages)
+  const stageWeights = calculateStageWeights(questions, scoredStages)
+  const totalWeight = Object.values(stageWeights).reduce((sum, w) => sum + w, 0)
+  
+  if (totalWeight === 0) {
+    const perStage = totalPoints / scoredStages.length
+    scoredStages.forEach(stage => {
+      distribution[stage.id] = Math.round(perStage * 100) / 100
+    })
+    return distribution
+  }
+  
+  scoredStages.forEach(stage => {
+    const weight = stageWeights[stage.id] || 0
+    const points = (weight / totalWeight) * totalPoints
+    distribution[stage.id] = Math.round(points * 100) / 100
+  })
+  
+  return distribution
+}
+
+/**
+ * Get default validation config
+ */
+export const getDefaultValidation = (): FormValidation => ({
+  mode: 'all_required',
+  exceptions: [],
+  allowOverride: true,
+})
+
+/**
+ * Get default scoring config
+ */
+export const getDefaultScoring = (): FormScoring => ({
+  totalPoints: 100,
+  mode: 'auto',
+  distribution: {},
+  overrides: {},
+  allowOverride: true,
+  autoBalance: true,
+})
+
+/**
+ * Get default stage config
+ */
+export const getDefaultStage = (name: string = 'Tahap 1'): FormStage => ({
+  id: `stage-${Date.now()}`,
+  name,
+  order: 0,
+  questionIds: [],
+  includeInScoring: true,
+})
+
+/**
+ * Helper: Reset scoring distribution
+ */
+export const resetScoringDistribution = (
+  questions: FlexibleQuestion[],
+  stages: FormStage[],
+  totalPoints: number,
+  mode: 'auto' | 'manual'
+): Record<string, number> => {
+  if (mode === 'auto') {
+    return generateAutoDistribution(questions, stages, totalPoints)
+  } else {
+    return generateManualDistribution(questions, totalPoints)
+  }
+}
+
+// ============================================================
+// SCORING INFO HELPERS (Untuk Display di Card)
+// ============================================================
+
+/**
+ * Mendapatkan informasi scoring untuk single choice
+ */
+export const getSingleChoiceScoringInfo = (question: FlexibleQuestion) => {
+  const config = question.config
+  const correctAnswer = config?.correctAnswer as string | undefined
+  const scoreCorrect = config?.scoreCorrect ?? 1
+  const scoreIncorrect = config?.scoreIncorrect ?? 0
+  
+  return {
+    correctAnswer,
+    scoreCorrect,
+    scoreIncorrect,
+    isCorrect: (option: string) => option === correctAnswer,
+    getScore: (option: string) => option === correctAnswer ? scoreCorrect : scoreIncorrect,
+  }
+}
+
+/**
+ * Mendapatkan informasi scoring untuk multiple choice
+ */
+export const getMultipleChoiceScoringInfo = (question: FlexibleQuestion) => {
+  const config = question.config
+  const correctAnswers = Array.isArray(config?.correctAnswer) 
+    ? config.correctAnswer 
+    : []
+  const scoreCorrect = config?.scoreCorrect ?? 1
+  
+  return {
+    correctAnswers,
+    scoreCorrect,
+    totalCorrect: correctAnswers.length,
+    isCorrect: (option: string) => correctAnswers.includes(option),
+    getScore: (option: string) => correctAnswers.includes(option) ? scoreCorrect : 0,
+  }
+}
+
+/**
+ * Mendapatkan informasi scoring untuk indicator table
+ */
+export const getIndicatorScoringInfo = (question: FlexibleQuestion) => {
+  const config = question.config
+  const indicators = config?.indicators || []
+  const scales = config?.indicatorScales || []
+  const showWeighted = config?.showWeightedScore || false
+  
+  return {
+    indicators,
+    scales,
+    showWeighted,
+    getScaleValue: (label: string) => {
+      const scale = scales.find(s => s.label === label)
+      return scale?.value || 0
+    },
+    getMaxScore: () => {
+      let max = 0
+      indicators.forEach(ind => {
+        const w = ind.weight || 1
+        max += showWeighted ? 5 * w : 5
+      })
+      return max
+    },
+  }
+}
+
+/**
+ * Mendapatkan informasi scoring untuk rating
+ */
+export const getRatingScoringInfo = (question: FlexibleQuestion) => {
+  const config = question.config
+  const maxRating = config?.ratingMax || 5
+  const weight = question.scoring?.weight || 1
+  
+  return {
+    maxRating,
+    weight,
+    getScore: (rating: number) => (rating / maxRating) * weight,
+  }
 }
