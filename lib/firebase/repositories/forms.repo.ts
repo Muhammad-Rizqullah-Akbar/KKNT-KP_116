@@ -21,29 +21,26 @@ import {
 
 // ============ TYPES ============
 
-// ===== NEW: Validation Type =====
 export interface FormValidation {
   mode: 'all_required' | 'all_required_except' | 'free'
   exceptions: string[]
   allowOverride: boolean
 }
 
-// ===== NEW: Stage Type =====
 export interface FormStage {
   id: string
   name: string
   order: number
   questionIds: string[]
+  includeInScoring?: boolean // <-- tambahan
 }
 
-// ===== NEW: Scoring Override Type =====
 export interface ScoringOverride {
   points: number
   defaultPoints: number
   reason?: string
 }
 
-// ===== NEW: Scoring Type =====
 export interface FormScoring {
   totalPoints: number
   mode: 'auto' | 'hybrid' | 'manual'
@@ -100,7 +97,6 @@ export interface FormQuestion {
   fileTypes?: string[]
   maxFileSize?: number
   dateFormat?: string
-  // ===== NEW FIELDS =====
   stageId?: string | null
   overridePoints?: number | null
 }
@@ -120,8 +116,6 @@ export interface FormData {
   updatedAt?: string
   createdBy?: string
   filledCount?: number
-  
-  // ===== NEW FIELDS =====
   validation?: FormValidation
   stages?: FormStage[]
   scoring?: FormScoring
@@ -213,7 +207,6 @@ const serializeQuestion = (q: any): any => {
       scheme: q.scoring?.scheme || 'none',
       weight: q.scoring?.weight || 1,
     },
-    // ===== NEW FIELDS =====
     stageId: q.stageId || null,
     overridePoints: q.overridePoints || null,
   }
@@ -269,7 +262,6 @@ const deserializeQuestion = (q: any): any => {
       scheme: q.scoring?.scheme || 'none',
       weight: q.scoring?.weight || 1,
     },
-    // ===== NEW FIELDS =====
     stageId: q.stageId || null,
     overridePoints: q.overridePoints || null,
   }
@@ -296,12 +288,14 @@ const cleanFormData = (data: any): any => {
   clean.createdBy = data.createdBy || ''
   clean.filledCount = data.filledCount || 0
   
-  // ===== NEW FIELDS =====
   if (data.validation) {
     clean.validation = data.validation
   }
   if (data.stages) {
-    clean.stages = data.stages
+    clean.stages = data.stages.map((s: any) => ({
+      ...s,
+      includeInScoring: s.includeInScoring ?? true,
+    }))
   }
   if (data.scoring) {
     clean.scoring = data.scoring
@@ -329,9 +323,11 @@ const deserializeFormData = (doc: any): FormData => {
     updatedAt: data.updatedAt?.toDate?.()?.toISOString() || data.updatedAt || '',
     createdBy: data.createdBy || '',
     filledCount: data.filledCount || 0,
-    // ===== NEW FIELDS =====
     validation: data.validation || { mode: 'all_required', exceptions: [], allowOverride: true },
-    stages: data.stages || [{ id: 'default', name: 'Semua Pertanyaan', order: 0, questionIds: [] }],
+    stages: (data.stages || []).map((s: any) => ({
+      ...s,
+      includeInScoring: s.includeInScoring ?? true,
+    })),
     scoring: data.scoring || { totalPoints: 100, mode: 'auto', distribution: {}, overrides: {}, allowOverride: true, autoBalance: true },
   }
 }
@@ -611,7 +607,6 @@ export const submitFormResponse = async (
         const type = q.answerType || q.type || 'short-text'
         const questionText = q.question || q.label || `Pertanyaan ${q.id}`
         
-        // ========== INDIKATOR TABLE / LIKERT ==========
         if (type === 'indicator-table' || type === 'likert') {
           const indicators = q.config?.indicators || []
           const statements = q.config?.statements || q.options || []
@@ -636,14 +631,12 @@ export const submitFormResponse = async (
             formattedAnswers[questionText] = tableAnswers
           }
         }
-        // ========== SIGNATURE ==========
         else if (type === 'signature') {
           const value = answers[q.id]
           if (value && value !== '' && value !== null) {
             formattedAnswers[questionText] = value
           }
         }
-        // ========== MULTIPLE CHOICE ==========
         else if (type === 'multiple-choice') {
           let value = answers[q.id]
           if (Array.isArray(value)) {
@@ -653,35 +646,30 @@ export const submitFormResponse = async (
             formattedAnswers[questionText] = value
           }
         }
-        // ========== RATING ==========
         else if (type === 'rating') {
           const value = answers[q.id]
           if (value !== undefined && value !== null && value !== '' && value !== 0) {
             formattedAnswers[questionText] = `${value}/${q.config?.ratingMax || 5}`
           }
         }
-        // ========== NUMBER ==========
         else if (type === 'number') {
           const value = answers[q.id]
           if (value !== undefined && value !== null && value !== '') {
             formattedAnswers[questionText] = Number(value)
           }
         }
-        // ========== DATE ==========
         else if (type === 'date') {
           const value = answers[q.id]
           if (value && value !== '') {
             formattedAnswers[questionText] = value
           }
         }
-        // ========== FILE UPLOAD ==========
         else if (type === 'file-upload') {
           const value = answers[q.id]
           if (value && value !== '') {
             formattedAnswers[questionText] = value
           }
         }
-        // ========== LAINNYA (single-choice, dropdown, short-text, long-text, binary) ==========
         else if (type !== 'image') {
           const value = answers[q.id]
           if (value !== undefined && value !== null && value !== '' && !(Array.isArray(value) && value.length === 0)) {
