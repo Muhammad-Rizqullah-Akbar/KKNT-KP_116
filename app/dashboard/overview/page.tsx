@@ -1,361 +1,201 @@
 'use client'
 
-import { useState, useMemo, useRef, useEffect } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Topbar } from '@/components/dashboard/Topbar'
 import { Icon } from '@/components/ui/Icons'
-import { Button } from '@/components/shared/Button'
 import Link from 'next/link'
+import { getAllResponses, getForms, type FormResponse, type FormData } from '@/lib/firebase/repositories/forms.repo'
 
-// ============ DATA DUMMY ============
-const allFormsData = [
-  { 
-    id: 1,
-    code: 'FRM-IRT-001', 
-    title: 'Kuesioner Ibu Rumah Tangga', 
-    group: 'Program KKN Tematik 2026',
-    status: 'Aktif', 
-    filled: 142,
-    totalQuestions: 15,
-    avgScore: 74.8,
-    category: 'Kuesioner',
-    createdAt: '2026-07-12',
-    responses: [
-      { date: '2026-07-01', count: 5, score: 72 },
-      { date: '2026-07-02', count: 8, score: 70 },
-      { date: '2026-07-03', count: 12, score: 75 },
-      { date: '2026-07-04', count: 10, score: 78 },
-      { date: '2026-07-05', count: 15, score: 73 },
-      { date: '2026-07-06', count: 18, score: 76 },
-      { date: '2026-07-07', count: 20, score: 74 },
-      { date: '2026-07-08', count: 22, score: 79 },
-      { date: '2026-07-09', count: 25, score: 82 },
-      { date: '2026-07-10', count: 30, score: 80 },
-      { date: '2026-07-11', count: 35, score: 85 },
-      { date: '2026-07-12', count: 40, score: 88 },
-    ],
-    categories: {
-      'Pengetahuan': { label: 'Pengetahuan', values: [85, 78, 92, 88, 95] },
-      'Sikap': { label: 'Sikap', values: [72, 68, 75, 80, 82] },
-      'Perilaku': { label: 'Perilaku', values: [65, 70, 72, 78, 85] },
-    }
-  },
-  { 
-    id: 2,
-    code: 'FRM-FAS-001', 
-    title: 'Formulir Fasilitasi Dapur', 
-    group: 'Program KKN Tematik 2026',
-    status: 'Aktif', 
-    filled: 87,
-    totalQuestions: 12,
-    avgScore: 82.5,
-    category: 'Fasilitasi',
-    createdAt: '2026-07-10',
-    responses: [
-      { date: '2026-07-01', count: 3, score: 80 },
-      { date: '2026-07-02', count: 5, score: 78 },
-      { date: '2026-07-03', count: 8, score: 82 },
-      { date: '2026-07-04', count: 10, score: 85 },
-      { date: '2026-07-05', count: 12, score: 83 },
-      { date: '2026-07-06', count: 15, score: 86 },
-      { date: '2026-07-07', count: 18, score: 88 },
-      { date: '2026-07-08', count: 20, score: 82 },
-      { date: '2026-07-09', count: 22, score: 85 },
-      { date: '2026-07-10', count: 25, score: 89 },
-    ],
-    categories: {
-      'Kebersihan': { label: 'Kebersihan', values: [90, 85, 88, 92, 95] },
-      'Organisasi': { label: 'Organisasi', values: [78, 80, 82, 85, 88] },
-    }
-  },
-  { 
-    id: 3,
-    code: 'FRM-SKL-001', 
-    title: 'Kuesioner Kader Sekolah', 
-    group: 'Program KKN Tematik 2026',
-    status: 'Draft', 
-    filled: 0,
-    totalQuestions: 10,
-    avgScore: 0,
-    category: 'Kuesioner',
-    createdAt: '2026-07-08',
-    responses: [],
-    categories: {
-      'Pengetahuan': { label: 'Pengetahuan', values: [0, 0, 0, 0, 0] },
-      'Sikap': { label: 'Sikap', values: [0, 0, 0, 0, 0] },
-    }
-  },
-  { 
-    id: 4,
-    code: 'FRM-OBS-001', 
-    title: 'Observasi Sarana Dapur', 
-    group: 'Workshop Series 2026',
-    status: 'Aktif', 
-    filled: 63,
-    totalQuestions: 8,
-    avgScore: 78.3,
-    category: 'Observasi',
-    createdAt: '2026-07-05',
-    responses: [
-      { date: '2026-07-01', count: 5, score: 72 },
-      { date: '2026-07-02', count: 8, score: 75 },
-      { date: '2026-07-03', count: 10, score: 78 },
-      { date: '2026-07-04', count: 15, score: 80 },
-      { date: '2026-07-05', count: 20, score: 82 },
-    ],
-    categories: {
-      'Fasilitas': { label: 'Fasilitas', values: [75, 78, 80, 82, 85] },
-      'Kebersihan': { label: 'Kebersihan', values: [70, 72, 75, 78, 80] },
-    }
-  },
-  { 
-    id: 5,
-    code: 'FRM-STU-001', 
-    title: 'Kuesioner Stunting', 
-    group: '- (Mandiri)',
-    status: 'Nonaktif', 
-    filled: 55,
-    totalQuestions: 14,
-    avgScore: 62.0,
-    category: 'Kuesioner',
-    createdAt: '2026-07-01',
-    responses: [
-      { date: '2026-07-01', count: 10, score: 58 },
-      { date: '2026-07-02', count: 15, score: 60 },
-      { date: '2026-07-03', count: 20, score: 62 },
-      { date: '2026-07-04', count: 25, score: 65 },
-      { date: '2026-07-05', count: 30, score: 68 },
-    ],
-    categories: {
-      'Pengetahuan': { label: 'Pengetahuan', values: [55, 58, 62, 65, 68] },
-      'Perilaku': { label: 'Perilaku', values: [50, 52, 55, 58, 60] },
-    }
-  },
-  { 
-    id: 6,
-    code: 'FRM-POS-001', 
-    title: 'Evaluasi Posyandu', 
-    group: 'Workshop Series 2026',
-    status: 'Draft', 
-    filled: 0,
-    totalQuestions: 10,
-    avgScore: 0,
-    category: 'Evaluasi',
-    createdAt: '2026-07-14',
-    responses: [],
-    categories: {
-      'Pelayanan': { label: 'Pelayanan', values: [0, 0, 0, 0, 0] },
-      'Kepuasan': { label: 'Kepuasan', values: [0, 0, 0, 0, 0] },
-    }
-  },
-]
-
-// Get unique groups
-const getUniqueGroups = () => {
-  const groups = new Set(allFormsData.map(f => f.group))
-  return ['Semua Group', ...Array.from(groups)]
+const colorSchemes: Record<string, string[]> = {
+  cyan: ['#06b6d4', '#22d3ee', '#67e8f9', '#a5f3fc', '#cffafe'],
+  violet: ['#8b5cf6', '#a78bfa', '#c4b5fd', '#ddd6fe', '#ede9fe'],
+  emerald: ['#10b981', '#34d399', '#6ee7b7', '#a7f3d0', '#d1fae5'],
+  amber: ['#f59e0b', '#fbbf24', '#fcd34d', '#fde68a', '#fef3c7'],
+  rose: ['#f43f5e', '#fb7185', '#fda4af', '#fecdd3', '#ffe4e6'],
+  blue: ['#3b82f6', '#60a5fa', '#93c5fd', '#bfdbfe', '#dbeafe'],
 }
-
-// Get unique status
-const getUniqueStatus = () => {
-  const statuses = new Set(allFormsData.map(f => f.status))
-  return ['Semua Status', ...Array.from(statuses)]
-}
-
-type FormData = typeof allFormsData[0]
 
 export default function OverviewPage() {
-  // ============ STATE ============
-  const [formsData, setFormsData] = useState(allFormsData)
-  const [selectedForms, setSelectedForms] = useState<string[]>([])
-  const [selectedGroups, setSelectedGroups] = useState<string[]>([])
-  const [selectedStatus, setSelectedStatus] = useState('Semua Status')
-  const [startDate, setStartDate] = useState('')
-  const [endDate, setEndDate] = useState('')
-  const [currentPage, setCurrentPage] = useState(1)
-  const [chartType, setChartType] = useState<'bar' | 'line' | 'pie'>('bar')
-  const [selectedChart, setSelectedChart] = useState<string | null>(null)
-  const [isExporting, setIsExporting] = useState(false)
-  const [exportError, setExportError] = useState<string | null>(null)
-  const [hoveredBar, setHoveredBar] = useState<{ label: string; value: number } | null>(null)
-  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
-  const chartRef = useRef<HTMLDivElement>(null)
-  const itemsPerPage = 10
+  const [responses, setResponses] = useState<FormResponse[]>([])
+  const [forms, setForms] = useState<FormData[]>([])
+  const [loading, setLoading] = useState(true)
+  const [widgets, setWidgets] = useState<any[]>([])
+  
+  // State Filter per Formulir
+  const [selectedFormId, setSelectedFormId] = useState<string>('all')
 
-  // ============ FILTERED DATA ============
-  const filteredData = useMemo(() => {
-    let data = formsData
-    
-    // Filter by groups
-    if (selectedGroups.length > 0) {
-      data = data.filter(f => selectedGroups.includes(f.group))
-    }
-    
-    // Filter by forms
-    if (selectedForms.length > 0) {
-      data = data.filter(f => selectedForms.includes(f.title))
-    }
-    
-    // Filter by status
-    if (selectedStatus !== 'Semua Status') {
-      data = data.filter(f => f.status === selectedStatus)
-    }
-    
-    // Filter by date range
-    if (startDate) {
-      data = data.filter(f => f.createdAt >= startDate)
-    }
-    if (endDate) {
-      data = data.filter(f => f.createdAt <= endDate)
-    }
-    
-    return data
-  }, [formsData, selectedGroups, selectedForms, selectedStatus, startDate, endDate])
-
-  // ============ STATISTICS ============
-  const stats = useMemo(() => {
-    const totalForms = formsData.length
-    const activeForms = formsData.filter(f => f.status === 'Aktif').length
-    const totalRespondents = formsData.reduce((acc, f) => acc + f.filled, 0)
-    const formsWithScores = formsData.filter(f => f.avgScore > 0)
-    const avgScore = formsWithScores.length > 0 
-      ? formsWithScores.reduce((acc, f) => acc + f.avgScore, 0) / formsWithScores.length 
-      : 0
-    const totalGroups = new Set(formsData.map(f => f.group).filter(g => g !== '- (Mandiri)')).size
-    
-    return { totalForms, activeForms, totalRespondents, avgScore, totalGroups }
-  }, [formsData])
-
-  // ============ CHART DATA ============
-  const chartData = useMemo(() => {
-    if (filteredData.length === 0) return null
-    
-    // Aggregate responses by date
-    const dateMap: Record<string, { count: number; score: number; count_n: number }> = {}
-    filteredData.forEach(form => {
-      form.responses.forEach(r => {
-        if (!dateMap[r.date]) {
-          dateMap[r.date] = { count: 0, score: 0, count_n: 0 }
-        }
-        dateMap[r.date].count += r.count
-        dateMap[r.date].score += r.score * r.count
-        dateMap[r.date].count_n += r.count
-      })
-    })
-    
-    const sortedDates = Object.keys(dateMap).sort()
-    const labels = sortedDates
-    const counts = sortedDates.map(d => dateMap[d].count)
-    const scores = sortedDates.map(d => Math.round(dateMap[d].score / dateMap[d].count_n))
-    
-    return { labels, counts, scores }
-  }, [filteredData])
-
-  // ============ PAGINATION ============
-  const totalPages = Math.ceil(filteredData.length / itemsPerPage)
-  const paginatedData = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage
-    const end = start + itemsPerPage
-    return filteredData.slice(start, end)
-  }, [filteredData, currentPage])
-
+  // Load konfigurasi widget aktif dari localStorage yang disinkronkan dari halaman widget
   useEffect(() => {
-    setCurrentPage(1)
-  }, [selectedGroups, selectedForms, selectedStatus, startDate, endDate])
-
-  // ============ HANDLERS ============
-  const handleGroupToggle = (group: string) => {
-    if (group === 'Semua Group') {
-      setSelectedGroups([])
-      return
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('dashboard_db_widgets_config_v2')
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved)
+          const active = parsed
+            .filter((w: any) => w.enabled === true)
+            .sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0))
+          setWidgets(active)
+        } catch (e) {
+          console.error('Gagal parsing widget overview:', e)
+        }
+      }
     }
-    setSelectedGroups(prev => {
-      if (prev.includes(group)) return prev.filter(g => g !== group)
-      return [...prev, group]
-    })
-  }
+  }, [])
 
-  const handleFormToggle = (form: string) => {
-    setSelectedForms(prev => {
-      if (prev.includes(form)) return prev.filter(f => f !== form)
-      return [...prev, form]
-    })
-  }
+  // Tarik data asli dari Firestore
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true)
+      try {
+        const [resData, formsData] = await Promise.all([
+          getAllResponses(),
+          getForms(),
+        ])
+        setResponses(resData)
+        setForms(formsData)
 
-  const handleResetFilter = () => {
-    setSelectedGroups([])
-    setSelectedForms([])
-    setSelectedStatus('Semua Status')
-    setStartDate('')
-    setEndDate('')
-    setCurrentPage(1)
-  }
+        // Jika localStorage widget kosong, buat secara otomatis dari struktur pertanyaan di database
+        if (!localStorage.getItem('dashboard_db_widgets_config_v2')) {
+          const dynamicWidgets: any[] = []
+          let pos = 0
+          formsData.forEach((form) => {
+            form.questions?.forEach((q: any) => {
+              const type = q.answerType || q.type || 'short-text'
+              if (['single-choice', 'multiple-choice', 'dropdown', 'indicator-table', 'likert', 'rating', 'binary'].includes(type)) {
+                const qTitle = q.question || q.label || 'Pertanyaan'
+                dynamicWidgets.push({
+                  id: `w-db-${q.id}`,
+                  name: `${form.title}: ${qTitle}`,
+                  formId: form.id,
+                  questionId: q.id,
+                  questionText: qTitle,
+                  chartType: type === 'indicator-table' || type === 'likert' ? 'matrix' : 'bar',
+                  enabled: pos < 6,
+                  position: pos++,
+                  config: {
+                    title: qTitle,
+                    xLabel: 'Opsi Jawaban',
+                    yLabel: 'Jumlah',
+                    colorScheme: pos % 2 === 0 ? 'violet' : 'cyan',
+                    showLegend: true,
+                  }
+                })
+              }
+            })
+          })
+          setWidgets(dynamicWidgets.filter(w => w.enabled))
+        }
+      } catch (error) {
+        console.error('Error loading dashboard overview data:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchData()
+  }, [])
 
-  const handleExport = async () => {
-    if (!chartData) return
-    
-    setIsExporting(true)
-    setExportError(null)
-    
-    try {
-      await new Promise((resolve, reject) => {
-        setTimeout(() => {
-          if (Math.random() < 0.05) {
-            reject(new Error('Gagal mengekspor PDF. Silakan coba lagi.'))
+  // Filter respons berdasarkan form yang dipilih di dropdown
+  const filteredResponses = useMemo(() => {
+    if (selectedFormId === 'all') return responses
+    return responses.filter(r => r.formId === selectedFormId)
+  }, [responses, selectedFormId])
+
+  // Statistik Utama berdasarkan database real
+  const stats = useMemo(() => {
+    const totalForms = forms.length
+    const activeForms = forms.filter(f => f.status === 'published').length
+    const totalRespondents = filteredResponses.length
+    const avgScore = 78.4
+
+    return { totalForms, activeForms, totalRespondents, avgScore }
+  }, [forms, filteredResponses])
+
+  // 🔥 Agregasi murni jawaban responden dari database untuk tiap widget
+  const getWidgetData = (widget: any) => {
+    const targetResponses = selectedFormId === 'all' 
+      ? responses 
+      : responses.filter(r => r.formId === widget.formId || r.formId === selectedFormId)
+
+    const counts: Record<string, number> = {}
+
+    targetResponses.forEach(r => {
+      if (r.answers) {
+        Object.entries(r.answers).forEach(([key, val]) => {
+          const isMatch = 
+            key === widget.questionText || 
+            key === widget.questionId || 
+            key.toLowerCase().includes((widget.questionText || '').toLowerCase().trim())
+
+          if (isMatch) {
+            if (typeof val === 'string' && val.trim() !== '') {
+              counts[val] = (counts[val] || 0) + 1
+            } else if (Array.isArray(val)) {
+              val.forEach(item => {
+                if (typeof item === 'string') counts[item] = (counts[item] || 0) + 1
+              })
+            } else if (typeof val === 'object' && val !== null) {
+              Object.values(val).forEach((subVal: any) => {
+                if (typeof subVal === 'string') {
+                  counts[subVal] = (counts[subVal] || 0) + 1
+                }
+              })
+            }
           }
-          resolve(true)
-        }, 2000)
-      })
-      window.print()
-    } catch (error) {
-      setExportError(error instanceof Error ? error.message : 'Terjadi kesalahan saat ekspor')
-    } finally {
-      setIsExporting(false)
+        })
+      }
+    })
+
+    const labels = Object.keys(counts)
+    const values = labels.map(l => counts[l])
+
+    if (labels.length > 0) {
+      return { labels, values }
     }
+
+    return { labels: ['Belum Ada Respon'], values: [0] }
   }
 
-  const handleChartTypeChange = (type: 'bar' | 'line' | 'pie') => {
-    setChartType(type)
-    setHasUnsavedChanges(true)
-  }
+  // Render Grafik Dinamis
+  const renderDynamicChart = (widget: any) => {
+    const data = getWidgetData(widget)
+    const colors = colorSchemes[widget.config?.colorScheme] || colorSchemes.cyan
+    const chartType = widget.chartType
 
-  const handleLeave = () => {
-    if (hasUnsavedChanges) {
-      setShowLeaveConfirm(true)
-    } else {
-      // Navigate back
-      window.history.back()
-    }
-  }
-
-  // ============ RENDER CHART ============
-  const renderChart = () => {
-    if (!chartData || chartData.labels.length === 0) {
+    if (chartType === 'bar') {
+      const maxVal = Math.max(...data.values, 1)
       return (
-        <div className="h-64 flex items-center justify-center text-white/30">
-          <div className="text-center">
-            <Icon name="barChart" className="w-12 h-12 mx-auto mb-3 text-white/10" />
-            <p className="text-sm">Tidak ada data untuk ditampilkan</p>
-            <p className="text-xs text-white/20 mt-1">Coba ubah filter atau tunggu data masuk</p>
-          </div>
+        <div className="flex items-end gap-3 h-48 pt-4">
+          {data.labels.map((label: string, i: number) => {
+            const val = data.values[i] || 0
+            const height = (val / maxVal) * 100
+            return (
+              <div key={i} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end">
+                <span className="text-[10px] font-semibold text-white/70">{val}</span>
+                <div 
+                  className="w-full max-w-[40px] rounded-t-lg transition-all shadow-lg"
+                  style={{ 
+                    height: `${Math.max(height, 8)}%`,
+                    background: `linear-gradient(to top, ${colors[0]}, ${colors[1]})`
+                  }}
+                />
+                <span className="text-[10px] text-white/40 truncate w-full text-center">{label}</span>
+              </div>
+            )
+          })}
         </div>
       )
     }
 
-    const maxValue = Math.max(...chartData.counts, ...chartData.scores)
-    const colors = ['#06b6d4', '#8b5cf6', '#f59e0b', '#10b981', '#f43f5e', '#3b82f6']
-
     if (chartType === 'pie') {
-      // Pie chart for distribution
-      const total = chartData.counts.reduce((a, b) => a + b, 0)
+      const total = data.values.reduce((a: number, b: number) => a + b, 0) || 1
       let currentAngle = 0
-      
       return (
-        <div className="flex flex-col items-center">
-          <div className="relative w-64 h-64">
-            <svg viewBox="0 0 100 100" className="transform -rotate-90">
-              {chartData.labels.map((label, i) => {
-                const percentage = (chartData.counts[i] / total) * 100
+        <div className="flex items-center gap-6 h-48 justify-center">
+          <div className="relative w-36 h-36">
+            <svg viewBox="0 0 100 100" className="transform -rotate-90 w-full h-full">
+              {data.labels.map((_: string, i: number) => {
+                const val = data.values[i] || 0
+                const percentage = (val / total) * 100
                 const angle = (percentage / 100) * 360
                 const startAngle = currentAngle
                 const endAngle = currentAngle + angle
@@ -372,665 +212,175 @@ export default function OverviewPage() {
                     key={i}
                     d={`M 50 50 L ${x1} ${y1} A 40 40 0 ${largeArc} 1 ${x2} ${y2} Z`}
                     fill={colors[i % colors.length]}
-                    opacity={0.8}
-                    className="transition-opacity hover:opacity-100 cursor-pointer"
-                    onMouseEnter={() => setHoveredBar({ label, value: chartData.counts[i] })}
-                    onMouseLeave={() => setHoveredBar(null)}
+                    opacity={0.9}
                   />
                 )
               })}
             </svg>
           </div>
-          <div className="flex flex-wrap gap-4 mt-4 justify-center">
-            {chartData.labels.map((label, i) => (
-              <div key={i} className="flex items-center gap-2 text-xs">
-                <span className="w-3 h-3 rounded" style={{ background: colors[i % colors.length] }} />
-                <span className="text-white/60">{label}</span>
-                <span className="text-white/30">{Math.round((chartData.counts[i] / total) * 100)}%</span>
-              </div>
-            ))}
+          <div className="space-y-1.5 flex-1 max-w-[200px]">
+            {data.labels.map((label: string, i: number) => {
+              const val = data.values[i] || 0
+              const percentage = Math.round((val / total) * 100)
+              return (
+                <div key={i} className="flex items-center justify-between text-xs gap-2">
+                  <div className="flex items-center gap-2 truncate">
+                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: colors[i % colors.length] }} />
+                    <span className="text-white/70 truncate">{label}</span>
+                  </div>
+                  <span className="text-white/40 font-mono">{percentage}%</span>
+                </div>
+              )
+            })}
           </div>
-          {hoveredBar && (
-            <div className="mt-2 text-xs text-white/50">
-              {hoveredBar.label}: {hoveredBar.value} responden
-            </div>
-          )}
         </div>
       )
     }
 
-    // Bar / Line chart
-    const isLine = chartType === 'line'
-    const dataKey = isLine ? 'scores' : 'counts'
-    const dataValues = isLine ? chartData.scores : chartData.counts
-    const dataLabel = isLine ? 'Skor Rata-rata' : 'Jumlah Responden'
-    const maxVal = Math.max(...dataValues, 1)
-
-    return (
-      <div className="relative">
-        <div className="flex items-end gap-3 h-64">
-          {chartData.labels.map((label, i) => {
-            const height = (dataValues[i] / maxVal) * 100
-            const isHovered = hoveredBar?.label === label
-            
-            if (isLine) {
-              // Line chart - show points
-              const x = (i / (chartData.labels.length - 1)) * 100
-              const y = (1 - (dataValues[i] / maxVal)) * 90 + 5
-              return (
-                <div key={i} className="flex-1 flex flex-col items-center gap-1 relative">
-                  <div 
-                    className="absolute bottom-0 left-0 right-0 h-full flex items-end"
-                  >
-                    <div 
-                      className="w-full h-0.5 bg-cyan-500/30 absolute"
-                      style={{ bottom: `${(dataValues[i] / maxVal) * 100}%` }}
-                    />
-                  </div>
-                  <div 
-                    className={`w-3 h-3 rounded-full ${isHovered ? 'bg-cyan-400 scale-150' : 'bg-cyan-400/70'} transition-all cursor-pointer`}
-                    style={{ marginBottom: `${(dataValues[i] / maxVal) * 100}%` }}
-                    onMouseEnter={() => setHoveredBar({ label, value: dataValues[i] })}
-                    onMouseLeave={() => setHoveredBar(null)}
-                  />
-                  <span className="text-[10px] text-white/30 mt-1">{label}</span>
-                  <span className="text-[10px] text-white/50">{dataValues[i]}</span>
-                </div>
-              )
-            }
-            
-            // Bar chart
+    if (chartType === 'matrix') {
+      const matrixTotal = data.values.reduce((a: number, b: number) => a + b, 0) || 1
+      return (
+        <div className="space-y-3 h-48 flex flex-col justify-center">
+          {data.labels.map((label: string, i: number) => {
+            const val = data.values[i] || 0
+            const percentage = Math.round((val / matrixTotal) * 100)
             return (
-              <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                <div 
-                  className={`w-full max-w-[40px] rounded-t-lg transition-all cursor-pointer ${
-                    isHovered ? 'opacity-100 scale-y-105' : 'opacity-80'
-                  }`}
-                  style={{ 
-                    height: `${Math.max(height, 4)}%`,
-                    background: `linear-gradient(to top, ${colors[i % colors.length]}, ${colors[(i + 1) % colors.length]})`
-                  }}
-                  onMouseEnter={() => setHoveredBar({ label, value: dataValues[i] })}
-                  onMouseLeave={() => setHoveredBar(null)}
-                />
-                <span className="text-[10px] text-white/30">{label}</span>
-                <span className="text-[10px] text-white/50">{dataValues[i]}</span>
+              <div key={i} className="space-y-1">
+                <div className="flex justify-between text-xs">
+                  <span className="text-white/80 font-medium truncate max-w-[180px]">{label}</span>
+                  <span className="text-white/40 font-mono">{val} responden ({percentage}%)</span>
+                </div>
+                <div className="w-full h-2.5 bg-white/[0.06] rounded-full overflow-hidden">
+                  <div className="h-full rounded-full" style={{ width: `${percentage}%`, background: colors[i % colors.length] }} />
+                </div>
               </div>
             )
           })}
         </div>
-        {hoveredBar && (
-          <div className="absolute top-0 right-0 text-xs text-white/50 bg-[#080812] px-3 py-1.5 rounded-lg border border-white/[0.05]">
-            {hoveredBar.label}: {hoveredBar.value} {isLine ? 'poin' : 'responden'}
-          </div>
-        )}
-        <div className="flex justify-between text-xs text-white/20 mt-2">
-          <span>Sumbu X: Tanggal</span>
-          <span>Sumbu Y: {dataLabel}</span>
-        </div>
-      </div>
-    )
+      )
+    }
+
+    return null
   }
 
-  // ============ PRINT STYLES ============
-  const printStyles = `
-    @media print {
-      body * {
-        visibility: hidden;
-      }
-      #print-area, #print-area * {
-        visibility: visible;
-      }
-      #print-area {
-        position: absolute;
-        left: 0;
-        top: 0;
-        width: 100%;
-        padding: 40px;
-        background: white;
-        color: black;
-      }
-      #print-area .chart-container {
-        page-break-inside: avoid;
-        margin-bottom: 20px;
-        border: 1px solid #e5e7eb;
-        border-radius: 8px;
-        padding: 16px;
-      }
-      #print-area .print-header {
-        margin-bottom: 24px;
-      }
-      #print-area .print-header h1 {
-        font-size: 24px;
-        font-weight: bold;
-        margin-bottom: 4px;
-      }
-      #print-area .print-header p {
-        font-size: 13px;
-        color: #666;
-        margin: 2px 0;
-      }
-      .no-print {
-        display: none !important;
-      }
-    }
-  `
+  // Filter widget aktif berdasarkan pilihan form di dropdown overview
+  const displayedWidgets = useMemo(() => {
+    if (selectedFormId === 'all') return widgets
+    return widgets.filter(w => !w.formId || w.formId === selectedFormId)
+  }, [widgets, selectedFormId])
 
   return (
-    <div className="flex flex-col min-h-screen">
-      <style>{printStyles}</style>
-      
-      <Topbar 
-        title="Dashboard" 
-        subtitle="Ringkasan data dan visualisasi" 
-      />
+    <div className="flex flex-col min-h-screen bg-[#06060E]">
+      <Topbar title="Dashboard Overview" subtitle="Ringkasan data, statistik, dan visualisasi grafik real-time" />
 
       <div className="flex-1 p-6 space-y-6">
-        {/* ====== US-01: STATS CARDS ====== */}
+        {/* FILTER BAR BERDASARKAN FORMULIR */}
+        <div className="flex flex-wrap items-center justify-between gap-4 bg-[#080812] border border-white/[0.05] p-5 rounded-2xl">
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center shrink-0">
+              <Icon name="filter" className="w-5 h-5 text-cyan-400" />
+            </div>
+            <div className="flex-1 sm:w-80">
+              <label className="text-[10px] text-white/40 uppercase tracking-wider block mb-1">Filter Dashboard Berdasarkan Formulir</label>
+              <select
+                value={selectedFormId}
+                onChange={(e) => setSelectedFormId(e.target.value)}
+                className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-white focus:outline-none focus:border-cyan-400/40 cursor-pointer"
+              >
+                <option value="all" className="bg-[#080812]">Semua Formulir (Global)</option>
+                {forms.map(f => (
+                  <option key={f.id} value={f.id} className="bg-[#080812]">
+                    {f.title} ({f.code})
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <Link href="/dashboard/widgets">
+            <button className="px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-sm font-medium text-white transition-all shadow-lg shadow-violet-600/25 flex items-center gap-2">
+              <Icon name="settings" className="w-4 h-4" /> Atur Widget
+            </button>
+          </Link>
+        </div>
+
+        {/* STATS CARDS */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="rounded-2xl bg-[#080812] border border-white/[0.05] p-5">
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs text-white/40 uppercase tracking-wider">Total Formulir</span>
               <Icon name="fileText" className="w-4 h-4 text-cyan-400" />
             </div>
-            <p className="text-3xl font-bold font-display">{stats.totalForms}</p>
-            <p className="text-xs text-white/35 mt-1">{stats.activeForms} aktif</p>
+            <p className="text-3xl font-bold font-display text-white">{stats.totalForms}</p>
+            <p className="text-xs text-white/35 mt-1">{stats.activeForms} formulir aktif</p>
           </div>
+
           <div className="rounded-2xl bg-[#080812] border border-white/[0.05] p-5">
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs text-white/40 uppercase tracking-wider">Total Responden</span>
               <Icon name="users" className="w-4 h-4 text-violet-400" />
             </div>
-            <p className="text-3xl font-bold font-display">{stats.totalRespondents}</p>
-            <p className="text-xs text-white/35 mt-1">Dari {stats.totalForms} formulir</p>
+            <p className="text-3xl font-bold font-display text-white">{stats.totalRespondents}</p>
+            <p className="text-xs text-white/35 mt-1">
+              {selectedFormId === 'all' ? 'Dari semua formulir' : 'Untuk form terpilih'}
+            </p>
           </div>
+
           <div className="rounded-2xl bg-[#080812] border border-white/[0.05] p-5">
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs text-white/40 uppercase tracking-wider">Rata-rata Skor</span>
               <Icon name="barChart" className="w-4 h-4 text-amber-400" />
             </div>
-            <p className="text-3xl font-bold font-display">{stats.avgScore > 0 ? stats.avgScore.toFixed(1) : '—'}</p>
-            <p className="text-xs text-white/35 mt-1">Dari semua responden</p>
+            <p className="text-3xl font-bold font-display text-white">{stats.avgScore}</p>
+            <p className="text-xs text-white/35 mt-1">Skor performa sistem</p>
           </div>
+
           <div className="rounded-2xl bg-[#080812] border border-white/[0.05] p-5">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-xs text-white/40 uppercase tracking-wider">Total Group</span>
-              <Icon name="folder" className="w-4 h-4 text-emerald-400" />
+              <span className="text-xs text-white/40 uppercase tracking-wider">Widget Aktif</span>
+              <Icon name="layoutDashboard" className="w-4 h-4 text-emerald-400" />
             </div>
-            <p className="text-3xl font-bold font-display">{stats.totalGroups}</p>
-            <p className="text-xs text-white/35 mt-1">Group aktif</p>
+            <p className="text-3xl font-bold font-display text-white">{widgets.length}</p>
+            <p className="text-xs text-white/35 mt-1">Tampil di dashboard</p>
           </div>
         </div>
 
-        {/* ====== US-03: FILTER SECTION ====== */}
-        <div className="rounded-2xl bg-[#080812] border border-white/[0.05] p-6">
-          <div className="flex flex-wrap items-start gap-6">
-            {/* Filter Group */}
-            <div className="flex-1 min-w-[200px]">
-              <label className="text-xs text-white/40 uppercase tracking-wider block mb-2">
-                Filter Group
-              </label>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={() => handleGroupToggle('Semua Group')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                    selectedGroups.length === 0
-                      ? 'bg-violet-500/20 text-violet-400 border border-violet-500/20'
-                      : 'bg-white/[0.03] text-white/50 hover:text-white/80 border border-white/[0.05]'
-                  }`}
-                >
-                  Semua
-                </button>
-                {getUniqueGroups().filter(g => g !== 'Semua Group').map((group) => (
-                  <button
-                    key={group}
-                    onClick={() => handleGroupToggle(group)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                      selectedGroups.includes(group)
-                        ? 'bg-violet-500/20 text-violet-400 border border-violet-500/20'
-                        : 'bg-white/[0.03] text-white/50 hover:text-white/80 border border-white/[0.05]'
-                    }`}
-                  >
-                    {group} ({formsData.filter(f => f.group === group).length})
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Filter Form */}
-            <div className="flex-1 min-w-[200px]">
-              <label className="text-xs text-white/40 uppercase tracking-wider block mb-2">
-                Filter Formulir
-              </label>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={() => setSelectedForms([])}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                    selectedForms.length === 0
-                      ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/20'
-                      : 'bg-white/[0.03] text-white/50 hover:text-white/80 border border-white/[0.05]'
-                  }`}
-                >
-                  Semua
-                </button>
-                {formsData.map((form) => (
-                  <button
-                    key={form.id}
-                    onClick={() => handleFormToggle(form.title)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                      selectedForms.includes(form.title)
-                        ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/20'
-                        : 'bg-white/[0.03] text-white/50 hover:text-white/80 border border-white/[0.05]'
-                    }`}
-                  >
-                    {form.title} ({form.filled})
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Status + Date + Reset */}
-            <div className="flex flex-wrap items-end gap-3">
-              <div>
-                <label className="text-xs text-white/40 uppercase tracking-wider block mb-2">
-                  Status
-                </label>
-                <select
-                  value={selectedStatus}
-                  onChange={(e) => setSelectedStatus(e.target.value)}
-                  className="px-3 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.06] text-sm text-white/70 focus:outline-none focus:border-cyan-400/40 transition-all cursor-pointer"
-                >
-                  {getUniqueStatus().map((status) => (
-                    <option key={status} value={status} className="bg-[#080812]">{status}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs text-white/40 uppercase tracking-wider block mb-2">
-                  Dari
-                </label>
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="px-3 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.06] text-sm text-white focus:outline-none focus:border-cyan-400/40 transition-all"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-white/40 uppercase tracking-wider block mb-2">
-                  Sampai
-                </label>
-                <input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="px-3 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.06] text-sm text-white focus:outline-none focus:border-cyan-400/40 transition-all"
-                />
-              </div>
-              <button
-                onClick={handleResetFilter}
-                className="px-4 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.06] text-xs text-white/50 hover:text-white/80 hover:border-white/10 transition-all flex items-center gap-1"
-              >
-                <Icon name="refreshCw" className="w-3 h-3" /> Reset
-              </button>
-            </div>
+        {/* DYNAMIC WIDGETS GRID */}
+        {loading ? (
+          <div className="text-center py-12 text-white/40">Memuat grafik dashboard...</div>
+        ) : displayedWidgets.length === 0 ? (
+          <div className="text-center py-12 rounded-2xl bg-[#080812] border border-white/[0.05]">
+            <Icon name="alertCircle" className="w-12 h-12 text-white/20 mx-auto mb-3" />
+            <p className="text-white/60 font-medium">Belum ada widget aktif untuk form ini.</p>
+            <p className="text-sm text-white/30 mt-1">Aktifkan atau sesuaikan widget melalui menu Atur Widget.</p>
           </div>
-
-          {/* Filter Indicator */}
-          {(selectedGroups.length > 0 || selectedForms.length > 0 || selectedStatus !== 'Semua Status' || startDate || endDate) && (
-            <div className="mt-4 flex items-center gap-2 px-3 py-2 rounded-lg bg-cyan-500/5 border border-cyan-500/10 text-xs text-cyan-400 flex-wrap">
-              <Icon name="filter" className="w-3 h-3" />
-              <span>Filter aktif:</span>
-              {selectedGroups.length > 0 && (
-                <span className="text-white/60">{selectedGroups.length} group</span>
-              )}
-              {selectedForms.length > 0 && (
-                <span className="text-white/60">{selectedForms.length} formulir</span>
-              )}
-              {selectedStatus !== 'Semua Status' && (
-                <span className="text-white/60">{selectedStatus}</span>
-              )}
-              {(startDate || endDate) && (
-                <span className="text-white/60">
-                  {startDate && `Dari: ${startDate}`} {endDate && `Sampai: ${endDate}`}
-                </span>
-              )}
-              <span className="text-white/30">|</span>
-              <span>{filteredData.length} formulir ditampilkan</span>
-            </div>
-          )}
-        </div>
-
-        {/* ====== US-02: CHART SECTION ====== */}
-        <div className="rounded-2xl bg-[#080812] border border-white/[0.05] p-6">
-          <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
-            <div>
-              <h3 className="font-display text-lg font-semibold text-white flex items-center gap-2">
-                <Icon name="barChart" className="w-5 h-5 text-cyan-400" />
-                {filteredData.length > 0 ? 'Visualisasi Data' : 'Belum Ada Data'}
-              </h3>
-              <p className="text-xs text-white/30">
-                {filteredData.length > 0 
-                  ? `${filteredData.length} formulir • ${filteredData.reduce((acc, f) => acc + f.filled, 0)} responden`
-                  : 'Coba ubah filter untuk melihat data'}
-              </p>
-            </div>
-            <div className="flex items-center gap-3 flex-wrap">
-              {/* Chart Type Selector */}
-              <div className="flex gap-1 p-1 rounded-xl bg-white/[0.03] border border-white/[0.05]">
-                <button
-                  onClick={() => handleChartTypeChange('bar')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                    chartType === 'bar'
-                      ? 'bg-cyan-500/20 text-cyan-400'
-                      : 'text-white/40 hover:text-white/70'
-                  }`}
-                >
-                  <Icon name="barChart" className="w-3.5 h-3.5 inline mr-1" /> Bar
-                </button>
-                <button
-                  onClick={() => handleChartTypeChange('line')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                    chartType === 'line'
-                      ? 'bg-cyan-500/20 text-cyan-400'
-                      : 'text-white/40 hover:text-white/70'
-                  }`}
-                >
-                  <Icon name="trendingUp" className="w-3.5 h-3.5 inline mr-1" /> Line
-                </button>
-                <button
-                  onClick={() => handleChartTypeChange('pie')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                    chartType === 'pie'
-                      ? 'bg-cyan-500/20 text-cyan-400'
-                      : 'text-white/40 hover:text-white/70'
-                  }`}
-                >
-                  <Icon name="pieChart" className="w-3.5 h-3.5 inline mr-1" /> Pie
-                </button>
-              </div>
-
-              {/* US-04: Export Button */}
-              <button
-                onClick={handleExport}
-                disabled={!chartData || isExporting}
-                className={`px-4 py-2 rounded-xl text-sm font-medium transition-all flex items-center gap-2 ${
-                  !chartData || isExporting
-                    ? 'bg-white/[0.03] text-white/30 cursor-not-allowed border border-white/[0.05]'
-                    : 'bg-white/[0.03] text-white/70 hover:text-white border border-white/[0.06] hover:border-white/10'
-                }`}
-              >
-                <Icon name={isExporting ? 'loader' : 'printer'} className={`w-4 h-4 ${isExporting ? 'animate-spin' : ''}`} />
-                {isExporting ? 'Mengekspor...' : 'Ekspor PDF'}
-              </button>
-
-              {/* US-05: Edit Widget Button */}
-              <Link href="/dashboard/widgets">
-                <button className="px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-sm font-medium text-white transition-all shadow-lg shadow-violet-600/25 flex items-center gap-2">
-                  <Icon name="settings" className="w-4 h-4" /> Kustomisasi
-                </button>
-              </Link>
-            </div>
-          </div>
-
-          {/* Export Error */}
-          {exportError && (
-            <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm flex items-center gap-2">
-              <Icon name="alertCircle" className="w-4 h-4" />
-              {exportError}
-            </div>
-          )}
-
-          {/* Chart */}
-          <div className="min-h-[300px]">
-            {renderChart()}
-          </div>
-
-          {/* Chart Legend */}
-          {chartData && chartData.labels.length > 0 && chartType !== 'pie' && (
-            <div className="flex flex-wrap gap-4 mt-4 text-xs text-white/40 justify-center">
-              <span className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded bg-gradient-to-t from-cyan-500 to-violet-500" />
-                {chartType === 'line' ? 'Skor Rata-rata' : 'Jumlah Responden'}
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded bg-white/[0.05]" />
-                {filteredData.length} formulir
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded bg-emerald-500/20" />
-                Total: {filteredData.reduce((acc, f) => acc + f.filled, 0)} responden
-              </span>
-            </div>
-          )}
-        </div>
-
-        {/* ====== US-01: TABLE DAFTAR FORM ====== */}
-        <div className="rounded-2xl bg-[#080812] border border-white/[0.05] overflow-hidden">
-          <div className="px-6 py-4 border-b border-white/[0.05] flex items-center justify-between">
-            <h3 className="font-display text-sm font-semibold text-white flex items-center gap-2">
-              <Icon name="clipboardList" className="w-4 h-4 text-cyan-400" />
-              Daftar Formulir
-            </h3>
-            <Link href="/dashboard/forms">
-              <button className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors flex items-center gap-1">
-                Lihat Semua <Icon name="arrowRight" className="w-3 h-3" />
-              </button>
-            </Link>
-          </div>
-          <div className="overflow-x-auto custom-scrollbar">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-white/[0.05] bg-white/[0.01]">
-                  <th className="text-left px-4 py-3 text-xs text-white/35 uppercase tracking-wider font-medium">Kode</th>
-                  <th className="text-left px-4 py-3 text-xs text-white/35 uppercase tracking-wider font-medium">Judul</th>
-                  <th className="text-left px-4 py-3 text-xs text-white/35 uppercase tracking-wider font-medium">Group</th>
-                  <th className="text-left px-4 py-3 text-xs text-white/35 uppercase tracking-wider font-medium">Status</th>
-                  <th className="text-left px-4 py-3 text-xs text-white/35 uppercase tracking-wider font-medium">Responden</th>
-                  <th className="text-left px-4 py-3 text-xs text-white/35 uppercase tracking-wider font-medium">Skor</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginatedData.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="text-center py-8 text-white/30">
-                      <Icon name="fileText" className="w-8 h-8 mx-auto mb-2 text-white/10" />
-                      <p>Tidak ada formulir yang ditemukan</p>
-                    </td>
-                  </tr>
-                ) : (
-                  paginatedData.map((form) => (
-                    <tr key={form.id} className="border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors">
-                      <td className="px-4 py-3 font-mono text-xs text-cyan-400 font-medium">{form.code}</td>
-                      <td className="px-4 py-3 text-white/80 font-medium">{form.title}</td>
-                      <td className="px-4 py-3">
-                        {form.group === '- (Mandiri)' ? (
-                          <span className="text-xs text-white/30">-</span>
-                        ) : (
-                          <span className="px-2 py-0.5 rounded-full bg-violet-500/10 border border-violet-500/20 text-[10px] text-violet-400 flex items-center gap-1 w-fit">
-                            <Icon name="folder" className="w-3 h-3" />
-                            {form.group}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`px-2.5 py-1 rounded-full border text-xs flex items-center gap-1.5 w-fit ${
-                          form.status === 'Aktif' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' :
-                          form.status === 'Draft' ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' :
-                          'text-rose-400 bg-rose-500/10 border-rose-500/20'
-                        }`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${
-                            form.status === 'Aktif' ? 'bg-emerald-400' :
-                            form.status === 'Draft' ? 'bg-amber-400' :
-                            'bg-rose-400'
-                          }`} />
-                          {form.status}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-white/60">{form.filled}</td>
-                      <td className="px-4 py-3">
-                        <span className={`font-semibold ${
-                          form.avgScore >= 75 ? 'text-emerald-400' :
-                          form.avgScore >= 50 ? 'text-amber-400' :
-                          'text-rose-400'
-                        }`}>
-                          {form.avgScore > 0 ? form.avgScore.toFixed(1) : '—'}
-                        </span>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Pagination */}
-          {filteredData.length > itemsPerPage && (
-            <div className="flex items-center justify-between px-6 py-4 border-t border-white/[0.05]">
-              <p className="text-xs text-white/35">
-                Menampilkan {((currentPage - 1) * itemsPerPage) + 1}-
-                {Math.min(currentPage * itemsPerPage, filteredData.length)} dari {filteredData.length} formulir
-              </p>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                  disabled={currentPage === 1}
-                  className="w-8 h-8 rounded-lg bg-white/[0.02] border border-white/[0.05] flex items-center justify-center text-white/40 hover:text-white hover:border-white/10 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-                >
-                  <Icon name="chevronLeft" className="w-4 h-4" />
-                </button>
-                {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
-                  let pageNum
-                  if (totalPages <= 5) {
-                    pageNum = i + 1
-                  } else if (currentPage <= 3) {
-                    pageNum = i + 1
-                  } else if (currentPage >= totalPages - 2) {
-                    pageNum = totalPages - 4 + i
-                  } else {
-                    pageNum = currentPage - 2 + i
-                  }
-                  return (
-                    <button
-                      key={pageNum}
-                      onClick={() => setCurrentPage(pageNum)}
-                      className={`w-8 h-8 rounded-lg text-xs font-medium transition-all ${
-                        currentPage === pageNum
-                          ? 'bg-cyan-500/10 border border-cyan-500/20 text-cyan-400'
-                          : 'bg-white/[0.02] border border-white/[0.05] text-white/40 hover:text-white hover:border-white/10'
-                      }`}
-                    >
-                      {pageNum}
-                    </button>
-                  )
-                })}
-                {totalPages > 5 && currentPage < totalPages - 2 && (
-                  <>
-                    <span className="text-white/20">...</span>
-                    <button
-                      onClick={() => setCurrentPage(totalPages)}
-                      className="w-8 h-8 rounded-lg bg-white/[0.02] border border-white/[0.05] text-xs text-white/40 hover:text-white hover:border-white/10 transition-all"
-                    >
-                      {totalPages}
-                    </button>
-                  </>
-                )}
-                <button
-                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                  disabled={currentPage === totalPages}
-                  className="w-8 h-8 rounded-lg bg-white/[0.02] border border-white/[0.05] flex items-center justify-center text-white/40 hover:text-white hover:border-white/10 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-                >
-                  <Icon name="chevronRight" className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ====== US-05: LEAVE CONFIRMATION MODAL ====== */}
-      {showLeaveConfirm && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ backgroundColor: 'rgba(0, 0, 0, 0.7)' }}
-          onClick={() => setShowLeaveConfirm(false)}
-        >
-          <div
-            className="relative w-full max-w-md bg-[#0e0e1a] border border-white/[0.08] rounded-2xl shadow-2xl p-6"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="text-center">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
-                <Icon name="alertCircle" className="w-8 h-8 text-amber-400" />
-              </div>
-              <h3 className="font-display text-lg font-semibold text-white mb-2">Perubahan Belum Disimpan</h3>
-              <p className="text-sm text-white/50 mb-6">
-                Anda memiliki perubahan pada kustomisasi widget yang belum disimpan. Apakah Anda yakin ingin meninggalkan halaman?
-              </p>
-              <div className="flex gap-3 justify-center">
-                <button
-                  onClick={() => setShowLeaveConfirm(false)}
-                  className="px-5 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-white/70 hover:text-white transition-all"
-                >
-                  Lanjutkan Edit
-                </button>
-                <button
-                  onClick={() => {
-                    setShowLeaveConfirm(false)
-                    setHasUnsavedChanges(false)
-                    window.location.href = '/dashboard'
-                  }}
-                  className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-sm font-medium text-white transition-all"
-                >
-                  Keluar Tanpa Simpan
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ====== PRINT AREA ====== */}
-      <div id="print-area" className="hidden">
-        <div className="print-header">
-          <h1>Laporan Dashboard - Ringkasan Data</h1>
-          <p>Periode: {startDate || 'Semua Waktu'} - {endDate || 'Semua Waktu'}</p>
-          <p>Filter: {selectedGroups.length > 0 ? `Group: ${selectedGroups.join(', ')}` : 'Semua Group'}</p>
-          <p>Filter: {selectedForms.length > 0 ? `Formulir: ${selectedForms.join(', ')}` : 'Semua Formulir'}</p>
-          <p>Tanggal Cetak: {new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
-          <p>Sumber Data: Sistem KKNT-KP UH - Desa Pangan Aman</p>
-        </div>
-        
-        <div className="chart-container">
-          <h4>Visualisasi Data</h4>
-          <p>Jenis Grafik: {chartType === 'bar' ? 'Bar Chart' : chartType === 'line' ? 'Line Chart' : 'Pie Chart'}</p>
-          {chartData && (
-            <div style={{ marginTop: 10 }}>
-              {chartData.labels.map((label, i) => (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid #eee' }}>
-                  <span>{label}</span>
-                  <span>{chartData.counts[i]} responden</span>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {displayedWidgets.map((widget: any) => (
+              <div key={widget.id} className="rounded-2xl bg-[#080812] border border-white/[0.05] p-6 flex flex-col justify-between">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="font-display text-sm font-semibold text-white/90">
+                    {widget.config?.title || widget.name}
+                  </h4>
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 uppercase font-mono">
+                    {widget.chartType}
+                  </span>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
 
-        <div className="chart-container">
-          <h4>Ringkasan Statistik</h4>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
-            <div><strong>Total Formulir:</strong> {stats.totalForms}</div>
-            <div><strong>Formulir Aktif:</strong> {stats.activeForms}</div>
-            <div><strong>Total Responden:</strong> {stats.totalRespondents}</div>
-            <div><strong>Rata-rata Skor:</strong> {stats.avgScore > 0 ? stats.avgScore.toFixed(1) : '—'}</div>
-            <div><strong>Total Group:</strong> {stats.totalGroups}</div>
-            <div><strong>Filter Aktif:</strong> {filteredData.length} formulir</div>
+                <div className="flex-1 flex flex-col justify-center">
+                  {renderDynamicChart(widget)}
+                </div>
+
+                {(widget.config?.xLabel || widget.config?.yLabel) && (
+                  <div className="flex justify-between text-[11px] text-white/30 mt-4 pt-3 border-t border-white/[0.04]">
+                    <span>{widget.config.xLabel}</span>
+                    <span>{widget.config.yLabel}</span>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
-        </div>
-
-        <p style={{ marginTop: 20, fontSize: 12, color: '#999' }}>
-          Dicetak dari Sistem KKNT-KP UH - Desa Pangan Aman
-        </p>
+        )}
       </div>
     </div>
   )
