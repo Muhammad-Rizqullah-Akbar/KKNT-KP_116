@@ -10,12 +10,18 @@ import { Canvas } from '@/components/form-builder/Canvas'
 import { ResizableToolbar } from '@/components/form-builder/ResizableToolbar'
 import { FlexibleElementProperties } from '@/components/form-builder/FlexibleElementProperties'
 import { PreviewModal } from '@/components/form-builder/PreviewModal'
+import { FormSettingsModal } from '@/components/form-builder/FormSettingsModal'
 import { Icon } from '@/components/ui/Icons'
 import { 
   FlexibleQuestion, 
   createFlexibleQuestion, 
   ANSWER_TYPES,
   getDefaultConfig,
+  type FormStage,
+  type FormValidation,
+  type FormScoring,
+  type ScoringOverride,
+  getScoredStages,  // ← NEW IMPORT
 } from '@/components/form-builder/ElementTypes'
 import { 
   createForm, 
@@ -35,6 +41,22 @@ const generateFormCode = () => {
   return `${prefix}-${random}`
 }
 
+// ============ DEFAULT CONFIGURATIONS ============
+const DEFAULT_VALIDATION: FormValidation = {
+  mode: 'all_required',
+  exceptions: [],
+  allowOverride: true,
+}
+
+const DEFAULT_SCORING: FormScoring = {
+  totalPoints: 100,
+  mode: 'auto',
+  distribution: {},
+  overrides: {},
+  allowOverride: true,
+  autoBalance: true,
+}
+
 export default function FormBuilderPage() {
   const { user } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
@@ -49,20 +71,20 @@ export default function FormBuilderPage() {
   const [generatedCode, setGeneratedCode] = useState('')
   const [isMobile, setIsMobile] = useState(false)
 
-  useEffect(() => {
-    const checkMobile = () => {
-      const mobile = window.innerWidth < 768
-      setIsMobile(mobile)
-      const sidebarWidth = mobile ? '0px' : '288px'
-      document.documentElement.style.setProperty('--sidebar-width', sidebarWidth)
-    }
-    checkMobile()
-    window.addEventListener('resize', checkMobile)
-    return () => {
-      window.removeEventListener('resize', checkMobile)
-      document.documentElement.style.removeProperty('--sidebar-width')
-    }
-  }, [])
+  // ============ FORM SETTINGS STATES ============
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  
+  // Validasi
+  const [validation, setValidation] = useState<FormValidation>(DEFAULT_VALIDATION)
+  
+  // Tahapan
+  const [stages, setStages] = useState<FormStage[]>([
+    { id: generateId(), name: 'Tahap 1', order: 0, questionIds: [], includeInScoring: true }  // ← tambah includeInScoring
+  ])
+  const [stageMode, setStageMode] = useState<'single' | 'multi'>('multi')
+  
+  // Penilaian
+  const [scoring, setScoring] = useState<FormScoring>(DEFAULT_SCORING)
 
   // ============ GROUPS ============
   const [groups, setGroups] = useState<FormGroup[]>([])
@@ -110,12 +132,32 @@ export default function FormBuilderPage() {
             setFormId(form.id || null)
             setFormTitle(form.title || 'Formulir Baru')
             
+            // Load validation settings
+            if (form.validation) {
+              setValidation(form.validation)
+            }
+            
+            // Load stages
+            if (form.stages && form.stages.length > 0) {
+              // Pastikan semua stage punya includeInScoring
+              const stagesWithScoring = form.stages.map((stage: any) => ({
+                ...stage,
+                includeInScoring: stage.includeInScoring !== false,
+              }))
+              setStages(stagesWithScoring)
+              setStageMode(form.stages.length > 1 ? 'multi' : 'single')
+            }
+            
+            // Load scoring
+            if (form.scoring) {
+              setScoring(form.scoring)
+            }
+            
             // Konversi questions ke FlexibleQuestion[]
             const loadedElements = (form.questions || []).map((q: any, index: number) => {
               const answerType = q.answerType || q.type || 'short-text'
               const config = q.config || {}
               
-              // Pastikan config punya semua field yang diperlukan
               const fullConfig = {
                 ...getDefaultConfig(answerType),
                 ...config,
@@ -133,6 +175,8 @@ export default function FormBuilderPage() {
                 isIdentifier: q.isIdentifier || false,
                 identifierType: q.identifierType || 'none',
                 scoring: q.scoring || { scheme: 'none' as const, weight: 1 },
+                stageId: q.stageId || null,
+                overridePoints: q.overridePoints || null,
               } as FlexibleQuestion
             })
             
@@ -153,11 +197,36 @@ export default function FormBuilderPage() {
     }
   }, [])
 
+  // ============ AUTO-ASSIGN STAGES TO QUESTIONS ============
+  useEffect(() => {
+    if (stageMode === 'single' && stages.length > 0) {
+      const firstStageId = stages[0].id
+      setElements(prev => 
+        prev.map(el => ({
+          ...el,
+          stageId: firstStageId
+        }))
+      )
+      setStages(prev => 
+        prev.map((stage, index) => ({
+          ...stage,
+          questionIds: index === 0 ? elements.map(el => el.id) : []
+        }))
+      )
+    }
+  }, [stageMode])
+
   // ============ HANDLERS ============
+  
+  // --- ELEMENT HANDLERS ---
   const handleAddElement = useCallback((element: any, targetIndex?: number) => {
     const answerType = element.type || element.answerType || 'short-text'
     const newElement = createFlexibleQuestion(answerType)
     newElement.question = `Pertanyaan ${elements.length + 1}`
+    
+    if (stages.length > 0) {
+      newElement.stageId = stages[0].id
+    }
     
     if (targetIndex !== undefined && targetIndex < elements.length) {
       const newElements = [...elements]
@@ -165,9 +234,12 @@ export default function FormBuilderPage() {
       newElements.splice(targetIndex, 0, newElement)
       newElements.forEach((el, i) => el.order = i)
       setElements(newElements)
+      updateStageQuestionIds(newElements)
     } else {
       newElement.order = elements.length
-      setElements([...elements, newElement])
+      const newElements = [...elements, newElement]
+      setElements(newElements)
+      updateStageQuestionIds(newElements)
     }
     
     if (targetIndex === undefined || targetIndex === elements.length) {
@@ -176,7 +248,7 @@ export default function FormBuilderPage() {
         if (canvas) canvas.scrollTop = canvas.scrollHeight
       }, 100)
     }
-  }, [elements])
+  }, [elements, stages])
 
   const handleDropFromToolbar = useCallback((elementType: string, targetIndex?: number) => {
     const answerType = ANSWER_TYPES.find(t => t.value === elementType)
@@ -196,12 +268,17 @@ export default function FormBuilderPage() {
     setElements(elements.map(el => 
       el.id === updatedElement.id ? updatedElement : el
     ))
+    updateStageQuestionIds(elements.map(el => 
+      el.id === updatedElement.id ? updatedElement : el
+    ))
     setIsPropertiesOpen(false)
     setSelectedId(null)
   }, [elements])
 
   const handleElementDelete = useCallback((id: string) => {
-    setElements(elements.filter(el => el.id !== id))
+    const newElements = elements.filter(el => el.id !== id)
+    setElements(newElements)
+    updateStageQuestionIds(newElements)
     if (selectedId === id) {
       setSelectedId(null)
       setIsPropertiesOpen(false)
@@ -220,6 +297,7 @@ export default function FormBuilderPage() {
     newElements.splice(newIndex, 0, movedElement)
     newElements.forEach((el, i) => el.order = i)
     setElements(newElements)
+    updateStageQuestionIds(newElements)
   }, [elements])
 
   const handleElementDuplicate = useCallback((element: FlexibleQuestion) => {
@@ -229,7 +307,9 @@ export default function FormBuilderPage() {
       question: `${element.question} (Copy)`,
       order: elements.length,
     }
-    setElements([...elements, newElement])
+    const newElements = [...elements, newElement]
+    setElements(newElements)
+    updateStageQuestionIds(newElements)
   }, [elements])
 
   const handleReorder = useCallback((startIndex: number, endIndex: number) => {
@@ -239,7 +319,213 @@ export default function FormBuilderPage() {
     newElements.splice(endIndex, 0, movedElement)
     newElements.forEach((el, i) => el.order = i)
     setElements(newElements)
+    updateStageQuestionIds(newElements)
   }, [elements])
+
+  // --- STAGE HANDLERS ---
+  const updateStageQuestionIds = useCallback((updatedElements: FlexibleQuestion[]) => {
+    setStages(prev => 
+      prev.map(stage => ({
+        ...stage,
+        questionIds: updatedElements
+          .filter(el => el.stageId === stage.id)
+          .map(el => el.id)
+      }))
+    )
+  }, [])
+
+  const handleAddStage = useCallback(() => {
+    const newStage: FormStage = {
+      id: generateId(),
+      name: `Tahap ${stages.length + 1}`,
+      order: stages.length,
+      questionIds: [],
+      includeInScoring: true,  // ← NEW: default true
+    }
+    setStages([...stages, newStage])
+    setStageMode('multi')
+  }, [stages])
+
+  const handleRemoveStage = useCallback((stageId: string) => {
+    if (stages.length <= 1) {
+      alert('Minimal harus ada 1 tahapan!')
+      return
+    }
+    
+    const removedStage = stages.find(s => s.id === stageId)
+    if (removedStage && removedStage.questionIds.length > 0) {
+      const firstStageId = stages.find(s => s.id !== stageId)?.id
+      if (firstStageId) {
+        setElements(prev => 
+          prev.map(el => 
+            el.stageId === stageId ? { ...el, stageId: firstStageId } : el
+          )
+        )
+      }
+    }
+    
+    // Remove from scoring distribution
+    const newDistribution = { ...scoring.distribution }
+    delete newDistribution[stageId]
+    setScoring(prev => ({
+      ...prev,
+      distribution: newDistribution,
+    }))
+    
+    setStages(stages.filter(s => s.id !== stageId))
+    updateStageQuestionIds(elements)
+  }, [stages, elements, scoring.distribution])
+
+  const handleStageReorder = useCallback((startIndex: number, endIndex: number) => {
+    if (startIndex === endIndex) return
+    const newStages = [...stages]
+    const [movedStage] = newStages.splice(startIndex, 1)
+    newStages.splice(endIndex, 0, movedStage)
+    newStages.forEach((stage, i) => stage.order = i)
+    setStages(newStages)
+  }, [stages])
+
+  const handleStageNameChange = useCallback((stageId: string, newName: string) => {
+    setStages(prev => 
+      prev.map(stage => 
+        stage.id === stageId ? { ...stage, name: newName } : stage
+      )
+    )
+  }, [])
+
+  const handleMoveQuestionToStage = useCallback((questionId: string, stageId: string) => {
+    setElements(prev => 
+      prev.map(el => 
+        el.id === questionId ? { ...el, stageId } : el
+      )
+    )
+    updateStageQuestionIds(elements.map(el => 
+      el.id === questionId ? { ...el, stageId } : el
+    ))
+  }, [elements])
+
+  // ===== NEW: Stage Scoring Toggle Handler =====
+  const handleStageScoringToggle = useCallback((stageId: string, include: boolean) => {
+    setStages(prev => 
+      prev.map(stage => 
+        stage.id === stageId ? { ...stage, includeInScoring: include } : stage
+      )
+    )
+    
+    // If turning off, remove from distribution
+    if (!include) {
+      const newDistribution = { ...scoring.distribution }
+      delete newDistribution[stageId]
+      setScoring(prev => ({
+        ...prev,
+        distribution: newDistribution,
+      }))
+    }
+    
+    // Auto-balance if mode is auto
+    if (scoring.mode === 'auto') {
+      handleAutoBalance()
+    }
+  }, [scoring.distribution, scoring.mode])
+
+  // --- VALIDATION HANDLERS ---
+  const handleValidationChange = useCallback((newValidation: FormValidation) => {
+    setValidation(newValidation)
+  }, [])
+
+  // --- SCORING HANDLERS ---
+  const handleScoringChange = useCallback((newScoring: FormScoring) => {
+    setScoring(newScoring)
+  }, [])
+
+  // ===== UPDATED: Auto-Balance with includeInScoring =====
+  const handleAutoBalance = useCallback(() => {
+    const scoredStages = getScoredStages(stages)
+    
+    if (scoredStages.length === 0) {
+      // No scored stages, set all to 0
+      const distribution: Record<string, number> = {}
+      stages.forEach(stage => {
+        distribution[stage.id] = 0
+      })
+      setScoring(prev => ({
+        ...prev,
+        distribution,
+        autoBalance: true,
+      }))
+      return
+    }
+    
+    // Calculate weights per stage
+    const stageWeights: Record<string, number> = {}
+    let totalWeight = 0
+    
+    scoredStages.forEach(stage => {
+      stageWeights[stage.id] = 0
+    })
+    
+    elements.forEach(el => {
+      const stageId = el.stageId || stages[0]?.id
+      if (stageId && stageWeights[stageId] !== undefined) {
+        let weight = el.scoring?.weight || 1
+        if (el.answerType === 'indicator-table' && el.config?.indicators) {
+          weight = el.config.indicators.reduce((sum, ind) => sum + (ind.weight || 1), 0)
+        }
+        stageWeights[stageId] += weight
+        totalWeight += weight
+      }
+    })
+    
+    if (totalWeight === 0) {
+      // Equal distribution if no weight
+      const perStage = scoring.totalPoints / scoredStages.length
+      const distribution: Record<string, number> = {}
+      stages.forEach(stage => {
+        distribution[stage.id] = 0
+      })
+      scoredStages.forEach(stage => {
+        distribution[stage.id] = Math.round(perStage * 100) / 100
+      })
+      setScoring(prev => ({
+        ...prev,
+        distribution,
+        autoBalance: true,
+      }))
+      return
+    }
+    
+    // Distribute based on weight
+    const distribution: Record<string, number> = {}
+    stages.forEach(stage => {
+      distribution[stage.id] = 0
+    })
+    
+    let distributedTotal = 0
+    
+    scoredStages.forEach(stage => {
+      const weight = stageWeights[stage.id] || 0
+      const points = Math.round((weight / totalWeight) * scoring.totalPoints)
+      distribution[stage.id] = points
+      distributedTotal += points
+    })
+    
+    // Fix rounding issues
+    if (distributedTotal !== scoring.totalPoints) {
+      const diff = scoring.totalPoints - distributedTotal
+      const maxStage = Object.keys(distribution).reduce((a, b) => 
+        (distribution[a] || 0) > (distribution[b] || 0) ? a : b
+      )
+      if (maxStage) {
+        distribution[maxStage] = (distribution[maxStage] || 0) + diff
+      }
+    }
+    
+    setScoring(prev => ({
+      ...prev,
+      distribution,
+      autoBalance: true,
+    }))
+  }, [elements, stages, scoring.totalPoints])
 
   // ============ SAVE HANDLER ============
   const handleSave = useCallback(async () => {
@@ -268,7 +554,6 @@ export default function FormBuilderPage() {
       let groupId = selectedGroup
       let groupCode: string | null = null
       
-      // Buat group baru jika diperlukan
       if (isNewGroup && selectedGroup === 'new') {
         const newGroup = await createFormGroup({
           code: `${newGroupData.title.substring(0, 4).toUpperCase()}-${Math.random().toString(36).substring(2, 4).toUpperCase()}`,
@@ -292,7 +577,6 @@ export default function FormBuilderPage() {
 
       const formCode = formId ? (generatedCode || generateFormCode()) : generateFormCode()
       
-      // Bersihkan elements sebelum save (hapus properti yang tidak perlu)
       const cleanElements = elements.map(el => ({
         id: el.id,
         question: el.question,
@@ -305,6 +589,8 @@ export default function FormBuilderPage() {
         isIdentifier: el.isIdentifier,
         identifierType: el.identifierType,
         scoring: el.scoring,
+        stageId: el.stageId || null,
+        overridePoints: el.overridePoints || null,
       }))
       
       const formData: Omit<FormData, 'id' | 'createdAt' | 'updatedAt'> = {
@@ -319,6 +605,9 @@ export default function FormBuilderPage() {
         groupCode: groupCode,
         createdBy: user?.uid || '',
         filledCount: 0,
+        validation: validation,
+        stages: stages,
+        scoring: scoring,
       }
 
       let result
@@ -329,7 +618,6 @@ export default function FormBuilderPage() {
         result = await createForm(formData)
         setFormId(result.id)
         
-        // Update URL tanpa reload
         const url = new URL(window.location.href)
         url.searchParams.set('id', result.id || '')
         window.history.replaceState({}, '', url.toString())
@@ -347,7 +635,7 @@ export default function FormBuilderPage() {
     } finally {
       setIsSaving(false)
     }
-  }, [formTitle, elements, selectedGroup, isNewGroup, newGroupData, groups, formId, user, generatedCode])
+  }, [formTitle, elements, selectedGroup, isNewGroup, newGroupData, groups, formId, user, generatedCode, validation, stages, scoring])
 
   const resetGroupForm = () => {
     setNewGroupData({
@@ -394,6 +682,7 @@ export default function FormBuilderPage() {
             onTitleChange={setFormTitle}
             onSave={handleSave}
             onPreview={() => setIsPreviewOpen(true)}
+            onSettings={() => setIsSettingsOpen(true)}
             isSaving={isSaving}
             elementCount={elements.length}
           />
@@ -479,13 +768,19 @@ export default function FormBuilderPage() {
         >
           <Canvas
             elements={elements}
+            stages={stages}
+            stageMode={stageMode}
             onElementClick={handleElementClick}
             onElementDelete={handleElementDelete}
             onElementMove={handleElementMove}
             onElementDuplicate={handleElementDuplicate}
             onReorder={handleReorder}
+            onMoveQuestionToStage={handleMoveQuestionToStage}
             selectedId={selectedId}
             onDropFromToolbar={handleDropFromToolbar}
+            validationMode={validation.mode}
+            allowScoringOverride={scoring.allowOverride}
+            scoringDistribution={scoring.distribution}
           />
         </div>
       </div>
@@ -493,6 +788,9 @@ export default function FormBuilderPage() {
       {/* Resizable Toolbar (kiri) */}
       <ResizableToolbar
         onAddElement={handleAddElement}
+        onAddPageBreak={() => {
+          handleAddStage()
+        }}
         isMobile={isMobile}
       />
 
@@ -506,6 +804,18 @@ export default function FormBuilderPage() {
         }}
         onSave={handleElementUpdate}
         formId={formId || undefined}
+        validationMode={validation.mode}
+        validationExceptions={validation.exceptions}
+        allowScoringOverride={scoring.allowOverride}
+        onScoringOverride={(questionId: string, points: number | null) => {
+          setElements(prev => 
+            prev.map(el => 
+              el.id === questionId 
+                ? { ...el, overridePoints: points } 
+                : el
+            )
+          )
+        }}
       />
 
       {/* Preview Modal */}
@@ -514,6 +824,33 @@ export default function FormBuilderPage() {
         onClose={() => setIsPreviewOpen(false)}
         elements={elements}
         formTitle={formTitle}
+        stages={stages}
+        stageMode={stageMode}
+        validationMode={validation.mode}
+        validationExceptions={validation.exceptions}
+        scoringDistribution={scoring.distribution}
+        scoringMode={scoring.mode}
+      />
+
+      {/* Form Settings Modal - UPDATED with onStageScoringToggle */}
+      <FormSettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        formTitle={formTitle}
+        elements={elements}
+        validation={validation}
+        onValidationChange={handleValidationChange}
+        stages={stages}
+        stageMode={stageMode}
+        onStageModeChange={setStageMode}
+        onAddStage={handleAddStage}
+        onRemoveStage={handleRemoveStage}
+        onStageReorder={handleStageReorder}
+        onStageNameChange={handleStageNameChange}
+        scoring={scoring}
+        onScoringChange={handleScoringChange}
+        onAutoBalance={handleAutoBalance}
+        onStageScoringToggle={handleStageScoringToggle}  // ← NEW: FIX ERROR
       />
 
       {/* Group Creation Modal */}
