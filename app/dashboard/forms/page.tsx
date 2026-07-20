@@ -1,3 +1,5 @@
+// app/dashboard/forms/page.tsx
+
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
@@ -51,6 +53,76 @@ const generateFormCode = () => {
   const prefix = 'FRM'
   const random = Math.random().toString(36).substring(2, 6).toUpperCase()
   return `${prefix}-${random}`
+}
+
+// ============ CONVERT QUESTIONS TO FLEXIBLE QUESTION FORMAT ============
+const convertToFlexibleQuestions = (questions: any[]) => {
+  return (questions || []).map((q: any, index: number) => {
+    // Dapatkan answerType dari berbagai kemungkinan field
+    const answerType = q.answerType || q.type || 'short-text'
+    
+    // Bangun config dari berbagai kemungkinan field
+    const config: any = {
+      options: q.options || q.config?.options || [],
+      placeholder: q.placeholder || q.config?.placeholder || '',
+      statements: q.statements || q.config?.statements || [],
+      scale: q.scale || q.config?.scale || 5,
+      min: q.min || q.config?.min || 0,
+      max: q.max || q.config?.max || 100,
+      step: q.step || q.config?.step || 1,
+      ratingMax: q.ratingMax || q.config?.ratingMax || 5,
+      ratingMin: q.ratingMin || q.config?.ratingMin || 1,
+      indicators: q.indicators || q.config?.indicators || [],
+      indicatorScales: q.indicatorScales || q.config?.indicatorScales || [
+        { value: 1, label: 'STS' },
+        { value: 2, label: 'TS' },
+        { value: 3, label: 'N' },
+        { value: 4, label: 'S' },
+        { value: 5, label: 'SS' },
+      ],
+      indicatorTitle: q.indicatorTitle || q.config?.indicatorTitle || 'Pertanyaan',
+      showTotalScore: q.showTotalScore || q.config?.showTotalScore || false,
+      showWeightedScore: q.showWeightedScore || q.config?.showWeightedScore || false,
+      correctAnswer: q.correctAnswer || q.config?.correctAnswer || '',
+      signatureWidth: q.signatureWidth || q.config?.signatureWidth || 400,
+      signatureHeight: q.signatureHeight || q.config?.signatureHeight || 200,
+      signaturePenColor: q.signaturePenColor || q.config?.signaturePenColor || '#000000',
+      signatureBgColor: q.signatureBgColor || q.config?.signatureBgColor || '#ffffff',
+      signatureLabel: q.signatureLabel || q.config?.signatureLabel || 'Tanda Tangan',
+      fileTypes: q.fileTypes || q.config?.fileTypes || ['image/*', 'application/pdf'],
+      maxFileSize: q.maxFileSize || q.config?.maxFileSize || 5,
+      dateFormat: q.dateFormat || q.config?.dateFormat || 'DD/MM/YYYY',
+      rows: q.rows || q.config?.rows || 4,
+      maxLength: q.maxLength || q.config?.maxLength || 500,
+      minLength: q.minLength || q.config?.minLength || 0,
+    }
+
+    // Merge dengan config yang sudah ada
+    if (q.config) {
+      Object.assign(config, q.config)
+    }
+
+    return {
+      id: q.id || `q-${generateId()}`,
+      question: q.question || q.label || `Pertanyaan ${index + 1}`,
+      description: q.description || '',
+      required: q.required || false,
+      order: q.order || index,
+      media: q.media || { 
+        type: q.imageUrl ? 'image' : 'none' as const, 
+        url: q.imageUrl || '', 
+        caption: q.mediaCaption || '' 
+      },
+      answerType: answerType,
+      config: config,
+      isIdentifier: q.isIdentifier || false,
+      identifierType: q.identifierType || 'none',
+      scoring: q.scoring || { scheme: 'none' as const, weight: 1 },
+      // ===== NEW FIELDS UNTUK KOMPATIBILITAS =====
+      stageId: q.stageId || null,
+      overridePoints: q.overridePoints || null,
+    }
+  })
 }
 
 // ============ COMPONENT ============
@@ -155,6 +227,23 @@ export default function FormsPage() {
     try {
       const newCode = generateFormCode()
       
+      // Konversi questions dengan benar
+      const duplicatedQuestions = (form.questions || []).map((q: any) => {
+        const answerType = q.answerType || q.type || 'short-text'
+        return {
+          ...q,
+          id: generateId(),
+          answerType: answerType,
+          // Pastikan config lengkap
+          config: q.config || {},
+          // Pastikan scoring
+          scoring: q.scoring || { scheme: 'none', weight: 1 },
+          // Pastikan stageId
+          stageId: q.stageId || null,
+          overridePoints: q.overridePoints || null,
+        }
+      })
+      
       const newForm: Omit<FormData, 'id' | 'createdAt' | 'updatedAt'> = {
         title: `${form.title} (Copy)`,
         code: newCode,
@@ -164,21 +253,13 @@ export default function FormsPage() {
         status: 'draft',
         groupId: form.groupId || null,
         groupCode: form.groupCode || null,
-        questions: form.questions.map(q => ({
-          ...q,
-          id: generateId(),
-          options: q.options || [],
-          required: q.required || false,
-          imageUrl: q.imageUrl || '',
-          config: q.config || {},
-          media: q.media || { type: 'none' },
-          answerType: q.answerType || q.type || 'short-text',
-          isIdentifier: q.isIdentifier || false,
-          identifierType: q.identifierType || 'none',
-          scoring: q.scoring || { scheme: 'none', weight: 1 },
-        })),
+        questions: duplicatedQuestions,
         createdBy: user?.uid || '',
         filledCount: 0,
+        // ===== TAMBAHKAN FIELD DARI FORM BUILDER =====
+        validation: form.validation || { mode: 'all_required', exceptions: [], allowOverride: true },
+        stages: form.stages || [{ id: generateId(), name: 'Tahap 1', order: 0, questionIds: duplicatedQuestions.map((q: any) => q.id) }],
+        scoring: form.scoring || { totalPoints: 100, mode: 'auto', distribution: {}, overrides: {}, allowOverride: true, autoBalance: true },
       }
       
       await createForm(newForm)
@@ -235,40 +316,6 @@ export default function FormsPage() {
     if (!groupId) return '- (Mandiri)'
     const group = groups.find(g => g.id === groupId)
     return group?.title || '- (Mandiri)'
-  }
-
-  // ============ CONVERT QUESTIONS TO FLEXIBLE QUESTION FORMAT ============
-  const convertToFlexibleQuestions = (questions: any[]) => {
-    return (questions || []).map((q: any, index: number) => ({
-      id: q.id || generateId(),
-      question: q.question || q.label || '',
-      description: q.description || '',
-      required: q.required || false,
-      order: q.order || index,
-      media: q.media || { type: 'none' as const, url: q.imageUrl || '', caption: '' },
-      answerType: q.answerType || q.type || 'short-text',
-      config: q.config || {
-        options: q.options || [],
-        statements: q.statements || [],
-        scale: q.scale || 5,
-        placeholder: q.placeholder || '',
-        indicators: q.indicators || [],
-        indicatorScales: q.indicatorScales || [],
-        indicatorTitle: q.indicatorTitle || 'Pertanyaan',
-        showTotalScore: q.showTotalScore || false,
-        showWeightedScore: q.showWeightedScore || false,
-        ratingMax: q.ratingMax || 5,
-        ratingMin: q.ratingMin || 1,
-        signatureWidth: q.signatureWidth || 400,
-        signatureHeight: q.signatureHeight || 200,
-        signaturePenColor: q.signaturePenColor || '#000000',
-        signatureBgColor: q.signatureBgColor || '#ffffff',
-        signatureLabel: q.signatureLabel || 'Tanda Tangan',
-      },
-      isIdentifier: q.isIdentifier || false,
-      identifierType: q.identifierType || 'none',
-      scoring: q.scoring || { scheme: 'none' as const, weight: 1 },
-    }))
   }
 
   // ============ RENDER ============
@@ -506,6 +553,8 @@ export default function FormsPage() {
           onClose={() => setIsPreviewModalOpen(false)}
           elements={convertToFlexibleQuestions(previewForm.questions || [])}
           formTitle={previewForm.title}
+          stages={previewForm.stages || []}
+          stageMode={previewForm.stages && previewForm.stages.length > 1 ? 'multi' : 'single'}
         />
       )}
 
