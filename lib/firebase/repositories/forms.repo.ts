@@ -20,6 +20,40 @@ import {
 } from 'firebase/firestore'
 
 // ============ TYPES ============
+
+// ===== NEW: Validation Type =====
+export interface FormValidation {
+  mode: 'all_required' | 'all_required_except' | 'free'
+  exceptions: string[]
+  allowOverride: boolean
+}
+
+// ===== NEW: Stage Type =====
+export interface FormStage {
+  id: string
+  name: string
+  order: number
+  questionIds: string[]
+}
+
+// ===== NEW: Scoring Override Type =====
+export interface ScoringOverride {
+  points: number
+  defaultPoints: number
+  reason?: string
+}
+
+// ===== NEW: Scoring Type =====
+export interface FormScoring {
+  totalPoints: number
+  mode: 'auto' | 'hybrid' | 'manual'
+  distribution: Record<string, number>
+  overrides: Record<string, ScoringOverride>
+  allowOverride: boolean
+  autoBalance: boolean
+  lastBalancedAt?: string
+}
+
 export interface FormQuestion {
   id: string
   type: 'binary' | 'single-choice' | 'multiple-choice' | 'image' | 'likert' | 'text' | 'textarea' | 'indicator-table' | 'signature' | 'rating' | 'date' | 'number' | 'file-upload' | 'short-text' | 'long-text' | 'dropdown'
@@ -66,6 +100,9 @@ export interface FormQuestion {
   fileTypes?: string[]
   maxFileSize?: number
   dateFormat?: string
+  // ===== NEW FIELDS =====
+  stageId?: string | null
+  overridePoints?: number | null
 }
 
 export interface FormData {
@@ -83,6 +120,11 @@ export interface FormData {
   updatedAt?: string
   createdBy?: string
   filledCount?: number
+  
+  // ===== NEW FIELDS =====
+  validation?: FormValidation
+  stages?: FormStage[]
+  scoring?: FormScoring
 }
 
 export interface FormGroup {
@@ -171,6 +213,9 @@ const serializeQuestion = (q: any): any => {
       scheme: q.scoring?.scheme || 'none',
       weight: q.scoring?.weight || 1,
     },
+    // ===== NEW FIELDS =====
+    stageId: q.stageId || null,
+    overridePoints: q.overridePoints || null,
   }
 }
 
@@ -224,6 +269,9 @@ const deserializeQuestion = (q: any): any => {
       scheme: q.scoring?.scheme || 'none',
       weight: q.scoring?.weight || 1,
     },
+    // ===== NEW FIELDS =====
+    stageId: q.stageId || null,
+    overridePoints: q.overridePoints || null,
   }
 }
 
@@ -248,14 +296,26 @@ const cleanFormData = (data: any): any => {
   clean.createdBy = data.createdBy || ''
   clean.filledCount = data.filledCount || 0
   
+  // ===== NEW FIELDS =====
+  if (data.validation) {
+    clean.validation = data.validation
+  }
+  if (data.stages) {
+    clean.stages = data.stages
+  }
+  if (data.scoring) {
+    clean.scoring = data.scoring
+  }
+  
   return clean
 }
 
 const deserializeFormData = (doc: any): FormData => {
   const data = doc.data ? doc.data() : doc
+  const docId = doc.id || data.id
   
   return {
-    id: doc.id || data.id,
+    id: docId,
     title: data.title || '',
     code: data.code || '',
     description: data.description || '',
@@ -269,6 +329,10 @@ const deserializeFormData = (doc: any): FormData => {
     updatedAt: data.updatedAt?.toDate?.()?.toISOString() || data.updatedAt || '',
     createdBy: data.createdBy || '',
     filledCount: data.filledCount || 0,
+    // ===== NEW FIELDS =====
+    validation: data.validation || { mode: 'all_required', exceptions: [], allowOverride: true },
+    stages: data.stages || [{ id: 'default', name: 'Semua Pertanyaan', order: 0, questionIds: [] }],
+    scoring: data.scoring || { totalPoints: 100, mode: 'auto', distribution: {}, overrides: {}, allowOverride: true, autoBalance: true },
   }
 }
 
