@@ -15,7 +15,7 @@ import {
   type FormData,
 } from '@/lib/firebase/repositories/forms.repo'
 import { ScoringEngine, ScoringResult } from '@/lib/scoring/scoringEngine'
-import { getDefaultScoring, getDefaultValidation, getDefaultStage } from '@/components/form-builder/ElementTypes'
+import { getDefaultScoring, getDefaultValidation } from '@/components/form-builder/ElementTypes'
 
 type GroupData = {
   id: string
@@ -330,12 +330,10 @@ export default function DynamicFormPage() {
   const [toastMessage, setToastMessage] = useState('')
   const [toastType, setToastType] = useState<'success' | 'error'>('success')
   
-  // ===== PAGINATION STATES =====
   const [currentStageIndex, setCurrentStageIndex] = useState(0)
   const [currentPageIndex, setCurrentPageIndex] = useState(0)
   const ITEMS_PER_PAGE = 10
 
-  // ===== SCORING RESULT STATE =====
   const [scoringResult, setScoringResult] = useState<ScoringResult | null>(null)
 
   const showToastMessage = (message: string, type: 'success' | 'error' = 'success') => {
@@ -343,7 +341,6 @@ export default function DynamicFormPage() {
     setTimeout(() => setShowToast(false), 3000)
   }
 
-  // ============ GROUP QUESTIONS BY STAGE ============
   const getQuestionsByStage = (questions: any[]) => {
     if (!questions || questions.length === 0) return []
     
@@ -361,7 +358,6 @@ export default function DynamicFormPage() {
     return [questions]
   }
 
-  // ============ GET STAGE NAME ============
   const getStageName = (stageId: string, index: number): string => {
     const stages = selectedForm?.stages || []
     const stage = stages.find((s: any) => s.id === stageId)
@@ -369,7 +365,6 @@ export default function DynamicFormPage() {
     return `Bagian ${index + 1}`
   }
 
-  // ============ LOAD DATA ============
   useEffect(() => {
     const loadData = async () => {
       if (!code) { router.push('/'); return }
@@ -412,7 +407,6 @@ export default function DynamicFormPage() {
     loadData()
   }, [code, router])
 
-  // ============ INITIALIZE ANSWERS ============
   const initializeAnswers = (form: FormData) => {
     const initial: Record<string, any> = {}
     form.questions?.forEach((q: any) => {
@@ -435,59 +429,105 @@ export default function DynamicFormPage() {
     setAnswers(initial)
   }
 
-  // ============ HANDLE ANSWER CHANGE ============
   const handleAnswerChange = (questionId: string, value: any) => {
     setAnswers(prev => ({ ...prev, [questionId]: value }))
   }
 
-  // ============ HANDLE SUBMIT DENGAN SCORING ============
+  const isQuestionAnswered = (q: any) => {
+    const type = q.answerType || q.type || 'short-text'
+    
+    if (type === 'indicator-table' || type === 'likert') {
+      const indicators = q.config?.indicators || []
+      const statements = q.config?.statements || q.options || []
+      const rows = indicators.length > 0 ? indicators : statements
+      if (rows.length === 0) return true
+      return rows.every((_: any, i: number) => {
+        const key = `${q.id}-${i}`
+        const val = answers[key]
+        return val && val !== '' && val !== null && val !== undefined
+      })
+    }
+    
+    if (type === 'multiple-choice') {
+      return answers[q.id] && Array.isArray(answers[q.id]) && answers[q.id].length > 0
+    }
+    
+    if (type === 'signature') {
+      return answers[q.id] !== null && answers[q.id] !== ''
+    }
+    
+    if (type === 'image' || type === 'file-upload') {
+      return true
+    }
+    
+    return answers[q.id] && answers[q.id] !== ''
+  }
+
+  const getUnansweredRequired = (questions: any[]) => {
+    return questions.filter((q: any) => {
+      if (!q.required) return false
+      return !isQuestionAnswered(q)
+    })
+  }
+
+  const scrollToQuestion = (questionId: string) => {
+    const el = document.getElementById(`q-${questionId}`)
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      el.classList.add('ring-2', 'ring-rose-400', 'ring-offset-2', 'ring-offset-[#06060E]', 'rounded-xl')
+      setTimeout(() => {
+        el.classList.remove('ring-2', 'ring-rose-400', 'ring-offset-2', 'ring-offset-[#06060E]')
+      }, 3000)
+    }
+  }
+
   const handleSubmit = async () => {
     if (!selectedForm) return
-    const missingQuestions: string[] = []
     
-    selectedForm.questions?.forEach((q: any) => {
-      const type = q.answerType || q.type || 'short-text'
-      if (q.required) {
-        if (type === 'indicator-table' || type === 'likert') {
-          const indicators = q.config?.indicators || []
-          const statements = q.config?.statements || q.options || []
-          const rows = indicators.length > 0 ? indicators : statements
-          rows.forEach((_: any, i: number) => {
-            if (!answers[`${q.id}-${i}`] || answers[`${q.id}-${i}`] === '') {
-              missingQuestions.push(`${q.question} - Baris ${i + 1}`)
-            }
-          })
-        } else if (type === 'multiple-choice') {
-          if (!answers[q.id] || (Array.isArray(answers[q.id]) && answers[q.id].length === 0)) {
-            missingQuestions.push(q.question || q.label)
-          }
-        } else if (type === 'signature') {
-          if (!answers[q.id]) missingQuestions.push(q.question || q.label)
-        } else if (type !== 'image' && type !== 'file-upload') {
-          if (!answers[q.id] || answers[q.id] === '') missingQuestions.push(q.question || q.label)
-        }
-      }
-    })
-
-    if (missingQuestions.length > 0) {
-      showToastMessage(`${missingQuestions.length} pertanyaan wajib belum diisi`, 'error')
+    const unanswered = getUnansweredRequired(selectedForm.questions || [])
+    if (unanswered.length > 0) {
+      const firstUnanswered = unanswered[0]
+      showToastMessage(`${unanswered.length} pertanyaan wajib belum diisi`, 'error')
+      scrollToQuestion(firstUnanswered.id)
       return
     }
 
     setIsSubmitting(true)
     try {
+      const nameQuestion = selectedForm.questions?.find(q => q.identifierType === 'name')
+      const emailQuestion = selectedForm.questions?.find(q => q.identifierType === 'email')
+
+      const respondentName = nameQuestion ? answers[nameQuestion.id] : 'Responden Baru'
+      const respondentEmail = emailQuestion ? answers[emailQuestion.id] : ''
+
       await submitFormResponse(
         selectedForm.id || '', 
         selectedForm.code, 
         selectedForm.title,
         answers, 
-        selectedForm.questions
+        selectedForm.questions,
+        respondentName,
+        respondentEmail
       )
       await incrementFilledCount(selectedForm.id || '')
       
       const scoring = selectedForm.scoring || getDefaultScoring()
       const validation = selectedForm.validation || getDefaultValidation()
-      const stages = selectedForm.stages || [{ id: 'default', name: 'Semua Pertanyaan', order: 0, questionIds: [] }]
+      
+      // Mapping stage agar includeInScoring selalu ada
+      let stages = (selectedForm.stages || []).map(s => ({
+        ...s,
+        includeInScoring: s.includeInScoring !== false,
+      }))
+      if (stages.length === 0) {
+        stages = [{
+          id: 'default',
+          name: 'Semua Pertanyaan',
+          order: 0,
+          questionIds: selectedForm.questions?.map(q => q.id) || [],
+          includeInScoring: true,
+        }]
+      }
       
       const engine = new ScoringEngine(
         selectedForm.questions || [],
@@ -509,27 +549,6 @@ export default function DynamicFormPage() {
     }
   }
 
-  // ============ CHECK IF ANSWERED ============
-  const isQuestionAnswered = (q: any) => {
-    const type = q.answerType || q.type || 'short-text'
-    if (type === 'indicator-table' || type === 'likert') {
-      const indicators = q.config?.indicators || []
-      const statements = q.config?.statements || q.options || []
-      const rows = indicators.length > 0 ? indicators : statements
-      if (rows.length === 0) return true
-      return rows.every((_: any, i: number) => 
-        answers[`${q.id}-${i}`] && answers[`${q.id}-${i}`] !== ''
-      )
-    }
-    if (type === 'multiple-choice') {
-      return answers[q.id] && Array.isArray(answers[q.id]) && answers[q.id].length > 0
-    }
-    if (type === 'signature') return answers[q.id] !== null && answers[q.id] !== ''
-    if (type === 'image' || type === 'file-upload') return true
-    return answers[q.id] && answers[q.id] !== ''
-  }
-
-  // ============ RENDER MEDIA/GAMBAR ============
   const renderMedia = (q: any) => {
     const media = q.media || {}
     const imageUrl = q.imageUrl || media.url || ''
@@ -554,7 +573,6 @@ export default function DynamicFormPage() {
     )
   }
 
-  // ============ RENDER QUESTION ============
   const renderQuestion = (q: any, index: number) => {
     const type = q.answerType || q.type || 'short-text'
     const config = q.config || {}
@@ -573,6 +591,12 @@ export default function DynamicFormPage() {
             </p>
             {q.description && <p className="text-xs text-white/30 mt-0.5">{q.description}</p>}
           </div>
+          {q.required && !isAnswered && (
+            <span className="text-[10px] text-rose-400/70 flex-shrink-0">⚠️ Wajib</span>
+          )}
+          {q.required && isAnswered && (
+            <span className="text-[10px] text-emerald-400/70 flex-shrink-0">✅ Terjawab</span>
+          )}
         </div>
         {hasImage && renderMedia(q)}
         <div className="ml-10">{children}</div>
@@ -678,8 +702,14 @@ export default function DynamicFormPage() {
         const scaleLabels = scales.length > 0 ? scales.map((s: any) => s.label || s) : ['STS', 'TS', 'CS', 'S', 'SS']
         const hasReverse = indicators.some((ind: any) => ind.reverse === true)
 
+        const allAnswered = items.every((_: any, i: number) => {
+          const key = `${q.id}-${i}`
+          const val = answers[key]
+          return val && val !== '' && val !== null && val !== undefined
+        })
+
         return (
-          <div id={`q-${q.id}`} className={`p-4 rounded-xl border transition-all ${isAnswered ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-white/[0.05] bg-white/[0.01]'}`}>
+          <div id={`q-${q.id}`} className={`p-4 rounded-xl border transition-all ${allAnswered ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-white/[0.05] bg-white/[0.01]'}`}>
             <div className="flex items-start gap-3 mb-3">
               <span className="w-7 h-7 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-xs font-bold text-cyan-400 flex-shrink-0">{qNum}</span>
               <div className="min-w-0 flex-1">
@@ -689,6 +719,9 @@ export default function DynamicFormPage() {
                 </p>
                 {q.description && <p className="text-xs text-white/30 mt-0.5">{q.description}</p>}
               </div>
+              {q.required && !allAnswered && (
+                <span className="text-[10px] text-rose-400/70 flex-shrink-0">⚠️ Wajib</span>
+              )}
             </div>
             {hasImage && renderMedia(q)}
             <div className="ml-2 sm:ml-10 overflow-x-auto -mx-2 px-2">
@@ -710,13 +743,17 @@ export default function DynamicFormPage() {
                   {items.map((row: string, i: number) => {
                     const isReverse = indicators[i]?.reverse === true
                     const displayRow = isReverse ? `${row} ↕` : row
+                    const isRowAnswered = answers[`${q.id}-${i}`] && answers[`${q.id}-${i}`] !== ''
                     
                     return (
-                      <tr key={i} className="border-t border-white/[0.05]">
+                      <tr key={i} className={`border-t border-white/[0.05] ${!isRowAnswered && q.required ? 'bg-rose-500/5' : ''}`}>
                         <td className="py-2 px-2 sm:px-3 text-sm text-white/60 break-words">
                           {displayRow}
                           {isReverse && (
                             <span className="text-[8px] text-amber-400/50 ml-0.5">(STS=baik)</span>
+                          )}
+                          {q.required && !isRowAnswered && (
+                            <span className="text-[8px] text-rose-400/50 ml-1">⚠️</span>
                           )}
                         </td>
                         {scaleLabels.map((label: string) => (
@@ -786,7 +823,6 @@ export default function DynamicFormPage() {
     }
   }
 
-  // ============ PAGINATION HELPERS ============
   const allQuestions = selectedForm?.questions || []
   
   const stageGroups = useMemo(() => {
@@ -806,7 +842,6 @@ export default function DynamicFormPage() {
   const answeredInStage = currentStageQuestions.filter((q: any) => isQuestionAnswered(q)).length
   const totalInStage = currentStageQuestions.length
 
-  // ===== OVERALL PROGRESS - TAMBAHKAN INI =====
   const totalQuestions = allQuestions.length
   const totalAnswered = allQuestions.filter((q: any) => isQuestionAnswered(q)).length
   const overallProgress = totalQuestions > 0 ? Math.round((totalAnswered / totalQuestions) * 100) : 0
@@ -815,8 +850,21 @@ export default function DynamicFormPage() {
   const isFirstStage = currentStageIndex === 0
   const isFirstPage = currentPageIndex === 0
 
-  // ============ NAVIGASI SEDERHANA ============
   const handleNavigate = () => {
+    const unansweredInPage = paginatedQuestions.filter((q: any) => !isQuestionAnswered(q))
+
+    if (unansweredInPage.length > 0) {
+      const firstUnanswered = unansweredInPage[0]
+      showToastMessage(`${unansweredInPage.length} pertanyaan belum diisi di halaman ini`, 'error')
+      scrollToQuestion(firstUnanswered.id)
+      return
+    }
+
+    if (isLastStage && isLastPage) {
+      handleSubmit()
+      return
+    }
+
     if (currentPageIndex < totalPagesInStage - 1) {
       setCurrentPageIndex(currentPageIndex + 1)
       window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -829,21 +877,20 @@ export default function DynamicFormPage() {
       window.scrollTo({ top: 0, behavior: 'smooth' })
       return
     }
-
-    handleSubmit()
   }
 
   const isNextDisabled = () => {
     if (isSubmitting) return true
-    const hasRequiredUnanswered = paginatedQuestions.some((q: any) => {
-      if (!q.required) return false
-      return !isQuestionAnswered(q)
-    })
-    return hasRequiredUnanswered
+    return paginatedQuestions.some((q: any) => !isQuestionAnswered(q))
   }
+
+  const unansweredCount = paginatedQuestions.filter((q: any) => !isQuestionAnswered(q)).length
 
   const getButtonLabel = () => {
     if (isSubmitting) return 'Mengirim...'
+    if (isLastStage && isLastPage) {
+      return 'Kirim Jawaban'
+    }
     if (currentPageIndex < totalPagesInStage - 1) {
       return 'Selanjutnya'
     }
@@ -856,7 +903,6 @@ export default function DynamicFormPage() {
     return 'Kirim Jawaban'
   }
 
-  // ============ LOADING ============
   if (loading) {
     return (
       <div className="min-h-screen bg-[#06060E] flex items-center justify-center">
@@ -868,7 +914,6 @@ export default function DynamicFormPage() {
     )
   }
 
-  // ============ RESULT PAGE ============
   if (currentPage === 'result' && scoringResult) {
     return (
       <ResultPage
@@ -888,7 +933,6 @@ export default function DynamicFormPage() {
     )
   }
 
-  // ============ GROUP DASHBOARD ============
   if (formType === 'group' && currentPage === 'dashboard') {
     return (
       <div className="min-h-screen bg-[#06060E] text-white">
@@ -935,7 +979,6 @@ export default function DynamicFormPage() {
     )
   }
 
-  // ============ SINGLE FORM WITH SIMPLE NAVIGATION ============
   if (selectedForm && currentPage === 'form') {
     const stageName = stageGroups.length > 1 
       ? getStageName(currentStageQuestions[0]?.stageId || '', currentStageIndex)
@@ -1045,7 +1088,7 @@ export default function DynamicFormPage() {
                 className={`px-6 py-2.5 rounded-xl text-sm font-semibold transition-all flex items-center gap-2 shadow-lg ${
                   isSubmitting 
                     ? 'bg-white/10 text-white/40 cursor-not-allowed' 
-                    : currentStageIndex === stageGroups.length - 1 && currentPageIndex === totalPagesInStage - 1
+                    : isLastStage && isLastPage
                       ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-emerald-600/25'
                       : 'bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white shadow-cyan-600/25'
                 }`}
@@ -1057,21 +1100,24 @@ export default function DynamicFormPage() {
                   </>
                 ) : (
                   <>
-                    {currentStageIndex === stageGroups.length - 1 && currentPageIndex === totalPagesInStage - 1 ? (
+                    {unansweredCount > 0 ? (
+                      <span className="text-xs mr-1 text-amber-400/80">({unansweredCount} belum)</span>
+                    ) : null}
+                    {buttonLabel}
+                    {!isSubmitting && (isLastStage && isLastPage ? (
                       <Icon name="send" className="w-4 h-4" />
                     ) : (
                       <Icon name="chevronRight" className="w-4 h-4" />
-                    )}
-                    {buttonLabel}
+                    ))}
                   </>
                 )}
               </button>
             </div>
 
-            {paginatedQuestions.some((q: any) => q.required && !isQuestionAnswered(q)) && (
+            {unansweredCount > 0 && (
               <p className="text-xs text-rose-400/70 text-center mt-3 flex items-center justify-center gap-1.5">
                 <Icon name="alertCircle" className="w-3.5 h-3.5" />
-                Jawab semua pertanyaan bertanda * untuk melanjutkan
+                Jawab semua pertanyaan ({unansweredCount} tersisa) untuk melanjutkan
               </p>
             )}
           </div>
@@ -1110,7 +1156,6 @@ export default function DynamicFormPage() {
     )
   }
 
-  // ============ FALLBACK ============
   return (
     <div className="min-h-screen bg-[#06060E] flex items-center justify-center">
       <div className="text-center px-4">
