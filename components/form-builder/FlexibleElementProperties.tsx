@@ -1,4 +1,5 @@
 // components/form-builder/FlexibleElementProperties.tsx
+
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
@@ -8,7 +9,6 @@ import {
   ANSWER_TYPES, 
   MEDIA_TYPES, 
   IDENTIFIER_TYPES, 
-  SCORING_SCHEMES,
   getDefaultConfig,
   AnswerType,
   IndicatorItem,
@@ -23,6 +23,10 @@ interface FlexibleElementPropertiesProps {
   onSave: (updatedElement: FlexibleQuestion) => void
   formId?: string | null
   formCode?: string
+  validationMode?: 'all_required' | 'all_required_except' | 'free'
+  validationExceptions?: string[]
+  allowScoringOverride?: boolean
+  onScoringOverride?: (questionId: string, points: number | null) => void
 }
 
 export function FlexibleElementProperties({
@@ -32,10 +36,14 @@ export function FlexibleElementProperties({
   onSave,
   formId,
   formCode,
+  validationMode = 'all_required',
+  validationExceptions = [],
+  allowScoringOverride = true,
+  onScoringOverride,
 }: FlexibleElementPropertiesProps) {
   const [localElement, setLocalElement] = useState<FlexibleQuestion | null>(null)
   const [showConfirm, setShowConfirm] = useState(false)
-  const [activeTab, setActiveTab] = useState<'basic' | 'answer' | 'media' | 'scoring'>('basic')
+  const [activeTab, setActiveTab] = useState<'basic' | 'answer' | 'media'>('basic')
   const [isUploading, setIsUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -63,6 +71,30 @@ export function FlexibleElementProperties({
     }
   }
 
+  // ===== CEK APAKAH PERTANYAAN TERMASUK EXCEPTION =====
+  const isException = (questionId: string): boolean => {
+    return validationExceptions.includes(questionId)
+  }
+
+  // ===== CEK APAKAH PERTANYAAN WAJIB =====
+  const isQuestionRequired = (): boolean => {
+    if (validationMode === 'free') return false
+    if (validationMode === 'all_required_except') {
+      return !isException(localElement.id)
+    }
+    return localElement.required
+  }
+
+  // ===== APAKAH USER BISA MENGUBAH STATUS WAJIB? =====
+  const canChangeRequired = (): boolean => {
+    if (validationMode === 'all_required') return false
+    if (validationMode === 'free') return false
+    if (validationMode === 'all_required_except') {
+      return true
+    }
+    return true
+  }
+
   const handleAnswerTypeChange = (newType: AnswerType) => {
     const currentType = localElement.answerType
     const currentConfig = localElement.config
@@ -78,8 +110,15 @@ export function FlexibleElementProperties({
       if (newType === 'single-choice' && currentConfig.correctAnswer) {
         newConfig = { ...newConfig, correctAnswer: currentConfig.correctAnswer }
       }
+      if (newType === 'multiple-choice' && Array.isArray(currentConfig.correctAnswer)) {
+        newConfig = { ...newConfig, correctAnswer: currentConfig.correctAnswer }
+      }
     } else if (isTextGroup(currentType) && isTextGroup(newType)) {
-      newConfig = { placeholder: currentConfig.placeholder || 'Tulis jawaban...' }
+      newConfig = { 
+        placeholder: currentConfig.placeholder || 'Tulis jawaban...',
+        minLength: currentConfig.minLength || 0,
+        maxLength: currentConfig.maxLength || (newType === 'short-text' ? 200 : 1000),
+      }
     } else if (isScaleGroup(currentType) && isScaleGroup(newType)) {
       newConfig = { ...currentConfig }
     } else {
@@ -94,7 +133,7 @@ export function FlexibleElementProperties({
         ...localElement.scoring,
         scheme: newType === 'indicator-table' ? 'indicator' : 
                 newType === 'rating' ? 'rating' :
-                newType === 'single-choice' ? 'binary' : 'none'
+                newType === 'single-choice' || newType === 'multiple-choice' ? 'binary' : 'none'
       }
     })
   }
@@ -141,120 +180,50 @@ export function FlexibleElementProperties({
     }
   }
 
-  // ============ TAB 1: PENGATURAN DASAR ============
-  const renderBasicTab = () => {
-    return (
-      <div className="space-y-4">
-        <div className="space-y-1.5">
-          <label className="text-xs text-white/50 uppercase tracking-wider">
-            {localElement.answerType === 'indicator-table' ? 'Judul Tabel' : 
-             localElement.answerType === 'signature' ? 'Label Tanda Tangan' : 
-             'Pertanyaan'} <span className="text-rose-400">*</span>
-          </label>
-          <input
-            type="text"
-            value={localElement.question}
-            onChange={(e) => setLocalElement({ ...localElement, question: e.target.value })}
-            className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-white placeholder-white/20 focus:outline-none focus:border-cyan-400/40 transition-all"
-            placeholder={
-              localElement.answerType === 'indicator-table' ? 'Judul tabel pertanyaan...' : 
-              localElement.answerType === 'signature' ? 'Label tanda tangan...' :
-              'Masukkan pertanyaan...'
-            }
-          />
-        </div>
-        <div className="space-y-1.5">
-          <label className="text-xs text-white/50 uppercase tracking-wider">Deskripsi Tambahan (opsional)</label>
-          <input
-            type="text"
-            value={localElement.description || ''}
-            onChange={(e) => setLocalElement({ ...localElement, description: e.target.value })}
-            className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-white placeholder-white/20 focus:outline-none focus:border-cyan-400/40 transition-all"
-            placeholder="Deskripsi atau instruksi pengerjaan..."
-          />
-        </div>
-        <div className="space-y-1.5">
-          <label className="text-xs text-white/50 uppercase tracking-wider">Sifat Pertanyaan</label>
-          <div className="flex items-center gap-4">
-            <label className="flex items-center gap-2 text-sm text-white/60 cursor-pointer">
-              <input
-                type="radio"
-                name="required-radio"
-                checked={localElement.required === true}
-                onChange={() => setLocalElement({ ...localElement, required: true })}
-                className="accent-cyan-400 w-4 h-4"
-              /> Ya, Wajib Diisi
-            </label>
-            <label className="flex items-center gap-2 text-sm text-white/60 cursor-pointer">
-              <input
-                type="radio"
-                name="required-radio"
-                checked={localElement.required === false}
-                onChange={() => setLocalElement({ ...localElement, required: false })}
-                className="accent-cyan-400 w-4 h-4"
-              /> Opsional
-            </label>
-          </div>
-        </div>
-        <div className="space-y-1.5 pt-2 border-t border-white/[0.06]">
-          <label className="text-xs text-white/50 uppercase tracking-wider">Gunakan Sebagai Penanda Biodata</label>
-          <select
-            value={localElement.identifierType || 'none'}
-            onChange={(e) => setLocalElement({
-              ...localElement,
-              isIdentifier: e.target.value !== 'none',
-              identifierType: e.target.value as any,
-            })}
-            className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-white/70 focus:outline-none focus:border-cyan-400/40 transition-all cursor-pointer"
-          >
-            {IDENTIFIER_TYPES.map((type) => (
-              <option key={type.value} value={type.value} className="bg-[#0e0e1a]">
-                {type.label}
-              </option>
-            ))}
-          </select>
-          <p className="text-[10px] text-white/25">Pemetaan otomatis kolom identitas responden pada dashboard laporan.</p>
-        </div>
-      </div>
-    )
+  // ============ GET LABEL MODE VALIDASI ============
+  const getValidationModeLabel = (): string => {
+    switch (validationMode) {
+      case 'all_required': return 'Semua Wajib'
+      case 'all_required_except': return 'Kecuali yang Dipilih'
+      case 'free': return 'Bebas (Tidak Wajib)'
+      default: return 'Semua Wajib'
+    }
   }
 
-  // ============ TAB 2: OPSI JAWABAN & TIPE INPUT ============
-  const renderAnswerTab = () => {
-    const config = localElement.config
-    const answerType = localElement.answerType
-    return (
-      <div className="space-y-4">
-        <div className="space-y-1.5">
-          <label className="text-xs text-white/50 uppercase tracking-wider">Ubah Tipe Render Input</label>
-          <div className="grid grid-cols-2 gap-1.5">
-            {ANSWER_TYPES.map((type) => (
-              <button
-                key={type.value}
-                type="button"
-                onClick={() => handleAnswerTypeChange(type.value)}
-                className={`px-3 py-2 rounded-xl text-xs font-medium transition-all text-left flex items-center gap-2 border ${
-                  localElement.answerType === type.value
-                    ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30'
-                    : 'bg-white/[0.02] text-white/50 hover:text-white/80 border-white/[0.05] hover:border-white/10'
-                }`}
-              >
-                <Icon name={type.icon as any} className="w-3.5 h-3.5 shrink-0" />
-                <span className="truncate">{type.label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="pt-3 border-t border-white/[0.06]">
-          {renderConfigByType(answerType, config)}
-        </div>
-      </div>
-    )
+  const getValidationModeDescription = (): string => {
+    switch (validationMode) {
+      case 'all_required': 
+        return '⚡ Semua pertanyaan wajib diisi. Atur di ⚙️ Pengaturan Form → Validasi.'
+      case 'all_required_except': 
+        return '⚡ Hanya pertanyaan yang dipilih yang opsional. Atur di ⚙️ Pengaturan Form → Validasi.'
+      case 'free': 
+        return '⚡ Pertanyaan bersifat opsional. Atur di ⚙️ Pengaturan Form → Validasi.'
+      default: 
+        return '⚡ Semua pertanyaan wajib diisi. Atur di ⚙️ Pengaturan Form → Validasi.'
+    }
   }
 
+  const getValidationModeColor = (): string => {
+    switch (validationMode) {
+      case 'all_required': return 'text-rose-400'
+      case 'all_required_except': return 'text-amber-400'
+      case 'free': return 'text-emerald-400'
+      default: return 'text-rose-400'
+    }
+  }
+
+  // ============ RENDER CONFIG BY TYPE ============
   const renderConfigByType = (type: string, config: any) => {
-    // ========== PILIHAN GANDA / DROPDOWN ==========
     if (['single-choice', 'multiple-choice', 'dropdown'].includes(type)) {
+      const isMultiple = type === 'multiple-choice'
+      const correctAnswer = config.correctAnswer
+      const isCorrect = (opt: string) => {
+        if (isMultiple && Array.isArray(correctAnswer)) {
+          return correctAnswer.includes(opt)
+        }
+        return opt === correctAnswer
+      }
+      
       return (
         <div className="space-y-4">
           <div className="space-y-1.5">
@@ -286,13 +255,16 @@ export function FlexibleElementProperties({
                     className="flex-1 px-4 py-2 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-white placeholder-white/20 focus:outline-none focus:border-cyan-400/40"
                     placeholder={`Opsi ${index + 1}`}
                   />
+                  {isCorrect(opt) && (
+                    <span className="text-[10px] text-emerald-400 font-medium shrink-0">✅ Benar</span>
+                  )}
                   <button
                     type="button"
                     onClick={() => {
                       const newOptions = (config.options || []).filter((_: string, i: number) => i !== index)
                       setLocalElement({ ...localElement, config: { ...config, options: newOptions } })
                     }}
-                    className="p-1.5 rounded-lg hover:bg-red-500/10 transition-colors"
+                    className="p-1.5 rounded-lg hover:bg-red-500/10 transition-colors shrink-0"
                   >
                     <Icon name="trash" className="w-4 h-4 text-white/30 hover:text-red-400" />
                   </button>
@@ -300,29 +272,100 @@ export function FlexibleElementProperties({
               ))}
             </div>
           </div>
-          {type === 'single-choice' && (
+
+          {/* KUNCI JAWABAN */}
+          <div className="space-y-1.5">
+            <label className="text-xs text-white/50 uppercase tracking-wider">
+              {isMultiple ? 'Kunci Jawaban (Pilih yang benar)' : 'Kunci Jawaban Kompetensi'}
+            </label>
             <div className="space-y-1.5">
-              <label className="text-xs text-white/50 uppercase tracking-wider">Kunci Jawaban Kompetensi</label>
-              <select
-                value={config.correctAnswer || ''}
+              {(config.options || []).map((opt: string, i: number) => {
+                const isChecked = isCorrect(opt)
+                return (
+                  <label key={i} className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-all ${
+                    isChecked ? 'bg-emerald-500/10 border border-emerald-500/20' : 'hover:bg-white/[0.03]'
+                  }`}>
+                    <input
+                      type={isMultiple ? 'checkbox' : 'radio'}
+                      name={`correct-answer-${localElement.id}`}
+                      checked={isChecked}
+                      onChange={() => {
+                        let newCorrectAnswer: string | string[] | undefined
+                        if (isMultiple) {
+                          const current = Array.isArray(config.correctAnswer) ? config.correctAnswer : []
+                          newCorrectAnswer = isChecked 
+                            ? current.filter((v: string) => v !== opt)
+                            : [...current, opt]
+                        } else {
+                          newCorrectAnswer = isChecked ? undefined : opt
+                        }
+                        setLocalElement({
+                          ...localElement,
+                          config: { ...config, correctAnswer: newCorrectAnswer }
+                        })
+                      }}
+                      className="accent-cyan-400 w-4 h-4 cursor-pointer"
+                    />
+                    <span className={`text-sm ${isChecked ? 'text-white/90' : 'text-white/50'}`}>{opt}</span>
+                    {isChecked && (
+                      <span className="ml-auto text-[10px] text-emerald-400">
+                        {isMultiple ? '✅ Benar' : '✅ Kunci'}
+                      </span>
+                    )}
+                  </label>
+                )
+              })}
+            </div>
+            <p className="text-[10px] text-white/20 mt-1">
+              {isMultiple 
+                ? 'Pilih semua opsi yang merupakan jawaban benar (Partial scoring)' 
+                : 'Pilih satu opsi sebagai jawaban benar'}
+            </p>
+          </div>
+
+          {/* BOBOT JAWABAN */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-xs text-white/50 uppercase tracking-wider">Bobot Jawaban Benar</label>
+              <input
+                type="number"
+                value={config.scoreCorrect ?? 1}
                 onChange={(e) => setLocalElement({
                   ...localElement,
-                  config: { ...config, correctAnswer: e.target.value }
+                  config: { ...config, scoreCorrect: parseInt(e.target.value) || 1 }
                 })}
-                className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-white/70 focus:outline-none"
-              >
-                <option value="" className="bg-[#0e0e1a]">Tidak dinilai (Umum)</option>
-                {(config.options || []).map((opt: string, i: number) => (
-                  <option key={i} value={opt} className="bg-[#0e0e1a]">{opt}</option>
-                ))}
-              </select>
+                min={0}
+                max={100}
+                className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-white focus:outline-none"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs text-white/50 uppercase tracking-wider">Bobot Jawaban Salah</label>
+              <input
+                type="number"
+                value={config.scoreIncorrect ?? 0}
+                onChange={(e) => setLocalElement({
+                  ...localElement,
+                  config: { ...config, scoreIncorrect: parseInt(e.target.value) || 0 }
+                })}
+                min={0}
+                max={100}
+                className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-white focus:outline-none"
+              />
+            </div>
+          </div>
+          {isMultiple && Array.isArray(config.correctAnswer) && config.correctAnswer.length > 0 && (
+            <div className="p-2 rounded-lg bg-cyan-500/5 border border-cyan-500/10">
+              <p className="text-[10px] text-cyan-400">
+                💡 Total jawaban benar: {config.correctAnswer.length} opsi
+                {config.scoreCorrect !== undefined && ` · Nilai per opsi: ${(config.scoreCorrect / config.correctAnswer.length).toFixed(2)} poin`}
+              </p>
             </div>
           )}
         </div>
       )
     }
 
-    // ========== TEXT INPUT ==========
     if (['short-text', 'long-text'].includes(type)) {
       return (
         <div className="space-y-4">
@@ -369,11 +412,30 @@ export function FlexibleElementProperties({
       )
     }
 
-    // ========== INDIKATOR TABLE ==========
+    // ============================================================
+    // ===== INDICATOR TABLE - DIPERBAIKI =====
+    // ============================================================
     if (type === 'indicator-table') {
+      // Helper untuk menghitung max score
+      const getMaxScaleValue = (): number => {
+        const scales = config.indicatorScales || []
+        if (scales.length === 0) return 5
+        return Math.max(...scales.map((s: IndicatorScale) => s.value))
+      }
+
+      const getTotalMaxScore = (): number => {
+        const indicators = config.indicators || []
+        const maxVal = getMaxScaleValue()
+        let total = 0
+        indicators.forEach((ind: IndicatorItem) => {
+          total += (ind.weight || 1) * maxVal
+        })
+        return total
+      }
+
       return (
         <div className="space-y-5">
-          {/* SKALA JAWABAN */}
+          {/* ===== SKALA JAWABAN ===== */}
           <div className="space-y-1.5">
             <label className="text-xs text-white/50 uppercase tracking-wider flex items-center justify-between">
               <span>Skala Jawaban (Kolom)</span>
@@ -430,45 +492,78 @@ export function FlexibleElementProperties({
               </div>
             ) : (
               <div className="space-y-1.5 max-h-36 overflow-y-auto custom-scrollbar pr-1">
-                {(config.indicatorScales || []).map((scale: IndicatorScale, index: number) => (
-                  <div key={index} className="flex items-center gap-2 p-2 rounded-lg hover:bg-white/[0.02] transition-colors">
-                    <div className="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center shrink-0">
-                      <span className="text-xs text-cyan-400 font-bold">{scale.value}</span>
+                {(config.indicatorScales || []).map((scale: IndicatorScale, index: number) => {
+                  const isLowest = scale.value === Math.min(...config.indicatorScales.map((s: IndicatorScale) => s.value))
+                  const isHighest = scale.value === Math.max(...config.indicatorScales.map((s: IndicatorScale) => s.value))
+                  
+                  return (
+                    <div key={index} className={`flex items-center gap-2 p-2 rounded-lg transition-colors ${
+                      isLowest ? 'bg-red-500/5 border border-red-500/10' :
+                      isHighest ? 'bg-emerald-500/5 border border-emerald-500/10' :
+                      'hover:bg-white/[0.02]'
+                    }`}>
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 font-bold text-xs ${
+                        isLowest ? 'bg-red-500/20 text-red-400 border border-red-500/20' :
+                        isHighest ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/20' :
+                        'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20'
+                      }`}>
+                        {scale.value}
+                      </div>
+                      <input
+                        type="text"
+                        value={scale.label}
+                        onChange={(e) => {
+                          const newScales = [...(config.indicatorScales || [])]
+                          newScales[index] = { ...newScales[index], label: e.target.value }
+                          setLocalElement({ ...localElement, config: { ...config, indicatorScales: newScales } })
+                        }}
+                        className="flex-1 px-3 py-2 rounded-lg bg-transparent border border-transparent hover:border-white/[0.06] focus:border-cyan-400/40 text-sm text-white focus:outline-none transition-all"
+                        placeholder="Label skala"
+                      />
+                      <span className="text-[10px] text-white/20 shrink-0">
+                        {isLowest ? '⬅️ Terendah' : isHighest ? 'Tertinggi ➡️' : `${scale.value} poin`}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newScales = (config.indicatorScales || []).filter((_: IndicatorScale, i: number) => i !== index)
+                          setLocalElement({ 
+                            ...localElement, 
+                            config: { ...config, indicatorScales: newScales, indicatorColumns: newScales.length } 
+                          })
+                        }}
+                        className="p-1.5 rounded-lg hover:bg-red-500/10 transition-colors shrink-0"
+                        title="Hapus skala"
+                      >
+                        <Icon name="trash" className="w-4 h-4 text-white/30 hover:text-red-400" />
+                      </button>
                     </div>
-                    <input
-                      type="text"
-                      value={scale.label}
-                      onChange={(e) => {
-                        const newScales = [...(config.indicatorScales || [])]
-                        newScales[index] = { ...newScales[index], label: e.target.value }
-                        setLocalElement({ ...localElement, config: { ...config, indicatorScales: newScales } })
-                      }}
-                      className="flex-1 px-3 py-2 rounded-lg bg-white/[0.03] border border-white/[0.06] text-sm text-white focus:outline-none focus:border-cyan-400/40"
-                      placeholder="Label skala"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const newScales = (config.indicatorScales || []).filter((_: IndicatorScale, i: number) => i !== index)
-                        setLocalElement({ 
-                          ...localElement, 
-                          config: { ...config, indicatorScales: newScales, indicatorColumns: newScales.length } 
-                        })
-                      }}
-                      className="p-1.5 rounded-lg hover:bg-red-500/10 transition-colors shrink-0"
-                      title="Hapus skala"
-                    >
-                      <Icon name="trash" className="w-4 h-4 text-white/30 hover:text-red-400" />
-                    </button>
-                  </div>
-                ))}
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Info skala */}
+            {config.indicatorScales && config.indicatorScales.length > 0 && (
+              <div className="p-2 rounded-lg bg-cyan-500/5 border border-cyan-500/10">
+                <div className="flex items-center gap-2 text-[10px] text-cyan-400/70">
+                  <Icon name="info" className="w-3.5 h-3.5" />
+                  <span>
+                    Skala: {config.indicatorScales.map((s: IndicatorScale) => `${s.label}=${s.value}`).join(' | ')}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-[10px] text-cyan-400/40 mt-0.5">
+                  <span>⬅️ Rendah ({config.indicatorScales[0]?.label}={config.indicatorScales[0]?.value})</span>
+                  <span className="w-8 h-0.5 bg-cyan-400/20 rounded-full" />
+                  <span>Tinggi ({config.indicatorScales[config.indicatorScales.length - 1]?.label}={config.indicatorScales[config.indicatorScales.length - 1]?.value}) ➡️</span>
+                </div>
               </div>
             )}
           </div>
 
           <div className="border-t border-white/[0.06]" />
 
-          {/* DAFTAR PERTANYAAN */}
+          {/* ===== DAFTAR PERTANYAAN / INDIKATOR ===== */}
           <div className="space-y-1.5">
             <label className="text-xs text-white/50 uppercase tracking-wider flex items-center justify-between">
               <span>Daftar Pertanyaan ({config.indicators?.length || 0})</span>
@@ -481,6 +576,7 @@ export function FlexibleElementProperties({
                       id: `q-${Date.now()}`,
                       label: `Pertanyaan ${(config.indicators || []).length + 1}`,
                       weight: 1,
+                      reverse: false,
                     }
                   ]
                   setLocalElement({ ...localElement, config: { ...config, indicators: newIndicators } })
@@ -498,54 +594,101 @@ export function FlexibleElementProperties({
                 <p className="text-[10px] mt-1">Klik "Tambah Pertanyaan" untuk memulai.</p>
               </div>
             ) : (
-              <div className="space-y-1.5 max-h-72 overflow-y-auto custom-scrollbar pr-1">
-                {(config.indicators || []).map((item: IndicatorItem, index: number) => (
-                  <div key={item.id || index} className="flex items-center gap-2 p-2.5 rounded-lg bg-white/[0.02] border border-white/[0.04] hover:border-white/[0.08] transition-all group">
-                    <div className="w-7 h-7 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center shrink-0">
-                      <span className="text-[10px] text-cyan-400 font-bold">{index + 1}</span>
-                    </div>
-                    
-                    <input
-                      type="text"
-                      value={item.label}
-                      onChange={(e) => {
-                        const newIndicators = [...(config.indicators || [])]
-                        newIndicators[index] = { ...newIndicators[index], label: e.target.value }
-                        setLocalElement({ ...localElement, config: { ...config, indicators: newIndicators } })
-                      }}
-                      className="flex-1 px-3 py-2 rounded-lg bg-white/[0.03] border border-white/[0.06] text-sm text-white placeholder-white/20 focus:outline-none focus:border-cyan-400/40"
-                      placeholder={`Pertanyaan ${index + 1}`}
-                    />
-                    
-                    <div className="flex items-center gap-1 shrink-0">
-                      <span className="text-[10px] text-white/20">B:</span>
-                      <input
-                        type="number"
-                        value={item.weight || 1}
-                        onChange={(e) => {
-                          const newIndicators = [...(config.indicators || [])]
-                          newIndicators[index] = { ...newIndicators[index], weight: parseInt(e.target.value) || 1 }
-                          setLocalElement({ ...localElement, config: { ...config, indicators: newIndicators } })
-                        }}
-                        min={1}
-                        max={10}
-                        className="w-12 px-2 py-2 rounded-lg bg-white/[0.03] border border-white/[0.06] text-xs text-white focus:outline-none focus:border-cyan-400/40 text-center"
-                      />
-                    </div>
-                    
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const newIndicators = (config.indicators || []).filter((_: IndicatorItem, i: number) => i !== index)
-                        setLocalElement({ ...localElement, config: { ...config, indicators: newIndicators } })
-                      }}
-                      className="p-1.5 rounded-lg hover:bg-red-500/10 transition-colors shrink-0 opacity-0 group-hover:opacity-100"
-                      title="Hapus pertanyaan"
+              <div className="space-y-2 max-h-72 overflow-y-auto custom-scrollbar pr-1">
+                {(config.indicators || []).map((item: IndicatorItem, index: number) => {
+                  const maxVal = getMaxScaleValue()
+                  const maxScore = (item.weight || 1) * maxVal
+                  
+                  return (
+                    <div 
+                      key={item.id || index} 
+                      className={`p-3 rounded-xl border transition-all group ${
+                        item.reverse === true 
+                          ? 'bg-amber-500/5 border-amber-500/20' 
+                          : 'bg-white/[0.02] border-white/[0.05] hover:border-white/[0.08]'
+                      }`}
                     >
-                      <Icon name="trash" className="w-4 h-4 text-white/30 hover:text-red-400" />
-                    </button>
-                  </div>
-                ))}
+                      {/* Header: Nomor + Label */}
+                      <div className="flex items-center gap-2">
+                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-[10px] font-bold ${
+                          item.reverse === true 
+                            ? 'bg-amber-500/10 border border-amber-500/20 text-amber-400' 
+                            : 'bg-cyan-500/10 border border-cyan-500/20 text-cyan-400'
+                        }`}>
+                          {index + 1}
+                        </div>
+                        
+                        <input
+                          type="text"
+                          value={item.label}
+                          onChange={(e) => {
+                            const newIndicators = [...(config.indicators || [])]
+                            newIndicators[index] = { ...newIndicators[index], label: e.target.value }
+                            setLocalElement({ ...localElement, config: { ...config, indicators: newIndicators } })
+                          }}
+                          className="flex-1 px-3 py-1.5 rounded-lg bg-transparent border border-transparent hover:border-white/[0.06] focus:border-cyan-400/40 text-sm text-white placeholder-white/20 focus:outline-none transition-all"
+                          placeholder={`Pertanyaan ${index + 1}`}
+                        />
+                        
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newIndicators = (config.indicators || []).filter((_: IndicatorItem, i: number) => i !== index)
+                            setLocalElement({ ...localElement, config: { ...config, indicators: newIndicators } })
+                          }}
+                          className="p-1.5 rounded-lg hover:bg-red-500/10 transition-colors shrink-0 opacity-0 group-hover:opacity-100"
+                        >
+                          <Icon name="trash" className="w-4 h-4 text-white/30 hover:text-red-400" />
+                        </button>
+                      </div>
+                      
+                      {/* Body: Reverse + Bobot + Info Skor */}
+                      <div className="flex items-center gap-4 mt-2 ml-9 flex-wrap">
+                        {/* REVERSE SCORING */}
+                        <label className="flex items-center gap-1.5 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={item.reverse === true}
+                            onChange={(e) => {
+                              const newIndicators = [...(config.indicators || [])]
+                              newIndicators[index] = { ...newIndicators[index], reverse: e.target.checked }
+                              setLocalElement({ ...localElement, config: { ...config, indicators: newIndicators } })
+                            }}
+                            className="accent-cyan-400 w-3.5 h-3.5 cursor-pointer rounded"
+                          />
+                          <span className={`text-[10px] ${item.reverse ? 'text-amber-400 font-medium' : 'text-white/30'}`}>
+                            {item.reverse ? '🔄 STS=Baik (Reverse)' : '↕ Normal (SS=Baik)'}
+                          </span>
+                        </label>
+                        
+                        {/* BOBOT */}
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] text-white/30">⚖️ Bobot:</span>
+                          <input
+                            type="number"
+                            value={item.weight || 1}
+                            onChange={(e) => {
+                              const newIndicators = [...(config.indicators || [])]
+                              newIndicators[index] = { ...newIndicators[index], weight: parseInt(e.target.value) || 1 }
+                              setLocalElement({ ...localElement, config: { ...config, indicators: newIndicators } })
+                            }}
+                            min={1}
+                            max={10}
+                            className="w-14 px-2 py-1 rounded-lg bg-white/[0.03] border border-white/[0.06] text-xs text-white focus:outline-none focus:border-cyan-400/40 text-center"
+                          />
+                          <span className="text-[10px] text-white/20">×</span>
+                        </div>
+                        
+                        {/* INFO SKOR MAKSIMAL */}
+                        <div className="ml-auto">
+                          <span className={`text-[10px] ${maxScore > 0 ? 'text-emerald-400/60' : 'text-white/20'}`}>
+                            📊 Maks: {maxScore} poin
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             )}
           </div>
@@ -566,7 +709,7 @@ export function FlexibleElementProperties({
               />
             </div>
             
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-4 flex-wrap">
               <label className="flex items-center gap-2 text-sm text-white/60 cursor-pointer">
                 <input
                   type="checkbox"
@@ -592,74 +735,123 @@ export function FlexibleElementProperties({
                 />
                 <span>Skor Berbobot</span>
               </label>
+
+              {/* Total Skor Maksimal */}
+              {config.indicators && config.indicators.length > 0 && (
+                <span className="text-[10px] text-cyan-400/60 bg-cyan-500/5 px-3 py-1 rounded-full border border-cyan-500/10">
+                  Total Maks: {getTotalMaxScore()} poin
+                </span>
+              )}
             </div>
           </div>
 
-          {/* PREVIEW MINI TABEL */}
+          {/* ===== PREVIEW MINI TABEL ===== */}
           {config.indicators && config.indicators.length > 0 && config.indicatorScales && config.indicatorScales.length > 0 && (
             <div className="pt-3 border-t border-white/[0.06]">
-              <label className="text-xs text-white/50 uppercase tracking-wider block mb-2">Pratinjau Tabel</label>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs text-white/50 uppercase tracking-wider">Pratinjau Tabel</label>
+                <div className="flex items-center gap-3 text-[9px] text-white/20">
+                  <span>📊 {config.indicators.length} pertanyaan</span>
+                  <span>📋 {config.indicatorScales.length} skala</span>
+                  <span>⚖️ {config.indicators.reduce((sum: number, ind: IndicatorItem) => sum + (ind.weight || 1), 0)} total bobot</span>
+                </div>
+              </div>
               <div className="overflow-x-auto rounded-xl border border-white/[0.08]">
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="bg-white/[0.03]">
                       <th className="text-left py-2 px-3 text-white/40 font-medium border-r border-white/[0.05] w-8">#</th>
-                      <th className="text-left py-2 px-3 text-white/40 font-medium border-r border-white/[0.05]">
+                      <th className="text-left py-2 px-3 text-white/40 font-medium border-r border-white/[0.05] min-w-[150px]">
                         {config.indicatorTitle || 'Pertanyaan'}
+                        {config.indicators?.some((ind: IndicatorItem) => ind.reverse === true) && (
+                          <span className="text-[9px] text-amber-400/60 ml-1">(↕ STS=baik)</span>
+                        )}
                       </th>
-                      {(config.indicatorScales || []).map((scale: IndicatorScale, i: number) => (
-                        <th key={i} className="text-center py-2 px-3 text-white/40 font-medium border-r border-white/[0.05]">
-                          {scale.label}
-                        </th>
-                      ))}
+                      {(config.indicatorScales || []).map((scale: IndicatorScale, i: number) => {
+                        const isLowest = scale.value === Math.min(...config.indicatorScales.map((s: IndicatorScale) => s.value))
+                        const isHighest = scale.value === Math.max(...config.indicatorScales.map((s: IndicatorScale) => s.value))
+                        
+                        return (
+                          <th key={i} className={`text-center py-2 px-3 font-medium border-r border-white/[0.05] min-w-[40px] ${
+                            isLowest ? 'text-red-400/60' : isHighest ? 'text-emerald-400/60' : 'text-white/40'
+                          }`}>
+                            <div className="flex flex-col items-center">
+                              <span className="font-bold">{scale.label}</span>
+                              <span className="text-[8px] text-white/20">({scale.value})</span>
+                            </div>
+                          </th>
+                        )
+                      })}
                       {config.showTotalScore && (
-                        <th className="text-center py-2 px-3 text-white/40 font-medium">Skor</th>
+                        <th className="text-center py-2 px-3 text-white/40 font-medium min-w-[50px]">Skor</th>
                       )}
                     </tr>
                   </thead>
                   <tbody>
-                    {(config.indicators || []).slice(0, 4).map((indicator: IndicatorItem, i: number) => (
-                      <tr key={i} className="border-t border-white/[0.03] hover:bg-white/[0.01]">
-                        <td className="py-2 px-3 text-white/30 border-r border-white/[0.05] text-center">{i + 1}</td>
-                        <td className="py-2 px-3 text-white/60 border-r border-white/[0.05] truncate max-w-[120px]">
-                          {indicator.label}
-                        </td>
-                        {(config.indicatorScales || []).map((_: IndicatorScale, j: number) => (
-                          <td key={j} className="text-center py-2 px-3 border-r border-white/[0.05]">
-                            <input type="radio" disabled className="w-3 h-3 opacity-20" />
+                    {(config.indicators || []).slice(0, 4).map((indicator: IndicatorItem, i: number) => {
+                      const isReverse = indicator.reverse === true
+                      const maxVal = getMaxScaleValue()
+                      const displayLabel = isReverse ? `${indicator.label} 🔄` : indicator.label
+                      
+                      return (
+                        <tr key={i} className={`border-t border-white/[0.03] hover:bg-white/[0.01] ${isReverse ? 'bg-amber-500/5' : ''}`}>
+                          <td className="py-2 px-3 text-white/30 border-r border-white/[0.05] text-center">{i + 1}</td>
+                          <td className="py-2 px-3 text-white/60 border-r border-white/[0.05] truncate max-w-[150px]">
+                            {displayLabel}
+                            {isReverse && (
+                              <span className="text-[8px] text-amber-400/50 ml-1">(STS=baik)</span>
+                            )}
+                            <span className="text-[8px] text-white/20 ml-1">×{indicator.weight || 1}</span>
                           </td>
-                        ))}
-                        {config.showTotalScore && (
-                          <td className="text-center py-2 px-3 text-white/20">-</td>
-                        )}
+                          {(config.indicatorScales || []).map((scale: IndicatorScale, j: number) => {
+                            const isHighlight = (isReverse && scale.value === 1) || (!isReverse && scale.value === maxVal)
+                            return (
+                              <td key={j} className="text-center py-2 px-3 border-r border-white/[0.05]">
+                                <div className={`w-4 h-4 mx-auto rounded-full border transition-all ${
+                                  isHighlight
+                                    ? 'border-emerald-400/50 bg-emerald-500/10 ring-1 ring-emerald-400/30'
+                                    : 'border-white/10'
+                                }`} />
+                              </td>
+                            )
+                          })}
+                          {config.showTotalScore && (
+                            <td className="text-center py-2 px-3 text-white/20">-</td>
+                          )}
+                        </tr>
+                      )
+                    })}
+                    {config.indicators.length > 4 && (
+                      <tr className="border-t border-white/[0.03]">
+                        <td colSpan={2 + (config.indicatorScales || []).length + (config.showTotalScore ? 1 : 0)} 
+                            className="py-2 px-3 text-center text-[10px] text-white/20">
+                          + {config.indicators.length - 4} pertanyaan lainnya
+                        </td>
                       </tr>
-                    ))}
+                    )}
                     {config.showTotalScore && (
                       <tr className="border-t border-white/[0.06] bg-white/[0.02]">
                         <td colSpan={2} className="py-2 px-3 text-white/50 font-medium text-right border-r border-white/[0.05]">
-                          Total Skor
+                          Total Skor Maksimal
                         </td>
                         {(config.indicatorScales || []).map((_: IndicatorScale, i: number) => (
                           <td key={i} className="border-r border-white/[0.05]"></td>
                         ))}
-                        <td className="text-center py-2 px-3 text-cyan-400 font-bold">0</td>
+                        <td className="text-center py-2 px-3 text-cyan-400 font-bold">
+                          {getTotalMaxScore()}
+                        </td>
                       </tr>
                     )}
                   </tbody>
                 </table>
               </div>
-              {config.indicators.length > 4 && (
-                <p className="text-[10px] text-white/20 text-center mt-1">
-                  + {config.indicators.length - 4} pertanyaan lainnya
-                </p>
-              )}
             </div>
           )}
         </div>
       )
     }
 
-    // ========== SIGNATURE ==========
+    // ===== SIGNATURE =====
     if (type === 'signature') {
       return (
         <div className="space-y-4">
@@ -757,7 +949,6 @@ export function FlexibleElementProperties({
             />
           </div>
 
-          {/* Preview Canvas */}
           <div className="pt-3 border-t border-white/[0.06]">
             <label className="text-xs text-white/50 uppercase tracking-wider block mb-2">Pratinjau</label>
             <div 
@@ -775,7 +966,7 @@ export function FlexibleElementProperties({
       )
     }
 
-    // ========== RATING ==========
+    // ===== RATING =====
     if (type === 'rating') {
       return (
         <div className="space-y-4">
@@ -817,7 +1008,7 @@ export function FlexibleElementProperties({
       )
     }
 
-    // ========== NUMBER ==========
+    // ===== NUMBER =====
     if (type === 'number') {
       return (
         <div className="grid grid-cols-3 gap-3">
@@ -852,7 +1043,7 @@ export function FlexibleElementProperties({
       )
     }
 
-    // ========== DATE ==========
+    // ===== DATE =====
     if (type === 'date') {
       return (
         <div className="space-y-4">
@@ -883,7 +1074,7 @@ export function FlexibleElementProperties({
       )
     }
 
-    // ========== FILE UPLOAD ==========
+    // ===== FILE UPLOAD =====
     if (type === 'file-upload') {
       return (
         <div className="space-y-4">
@@ -943,9 +1134,224 @@ export function FlexibleElementProperties({
     return <p className="text-xs text-white/30 italic">Tidak ada konfigurasi parameter khusus untuk tipe ini.</p>
   }
 
-  // ============ TAB 3: MEDIA ============
+  // ============ TAB 1: PENGATURAN DASAR ============
+  const renderBasicTab = () => {
+    const isRequired = isQuestionRequired()
+    const canChange = canChangeRequired()
+    const isExceptionQuestion = isException(localElement.id)
+    
+    return (
+      <div className="space-y-4">
+        <div className="space-y-1.5">
+          <label className="text-xs text-white/50 uppercase tracking-wider">
+            {localElement.answerType === 'indicator-table' ? 'Judul Tabel' : 
+             localElement.answerType === 'signature' ? 'Label Tanda Tangan' : 
+             'Pertanyaan'} <span className="text-rose-400">*</span>
+          </label>
+          <input
+            type="text"
+            value={localElement.question}
+            onChange={(e) => setLocalElement({ ...localElement, question: e.target.value })}
+            className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-white placeholder-white/20 focus:outline-none focus:border-cyan-400/40 transition-all"
+            placeholder={
+              localElement.answerType === 'indicator-table' ? 'Judul tabel pertanyaan...' : 
+              localElement.answerType === 'signature' ? 'Label tanda tangan...' :
+              'Masukkan pertanyaan...'
+            }
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-xs text-white/50 uppercase tracking-wider">Deskripsi Tambahan (opsional)</label>
+          <input
+            type="text"
+            value={localElement.description || ''}
+            onChange={(e) => setLocalElement({ ...localElement, description: e.target.value })}
+            className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-white placeholder-white/20 focus:outline-none focus:border-cyan-400/40 transition-all"
+            placeholder="Deskripsi atau instruksi pengerjaan..."
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-xs text-white/50 uppercase tracking-wider flex items-center gap-2">
+            <span>Sifat Pertanyaan</span>
+            <span className="text-[9px] text-white/20 font-normal">
+              (mode: <span className={getValidationModeColor()}>{getValidationModeLabel()}</span>)
+            </span>
+          </label>
+
+          <div className="p-2.5 rounded-lg bg-cyan-500/5 border border-cyan-500/10 mb-2">
+            <div className="flex items-center gap-2">
+              <Icon name="info" className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />
+              <p className="text-[10px] text-white/40">
+                Mode validasi global: 
+                <span className={`font-medium ml-1 ${getValidationModeColor()}`}>
+                  {getValidationModeLabel()}
+                </span>
+              </p>
+            </div>
+            <p className="text-[9px] text-white/25 mt-0.5 ml-5">
+              {getValidationModeDescription()}
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-4">
+            <label className={`flex items-center gap-2 text-sm cursor-pointer ${
+              !canChange || validationMode === 'all_required'
+                ? 'text-white/40 cursor-not-allowed' 
+                : 'text-white/60 hover:text-white/80'
+            }`}>
+              <input
+                type="radio"
+                name="required-radio"
+                checked={localElement.required === true}
+                onChange={() => {
+                  if (canChange) {
+                    setLocalElement({ ...localElement, required: true })
+                  }
+                }}
+                disabled={!canChange || validationMode === 'all_required'}
+                className={`accent-cyan-400 w-4 h-4 ${
+                  !canChange || validationMode === 'all_required' 
+                    ? 'opacity-30 cursor-not-allowed' 
+                    : 'cursor-pointer'
+                }`}
+              />
+              <span>Ya, Wajib Diisi</span>
+              {(validationMode === 'all_required' || !canChange) && (
+                <span className="text-[9px] text-white/20 ml-1">(global)</span>
+              )}
+            </label>
+            
+            <label className={`flex items-center gap-2 text-sm cursor-pointer ${
+              !canChange || validationMode === 'free'
+                ? 'text-white/40 cursor-not-allowed' 
+                : 'text-white/60 hover:text-white/80'
+            }`}>
+              <input
+                type="radio"
+                name="required-radio"
+                checked={localElement.required === false}
+                onChange={() => {
+                  if (canChange) {
+                    setLocalElement({ ...localElement, required: false })
+                  }
+                }}
+                disabled={!canChange || validationMode === 'free'}
+                className={`accent-cyan-400 w-4 h-4 ${
+                  !canChange || validationMode === 'free'
+                    ? 'opacity-30 cursor-not-allowed' 
+                    : 'cursor-pointer'
+                }`}
+              />
+              <span>Opsional</span>
+              {(validationMode === 'free' || !canChange) && (
+                <span className="text-[9px] text-white/20 ml-1">(global)</span>
+              )}
+            </label>
+
+            {validationMode === 'all_required_except' && (
+              <span className={`text-[9px] px-2 py-0.5 rounded-full ${
+                isExceptionQuestion 
+                  ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                  : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+              }`}>
+                {isExceptionQuestion ? '🔓 Dikecualikan (Opsional)' : '🔒 Wajib (Default)'}
+              </span>
+            )}
+
+            {localElement.overridePoints !== null && (
+              <span className="text-[9px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                ⚡ Override: {localElement.overridePoints} pts
+              </span>
+            )}
+          </div>
+
+          {validationMode === 'all_required_except' && (
+            <div className={`mt-2 p-2 rounded-lg ${
+              isExceptionQuestion 
+                ? 'bg-amber-500/5 border border-amber-500/10'
+                : 'bg-rose-500/5 border border-rose-500/10'
+            }`}>
+              <div className="flex items-center gap-2">
+                <Icon name={isExceptionQuestion ? 'checkCircle' : 'alertCircle'} 
+                  className={`w-3.5 h-3.5 ${
+                    isExceptionQuestion ? 'text-amber-400' : 'text-rose-400'
+                  }`} 
+                />
+                <p className={`text-[10px] ${
+                  isExceptionQuestion ? 'text-amber-400/70' : 'text-rose-400/70'
+                }`}>
+                  {isExceptionQuestion 
+                    ? '✅ Pertanyaan ini OPSIONAL (telah ditambahkan ke daftar pengecualian di ⚙️ Pengaturan Form → Validasi)' 
+                    : '🔒 Pertanyaan ini WAJIB (belum ditambahkan ke daftar pengecualian)'}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-1.5 pt-2 border-t border-white/[0.06]">
+          <label className="text-xs text-white/50 uppercase tracking-wider">Gunakan Sebagai Penanda Biodata</label>
+          <select
+            value={localElement.identifierType || 'none'}
+            onChange={(e) => setLocalElement({
+              ...localElement,
+              isIdentifier: e.target.value !== 'none',
+              identifierType: e.target.value as any,
+            })}
+            className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-white/70 focus:outline-none focus:border-cyan-400/40 transition-all cursor-pointer"
+          >
+            {IDENTIFIER_TYPES.map((type) => (
+              <option key={type.value} value={type.value} className="bg-[#0e0e1a]">
+                {type.label}
+              </option>
+            ))}
+          </select>
+          <p className="text-[10px] text-white/25">Pemetaan otomatis kolom identitas responden pada dashboard laporan.</p>
+        </div>
+      </div>
+    )
+  }
+
+  // ============ TAB 2: OPSI JAWABAN & TIPE INPUT ============
+  const renderAnswerTab = () => {
+    const config = localElement.config
+    const answerType = localElement.answerType
+
+    return (
+      <div className="space-y-4">
+        <div className="space-y-1.5">
+          <label className="text-xs text-white/50 uppercase tracking-wider">Ubah Tipe Render Input</label>
+          <div className="grid grid-cols-2 gap-1.5">
+            {ANSWER_TYPES.map((type) => (
+              <button
+                key={type.value}
+                type="button"
+                onClick={() => handleAnswerTypeChange(type.value)}
+                className={`px-3 py-2 rounded-xl text-xs font-medium transition-all text-left flex items-center gap-2 border ${
+                  localElement.answerType === type.value
+                    ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30'
+                    : 'bg-white/[0.02] text-white/50 hover:text-white/80 border-white/[0.05] hover:border-white/10'
+                }`}
+              >
+                <Icon name={type.icon as any} className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">{type.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="pt-3 border-t border-white/[0.06]">
+          {renderConfigByType(answerType, config)}
+        </div>
+      </div>
+    )
+  }
+
+  // ============ TAB 3: MEDIA LAMPIRAN ============
   const renderMediaTab = () => {
     const media = localElement.media
+    
     return (
       <div className="space-y-4">
         <div className="space-y-1.5">
@@ -1088,72 +1494,10 @@ export function FlexibleElementProperties({
     )
   }
 
-  // ============ TAB 4: AUTOMATED SCORING ============
-  const renderScoringTab = () => {
-    const scoring = localElement.scoring
-    return (
-      <div className="space-y-4">
-        <div className="space-y-1.5">
-          <label className="text-xs text-white/50 uppercase tracking-wider">Skema Evaluasi Kuesioner</label>
-          <select
-            value={scoring.scheme || 'none'}
-            onChange={(e) => setLocalElement({
-              ...localElement,
-              scoring: { ...scoring, scheme: e.target.value as any }
-            })}
-            className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-white/70 focus:outline-none"
-          >
-            {SCORING_SCHEMES.map((scheme) => (
-              <option key={scheme.value} value={scheme.value} className="bg-[#0e0e1a]">
-                {scheme.label}
-              </option>
-            ))}
-          </select>
-          <p className="text-[10px] text-white/25">
-            {localElement.answerType === 'indicator-table' 
-              ? 'Skema Indikator: Skor = Σ (Nilai Skala × Bobot per Pertanyaan).' 
-              : 'Pilih skema penilaian yang sesuai dengan tipe pertanyaan.'}
-          </p>
-        </div>
-        {scoring.scheme !== 'none' && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-xs text-white/50 uppercase tracking-wider">Bobot Pengali Nilai (Weight)</label>
-                <input
-                  type="number"
-                  value={scoring.weight || 1}
-                  onChange={(e) => setLocalElement({
-                    ...localElement,
-                    scoring: { ...scoring, weight: parseInt(e.target.value) || 1 }
-                  })}
-                  min={1}
-                  max={10}
-                  className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-white focus:outline-none focus:border-cyan-400/40"
-                />
-                <p className="text-[10px] text-white/20">Skala pengali bobot standar tingkat kepentingan (1 - 10).</p>
-              </div>
-            </div>
-            {localElement.answerType === 'indicator-table' && scoring.scheme === 'indicator' && (
-              <div className="p-3 rounded-xl bg-cyan-500/5 border border-cyan-500/10">
-                <div className="flex items-start gap-2">
-                  <Icon name="info" className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
-                  <div className="text-xs text-white/50 leading-relaxed">
-                    <p className="text-cyan-400 font-medium mb-1">Perhitungan Skor:</p>
-                    <p>• Skor per pertanyaan = Nilai Skala × Bobot</p>
-                    <p>• Total Skor = Jumlah semua skor pertanyaan</p>
-                    <p className="mt-1 text-white/30">Bobot diatur per pertanyaan di tab "Jawaban & Opsi".</p>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    )
-  }
+  // ============================================================================
+  // MAIN RENDER
+  // ============================================================================
 
-  // ============ MAIN RENDER ============
   return (
     <>
       <div
@@ -1187,7 +1531,6 @@ export function FlexibleElementProperties({
               { id: 'basic', label: 'Dasar', icon: 'settings' },
               { id: 'answer', label: localElement.answerType === 'indicator-table' ? 'Pertanyaan & Skala' : localElement.answerType === 'signature' ? 'Pengaturan' : 'Jawaban & Opsi', icon: localElement.answerType === 'indicator-table' ? 'table' : localElement.answerType === 'signature' ? 'edit' : 'list' },
               { id: 'media', label: 'Media Lampiran', icon: 'image' },
-              { id: 'scoring', label: 'Skema Nilai', icon: 'barChart' },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -1210,7 +1553,6 @@ export function FlexibleElementProperties({
             {activeTab === 'basic' && renderBasicTab()}
             {activeTab === 'answer' && renderAnswerTab()}
             {activeTab === 'media' && renderMediaTab()}
-            {activeTab === 'scoring' && renderScoringTab()}
           </div>
 
           {/* Modal Actions Footer */}
