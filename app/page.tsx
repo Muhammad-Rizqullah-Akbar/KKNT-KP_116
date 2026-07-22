@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Navbar } from '@/components/layout/Navbar'
 import { Footer } from '@/components/layout/Footer'
 import { HeroSection } from '@/components/home/HeroSection'
@@ -11,7 +11,14 @@ import { ArticleModal } from '@/components/home/ArticleModal'
 import { CodeModal } from '@/components/home/CodeModal'
 import { Icon } from '@/components/ui/Icons'
 
-// ============ DATA ============
+// Import Repositori Firestore
+import { 
+  getArticles, 
+  incrementArticleViews, 
+  type ArticleData 
+} from '@/lib/firebase/repositories/articles.repo'
+
+// ============ DATA STATIS / PARTNERSHIP ============
 const partnershipData = {
   kkn: {
     title: 'Program Kuliah Kerja Nyata Tematik Keamanan Pangan Universitas Hasanuddin',
@@ -35,88 +42,6 @@ const partnershipData = {
   }
 }
 
-const articlesData = [
-  {
-    id: 1,
-    title: 'Tren Teknologi 2026: AI & Beyond',
-    slug: 'tren-teknologi-2026-ai-beyond',
-    excerpt: 'Eksplorasi mendalam tentang bagaimana kecerdasan buatan membentuk ulang industri global — dari generative AI hingga edge computing.',
-    category: 'Teknologi',
-    author: 'Dr. Aria Nugraha',
-    authorBio: 'Chief Technology Officer di Aether Global Labs dengan pengalaman 15+ tahun di bidang AI dan machine learning. Alumni MIT dan Stanford.',
-    date: '12 Juli 2026',
-    readTime: 8,
-    views: 12500,
-    image: null,
-    gradient: 'from-emerald-600/30 via-teal-700/20 to-cyan-800/30',
-    icon: 'cpu',
-    iconColor: 'text-emerald-400',
-    content: `
-      <p>Kecerdasan buatan generatif telah menjadi katalis utama transformasi digital di tahun 2026. Teknologi ini tidak lagi sekadar menghasilkan teks atau gambar — kini AI mampu menciptakan video, musik, kode program kompleks, dan bahkan desain produk secara otonom.</p>
-      <h2>1. Revolusi AI Generatif: Dari Teks ke Realitas</h2>
-      <p>Kecerdasan buatan generatif telah menjadi katalis utama transformasi digital di tahun 2026.</p>
-      <blockquote>"Edge AI adalah masa depan komputasi cerdas. Dengan memproses data di perangkat lokal, kita mengurangi latensi hingga 90%."</blockquote>
-      <h2>2. Edge AI & Internet of Things (IoT)</h2>
-      <p>Salah satu tren paling signifikan adalah pergeseran pemrosesan AI dari cloud ke edge devices.</p>
-    `,
-    tags: ['#AI', '#MachineLearning', '#FutureTech']
-  },
-  {
-    id: 2,
-    title: 'Strategi Fundraising Startup',
-    slug: 'strategi-fundraising-startup',
-    excerpt: 'Panduan lengkap mendapatkan pendanaan dari tahap seed hingga series A.',
-    category: 'Bisnis',
-    author: 'Maya Pratiwi, MBA',
-    authorBio: 'Praktisi bisnis dan startup dengan pengalaman 10+ tahun di industri keuangan dan pendanaan.',
-    date: '5 Juli 2026',
-    readTime: 6,
-    views: 8200,
-    image: null,
-    gradient: 'from-rose-600/25 via-pink-700/20 to-orange-800/25',
-    icon: 'piggyBank',
-    iconColor: 'text-rose-400',
-    content: '<p>Panduan lengkap mendapatkan pendanaan dari tahap seed hingga series A.</p>',
-    tags: ['#Fundraising', '#Startup', '#Bisnis']
-  },
-  {
-    id: 3,
-    title: 'Membangun Personal Brand',
-    slug: 'membangun-personal-brand',
-    excerpt: 'Cara efektif membangun reputasi profesional yang kuat di era digital.',
-    category: 'Karir',
-    author: 'Rian Hermawan',
-    authorBio: 'Personal Branding Expert dan Public Speaker dengan pengalaman membangun brand untuk 100+ profesional.',
-    date: '28 Juni 2026',
-    readTime: 5,
-    views: 5600,
-    image: null,
-    gradient: 'from-amber-600/25 via-yellow-700/20 to-orange-800/25',
-    icon: 'badgeCheck',
-    iconColor: 'text-amber-400',
-    content: '<p>Cara efektif membangun reputasi profesional yang kuat di era digital.</p>',
-    tags: ['#PersonalBrand', '#Karir', '#Profesional']
-  },
-  {
-    id: 4,
-    title: 'Data Analytics untuk Bisnis',
-    slug: 'data-analytics-untuk-bisnis',
-    excerpt: 'Optimalkan keputusan bisnis Anda dengan pendekatan data-driven.',
-    category: 'Data',
-    author: 'Dr. Sari Dewanti',
-    authorBio: 'Data Scientist dengan pengalaman 12+ tahun di bidang analitik data dan business intelligence.',
-    date: '20 Juni 2026',
-    readTime: 7,
-    views: 6900,
-    image: null,
-    gradient: 'from-sky-600/25 via-blue-700/20 to-indigo-800/25',
-    icon: 'barChart',
-    iconColor: 'text-sky-400',
-    content: '<p>Optimalkan keputusan bisnis Anda dengan pendekatan data-driven.</p>',
-    tags: ['#DataAnalytics', '#Bisnis', '#DataDriven']
-  }
-]
-
 const galleryData = [
   { id: 1, title: 'Keynote: Masa Depan AI', location: 'Jakarta Convention Center', category: 'Summit 2026', gradient: 'from-amber-700/40 via-orange-800/30 to-rose-900/40' },
   { id: 2, title: 'UI/UX Masterclass', location: 'Bandung Creative Hub', category: 'Workshop', gradient: 'from-violet-700/40 via-purple-800/30 to-indigo-900/40' },
@@ -135,7 +60,26 @@ const categoryBadgeColors: Record<string, string> = {
   Data: 'bg-sky-500/10 text-sky-400 border-sky-500/20',
 }
 
+const categoryIcons: Record<string, string> = {
+  Teknologi: 'cpu',
+  Bisnis: 'piggyBank',
+  Karir: 'badgeCheck',
+  Data: 'barChart',
+}
+
+const categoryGradients: Record<string, string> = {
+  Teknologi: 'from-emerald-600/30 via-teal-700/20 to-cyan-800/30',
+  Bisnis: 'from-rose-600/25 via-pink-700/20 to-orange-800/25',
+  Karir: 'from-amber-600/25 via-yellow-700/20 to-orange-800/25',
+  Data: 'from-sky-600/25 via-blue-700/20 to-indigo-800/25',
+}
+
 export default function HomePage() {
+  // State Data Artikel dari Database
+  const [articles, setArticles] = useState<any[]>([])
+  const [isArticlesLoading, setIsArticlesLoading] = useState(true)
+
+  // State Modals & Toast
   const [isCodeModalOpen, setIsCodeModalOpen] = useState(false)
   const [isArticleModalOpen, setIsArticleModalOpen] = useState(false)
   const [selectedArticle, setSelectedArticle] = useState<any>(null)
@@ -152,7 +96,50 @@ export default function HomePage() {
     setTimeout(() => setShowToast(false), 3000)
   }
 
-  // ============ HANDLE CODE SUBMIT ============
+  // ============ 1. FETCH ARTIKEL DARI FIRESTORE ============
+  useEffect(() => {
+    const fetchPublishedArticles = async () => {
+      setIsArticlesLoading(true)
+      try {
+        const rawArticles = await getArticles()
+        
+        // Filter HANYA artikel yang berstatus 'Published'
+        const published = rawArticles
+          .filter((a: ArticleData) => a.status === 'Published')
+          .map((a: ArticleData) => ({
+            id: a.id,
+            title: a.title,
+            slug: a.slug,
+            excerpt: a.excerpt,
+            category: a.category || 'Teknologi',
+            author: a.author,
+            authorBio: a.authorBio,
+            date: a.date,
+            readTime: a.readTime || 5,
+            views: a.views || 0,
+            image: a.featuredImage || null,
+            gradient: categoryGradients[a.category] || categoryGradients['Teknologi'],
+            icon: categoryIcons[a.category] || 'cpu',
+            iconColor: a.category === 'Teknologi' ? 'text-emerald-400' : 
+                       a.category === 'Bisnis' ? 'text-rose-400' : 
+                       a.category === 'Karir' ? 'text-amber-400' : 'text-sky-400',
+            content: a.content,
+            tags: a.tags ? a.tags.map(t => t.startsWith('#') ? t : `#${t}`) : [],
+            gallery: a.gallery || []
+          }))
+
+        setArticles(published)
+      } catch (error) {
+        console.error('Gagal memuat artikel:', error)
+      } finally {
+        setIsArticlesLoading(false)
+      }
+    }
+
+    fetchPublishedArticles()
+  }, [])
+
+  // ============ 2. HANDLE CODE SUBMIT ============
   const handleCodeSubmit = async (code: string) => {
     setIsLoading(true)
     setCodeError(null)
@@ -176,10 +163,22 @@ export default function HomePage() {
     }
   }
 
-  // ============ ARTICLE MODAL ============
-  const openArticleModal = (article: any) => {
+  // ============ 3. ARTICLE MODAL & INCREMENT VIEWS METRIC ============
+  const openArticleModal = async (article: any) => {
     setSelectedArticle(article)
     setIsArticleModalOpen(true)
+
+    // 🔥 PENTING: Pemicu pencatatan metrik views ke Firestore
+    if (article.id) {
+      try {
+        await incrementArticleViews(article.id)
+        
+        // Update statistik lokal agar counter modal langsung bertambah 1
+        setArticles(prev => prev.map(a => a.id === article.id ? { ...a, views: (a.views || 0) + 1 } : a))
+      } catch (err) {
+        console.error('Gagal menambah views:', err)
+      }
+    }
   }
 
   const closeArticleModal = () => {
@@ -208,8 +207,10 @@ export default function HomePage() {
 
       <ProgramSection data={partnershipData} />
 
+      {/* EdukasiSection Menerima Data Artikel Real-Time Firestore */}
       <EdukasiSection
-        articles={articlesData}
+        articles={articles}
+        isLoading={isArticlesLoading}
         categoryBadgeColors={categoryBadgeColors}
         onOpenArticleModal={openArticleModal}
       />
