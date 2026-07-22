@@ -1,8 +1,12 @@
 'use client'
 
+import Image from 'next/image' // 🔥 Import Image Next.js
 import { Icon } from '@/components/ui/Icons'
 
 export function Footer() {
+  // 🔴 LOGO PATH: Ganti path gambar di sini sesuai file di public/
+  const LOGO_SRC = '/logo.png'
+
   return (
     <footer className="relative w-full max-w-6xl mx-auto mt-6 mb-4 px-4 sm:px-6 lg:px-8">
       <div className="relative overflow-hidden rounded-3xl bg-[#080812] bg-grid-pattern border border-white/[0.05] p-8 sm:p-10 lg:p-12">
@@ -11,15 +15,30 @@ export function Footer() {
         
         <div className="relative z-10 grid grid-cols-1 md:grid-cols-3 gap-10">
           <div className="space-y-4">
+            {/* ============ LOGO UTAMA FOOTER ============ */}
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-violet-500 flex items-center justify-center shadow-lg shadow-cyan-500/20">
-                <Icon name="hexagon" className="w-6 h-6 text-white" />
+              <div className="relative w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center flex-shrink-0">
+                {/* 🔴 IMPLEMENTASI LOGO GAMBAR DENGAN FALLBACK */}
+                <Image
+                  src={LOGO_SRC}
+                  alt="Logo KKNT-KP UH"
+                  width={40}
+                  height={40}
+                  className="w-full h-full object-contain"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none'
+                  }}
+                />
               </div>
-              <span className="font-display font-bold text-xl text-white">KKNT-KP<span className="text-cyan-400"> UH</span></span>
+              <span className="font-display font-bold text-xl text-white">
+                KKNT-KP<span className="text-cyan-400"> UH</span>
+              </span>
             </div>
+
             <p className="text-white/40 text-sm leading-relaxed">
               Program Kuliah Kerja Nyata Tematik Keamanan Pangan Universitas Hasanuddin bekerjasama dengan BPOM.
             </p>
+
             <div className="flex gap-3 pt-2">
               <a href="#" className="w-9 h-9 rounded-lg bg-white/[0.03] border border-white/[0.06] flex items-center justify-center hover:bg-cyan-500/10 hover:border-cyan-400/20 transition-all">
                 <Icon name="facebook" className="w-4 h-4 text-white/60" />
