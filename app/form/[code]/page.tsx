@@ -2,7 +2,7 @@
 
 'use client'
 
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import { Icon } from '@/components/ui/Icons'
@@ -292,10 +292,6 @@ function ResultPage({
           )}
 
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <button onClick={() => window.print()} 
-              className="px-6 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-white/60 hover:text-white transition-all flex items-center justify-center gap-2">
-              <Icon name="printer" className="w-4 h-4" /> Cetak Hasil
-            </button>
             <button onClick={onReset}
               className="px-6 py-2.5 rounded-xl bg-white/[0.05] border border-white/[0.06] text-sm text-white/60 hover:text-white transition-all flex items-center justify-center gap-2">
               <Icon name="rotateCcw" className="w-4 h-4" /> Isi Ulang
@@ -325,7 +321,11 @@ export default function DynamicFormPage() {
   const [answers, setAnswers] = useState<Record<string, any>>({})
   const [currentPage, setCurrentPage] = useState<'dashboard' | 'form' | 'result'>('dashboard')
   const [selectedForm, setSelectedForm] = useState<FormData | null>(null)
+  
+  // State loader UI & Ref Lock untuk Mencegah Double Submission (Debounce/Lock Guard)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const isSubmittingRef = useRef(false)
+
   const [showToast, setShowToast] = useState(false)
   const [toastMessage, setToastMessage] = useState('')
   const [toastType, setToastType] = useState<'success' | 'error'>('success')
@@ -481,19 +481,28 @@ export default function DynamicFormPage() {
     }
   }
 
-  const handleSubmit = async () => {
+  // ============ PROTECTED SUBMIT WITH IMMEDIATE REF LOCK ============
+  const handleSubmit = useCallback(async () => {
     if (!selectedForm) return
     
-    const unanswered = getUnansweredRequired(selectedForm.questions || [])
-    if (unanswered.length > 0) {
-      const firstUnanswered = unanswered[0]
-      showToastMessage(`${unanswered.length} pertanyaan wajib belum diisi`, 'error')
-      scrollToQuestion(firstUnanswered.id)
-      return
-    }
-
+    // Lock secara instan sebelum async state murni berjalan untuk cegah double request
+    if (isSubmittingRef.current) return
+    isSubmittingRef.current = true
     setIsSubmitting(true)
+
     try {
+      const unanswered = getUnansweredRequired(selectedForm.questions || [])
+      if (unanswered.length > 0) {
+        const firstUnanswered = unanswered[0]
+        showToastMessage(`${unanswered.length} pertanyaan wajib belum diisi`, 'error')
+        scrollToQuestion(firstUnanswered.id)
+        
+        // Buka kembali lock jika validasi gagal
+        isSubmittingRef.current = false
+        setIsSubmitting(false)
+        return
+      }
+
       const nameQuestion = selectedForm.questions?.find(q => q.identifierType === 'name')
       const emailQuestion = selectedForm.questions?.find(q => q.identifierType === 'email')
 
@@ -514,7 +523,6 @@ export default function DynamicFormPage() {
       const scoring = selectedForm.scoring || getDefaultScoring()
       const validation = selectedForm.validation || getDefaultValidation()
       
-      // Mapping stage agar includeInScoring selalu ada
       let stages = (selectedForm.stages || []).map(s => ({
         ...s,
         includeInScoring: s.includeInScoring !== false,
@@ -544,10 +552,12 @@ export default function DynamicFormPage() {
     } catch (error) {
       console.error('Error submitting form:', error)
       showToastMessage('Gagal mengirim jawaban. Silakan coba lagi.', 'error')
-    } finally { 
-      setIsSubmitting(false) 
+      
+      // Buka kembali lock jika server/network error
+      isSubmittingRef.current = false
+      setIsSubmitting(false)
     }
-  }
+  }, [selectedForm, answers])
 
   const renderMedia = (q: any) => {
     const media = q.media || {}
@@ -700,7 +710,6 @@ export default function DynamicFormPage() {
         const title = config.indicatorTitle || 'Pertanyaan'
         const items = indicators.length > 0 ? indicators.map((ind: any) => ind.label || ind) : (config.statements || q.options || [])
         const scaleLabels = scales.length > 0 ? scales.map((s: any) => s.label || s) : ['STS', 'TS', 'CS', 'S', 'SS']
-        const hasReverse = indicators.some((ind: any) => ind.reverse === true)
 
         const allAnswered = items.every((_: any, i: number) => {
           const key = `${q.id}-${i}`
@@ -730,9 +739,6 @@ export default function DynamicFormPage() {
                   <tr className="bg-white/[0.02]">
                     <th className="text-left text-xs text-white/40 font-medium py-2 px-2 sm:px-3">
                       {title}
-                      {hasReverse && (
-                        <span className="text-[9px] text-amber-400/60 ml-1">(↕ STS=baik)</span>
-                      )}
                     </th>
                     {scaleLabels.map((label: string) => (
                       <th key={label} className="text-center text-xs text-white/40 font-medium py-2 px-1 sm:px-2">{label}</th>
@@ -741,17 +747,12 @@ export default function DynamicFormPage() {
                 </thead>
                 <tbody>
                   {items.map((row: string, i: number) => {
-                    const isReverse = indicators[i]?.reverse === true
-                    const displayRow = isReverse ? `${row} ↕` : row
                     const isRowAnswered = answers[`${q.id}-${i}`] && answers[`${q.id}-${i}`] !== ''
                     
                     return (
                       <tr key={i} className={`border-t border-white/[0.05] ${!isRowAnswered && q.required ? 'bg-rose-500/5' : ''}`}>
                         <td className="py-2 px-2 sm:px-3 text-sm text-white/60 break-words">
-                          {displayRow}
-                          {isReverse && (
-                            <span className="text-[8px] text-amber-400/50 ml-0.5">(STS=baik)</span>
-                          )}
+                          {row}
                           {q.required && !isRowAnswered && (
                             <span className="text-[8px] text-rose-400/50 ml-1">⚠️</span>
                           )}
@@ -851,6 +852,8 @@ export default function DynamicFormPage() {
   const isFirstPage = currentPageIndex === 0
 
   const handleNavigate = () => {
+    if (isSubmitting || isSubmittingRef.current) return
+
     const unansweredInPage = paginatedQuestions.filter((q: any) => !isQuestionAnswered(q))
 
     if (unansweredInPage.length > 0) {
@@ -921,6 +924,8 @@ export default function DynamicFormPage() {
         formTitle={selectedForm?.title || 'Formulir'}
         onReset={() => {
           if (selectedForm) {
+            isSubmittingRef.current = false
+            setIsSubmitting(false)
             initializeAnswers(selectedForm)
             setCurrentPage('form')
             setScoringResult(null)
@@ -1066,6 +1071,7 @@ export default function DynamicFormPage() {
             <div className="flex flex-wrap items-center justify-between gap-3 mt-8 pt-6 border-t border-white/[0.06]">
               <button
                 onClick={() => {
+                  if (isSubmitting) return
                   if (currentPageIndex > 0) {
                     setCurrentPageIndex(currentPageIndex - 1)
                     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -1075,7 +1081,7 @@ export default function DynamicFormPage() {
                     window.scrollTo({ top: 0, behavior: 'smooth' })
                   }
                 }}
-                disabled={isFirstStage && isFirstPage}
+                disabled={isFirstStage && isFirstPage || isSubmitting}
                 className="px-4 py-2.5 rounded-xl text-sm font-medium bg-white/[0.02] border border-white/[0.06] text-white/60 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center gap-1.5"
               >
                 <Icon name="chevronLeft" className="w-4 h-4" />
