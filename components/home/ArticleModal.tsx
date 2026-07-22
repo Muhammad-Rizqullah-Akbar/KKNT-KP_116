@@ -25,6 +25,10 @@ export function ArticleModal({ article, isOpen, onClose, categoryBadgeColors }: 
 
   if (!isOpen || !article) return null
 
+  // Deduplikasi array tag agar key tidak bentrok
+  const uniqueTags = Array.from(new Set(article.tags || []))
+  const displayImage = article.image || article.featuredImage || null
+
   return (
     <div
       className="fixed inset-0 z-[70] flex items-center justify-center p-4 overflow-y-auto"
@@ -42,14 +46,23 @@ export function ArticleModal({ article, isOpen, onClose, categoryBadgeColors }: 
           <Icon name="x" className="w-5 h-5 text-white" />
         </button>
 
-        <div className={`relative h-56 sm:h-72 rounded-t-3xl overflow-hidden bg-gradient-to-br ${article.gradient}`}>
-          <div className="absolute inset-0 flex items-center justify-center">
-            <Icon name={article.icon as any} className={`w-20 h-20 ${article.iconColor} opacity-40`} />
-          </div>
+        {/* Header Banner / Featured Image */}
+        <div className={`relative h-56 sm:h-72 rounded-t-3xl overflow-hidden bg-gradient-to-br ${article.gradient || 'from-emerald-700/40 to-cyan-800/40'}`}>
+          {displayImage ? (
+            <img 
+              src={displayImage} 
+              alt={article.title || 'Featured'} 
+              className="w-full h-full object-cover" 
+            />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Icon name={(article.icon as any) || 'fileText'} className={`w-20 h-20 ${article.iconColor || 'text-emerald-400'} opacity-40`} />
+            </div>
+          )}
           <div className="absolute inset-0 bg-gradient-to-t from-[#0e0e1a] via-transparent to-transparent" />
-          <div className="absolute bottom-4 left-6">
-            <span className={`px-3 py-1 rounded-full text-xs font-medium ${categoryBadgeColors[article.category]}`}>
-              {article.category}
+          <div className="absolute bottom-4 left-6 z-10">
+            <span className={`px-3 py-1 rounded-full text-xs font-medium ${categoryBadgeColors[article.category] || 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'}`}>
+              {article.category || 'Edukasi'}
             </span>
           </div>
         </div>
@@ -61,48 +74,56 @@ export function ArticleModal({ article, isOpen, onClose, categoryBadgeColors }: 
             </h2>
             <div className="flex flex-wrap items-center gap-4 text-xs text-white/40">
               <span className="flex items-center gap-1.5">
-                <Icon name="calendar" className="w-3.5 h-3.5" /> {article.date}
+                <Icon name="calendar" className="w-3.5 h-3.5" /> {article.date || '—'}
               </span>
               <span className="text-white/20">•</span>
               <span className="flex items-center gap-1.5">
-                <Icon name="clock" className="w-3.5 h-3.5" /> {article.readTime} menit baca
+                <Icon name="clock" className="w-3.5 h-3.5" /> {article.readTime || 5} menit baca
               </span>
               <span className="text-white/20">•</span>
               <span className="flex items-center gap-1.5">
-                <Icon name="eye" className="w-3.5 h-3.5" /> {article.views.toLocaleString()} views
+                <Icon name="eye" className="w-3.5 h-3.5" /> {(article.views || 0).toLocaleString()} views
               </span>
               <span className="text-white/20">•</span>
               <span className="flex items-center gap-1.5">
-                <Icon name="user" className="w-3.5 h-3.5" /> {article.author}
+                <Icon name="user" className="w-3.5 h-3.5" /> {article.author || 'Penulis'}
               </span>
             </div>
           </div>
 
-          <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.06]">
-            <p className="text-white/60 text-sm leading-relaxed italic">
-              "{article.excerpt}"
-            </p>
-          </div>
+          {article.excerpt && (
+            <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+              <p className="text-white/60 text-sm leading-relaxed italic">
+                "{article.excerpt}"
+              </p>
+            </div>
+          )}
 
           <div className="prose prose-invert max-w-none text-white/60 text-sm leading-relaxed space-y-4">
-            <div dangerouslySetInnerHTML={{ __html: article.content }} />
+            <div dangerouslySetInnerHTML={{ __html: article.content || '' }} />
           </div>
 
-          <div className="flex flex-wrap gap-2 pt-4 border-t border-white/[0.06]">
-            {article.tags.map((tag: string) => (
-              <span key={tag} className="px-3 py-1.5 rounded-full bg-emerald-500/8 border border-emerald-500/15 text-xs text-emerald-400">
-                {tag}
-              </span>
-            ))}
-          </div>
+          {/* 🔥 DEDUPLIKASI TAGS + UNIQUE COMBINED KEY */}
+          {uniqueTags.length > 0 && (
+            <div className="flex flex-wrap gap-2 pt-4 border-t border-white/[0.06]">
+              {uniqueTags.map((tag: string, index: number) => (
+                <span 
+                  key={`${tag}-${index}`} 
+                  className="px-3 py-1.5 rounded-full bg-emerald-500/8 border border-emerald-500/15 text-xs text-emerald-400"
+                >
+                  {tag.startsWith('#') ? tag : `#${tag}`}
+                </span>
+              ))}
+            </div>
+          )}
 
           <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.05] flex items-start gap-4">
             <div className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-500 to-cyan-500 flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
-              {article.author.split(' ').map((n: string) => n[0]).join('')}
+              {(article.author || 'A').split(' ').map((n: string) => n[0]).join('')}
             </div>
             <div>
-              <p className="text-sm font-semibold text-white">{article.author}</p>
-              <p className="text-xs text-white/40">{article.authorBio}</p>
+              <p className="text-sm font-semibold text-white">{article.author || 'Penulis Edukasi'}</p>
+              <p className="text-xs text-white/40">{article.authorBio || 'Kontributor Keamanan Pangan'}</p>
             </div>
           </div>
 
