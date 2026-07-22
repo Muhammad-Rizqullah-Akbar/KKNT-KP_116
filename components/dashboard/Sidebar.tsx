@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image' // 🔥 Import Image Next.js
 import { usePathname } from 'next/navigation'
 import { Icon } from '@/components/ui/Icons'
 import { SidebarItem } from './SidebarItem'
@@ -19,9 +20,11 @@ export function Sidebar({ userRole }: SidebarProps) {
   const pathname = usePathname()
   const { user, userData, logout } = useAuth()
 
+  // 🔴 LOGO PATH: Ganti path gambar di sini sesuai file di public/
+  const LOGO_SRC = '/logo.png'
+
   const isSuperAdmin = userRole === 'super_admin'
 
-  // Buat menu items dengan cara yang lebih aman
   const mainMenuItems = [
     { href: '/dashboard/overview', icon: 'dashboard' as const, label: 'Dashboard' },
     { href: '/dashboard/form-builder', icon: 'filePlus' as const, label: 'Form Builder' },
@@ -32,12 +35,10 @@ export function Sidebar({ userRole }: SidebarProps) {
     { href: '/dashboard/analytics', icon: 'barChart' as const, label: 'Laporan & Analisis' },
   ]
 
-  // Settings items - base selalu ada
   const settingsItems = [
     { href: '/dashboard/settings', icon: 'settings' as const, label: 'Pengaturan' },
   ]
 
-  // Tambahkan User Management hanya jika Super Admin
   if (isSuperAdmin) {
     settingsItems.push({
       href: '/dashboard/settings/users',
@@ -83,11 +84,21 @@ export function Sidebar({ userRole }: SidebarProps) {
           isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         )}
       >
-        {/* Logo */}
+        {/* ============ LOGO UTAMA SIDEBAR ============ */}
         <div className="p-4 md:p-6 border-b border-white/[0.05] flex-shrink-0">
           <Link href="/dashboard/overview" className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-500 to-violet-500 flex items-center justify-center shadow-lg shadow-cyan-500/20 flex-shrink-0">
-              <Icon name="hexagon" className="w-5 h-5 text-white" />
+            <div className="relative w-9 h-9 rounded-xl overflow-hidden flex items-center justify-center flex-shrink-0">
+              {/* 🔴 IMPLEMENTASI LOGO GAMBAR DENGAN FALLBACK */}
+              <Image
+                src={LOGO_SRC}
+                alt="Logo KKNT-KP UH"
+                width={36}
+                height={36}
+                className="w-full h-full object-contain"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none'
+                }}
+              />
             </div>
             <div>
               <span className="font-display font-bold text-sm block leading-tight text-white">

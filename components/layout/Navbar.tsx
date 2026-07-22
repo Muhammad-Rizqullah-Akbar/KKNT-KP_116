@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import Image from 'next/image' // 🔥 Impor Image dari Next.js
 import { Icon } from '@/components/ui/Icons'
 import { Button } from '@/components/shared/Button'
 import { clsx } from 'clsx'
@@ -16,6 +17,10 @@ export function Navbar({ transparent = false }: NavbarProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isVisible, setIsVisible] = useState(false)
   const { user, userRole, isAuthenticated } = useAuth()
+
+  // 🔴 LOGO PATH: Ganti string di bawah ini sesuai nama file di folder public/
+  // Contoh: jika file bernama 'public/logo-kkn.png', ubah nilainya jadi '/logo-kkn.png'
+  const LOGO_SRC = '/logo.png' 
 
   useEffect(() => {
     const handleScroll = () => {
@@ -56,7 +61,7 @@ export function Navbar({ transparent = false }: NavbarProps) {
         isVisible && 'opacity-100 pointer-events-auto translate-y-0',
         isScrolled || !transparent
           ? 'bg-[#0a0a16]/80 backdrop-blur-2xl border-b border-white/[0.06] shadow-2xl shadow-black/40'
-          : 'bg-transparent border-b border-transparent'
+          : 'bg-[#0a0a16]/80 backdrop-blur-2xl border-b border-white/[0.06] shadow-2xl shadow-black/40'
       )}
     >
       <div className={clsx(
@@ -65,11 +70,24 @@ export function Navbar({ transparent = false }: NavbarProps) {
           ? 'bg-[#0a0a16]/80 backdrop-blur-2xl border border-white/[0.06] shadow-2xl shadow-black/40 glass-edge-accent'
           : 'bg-transparent border border-transparent'
       )}>
-        {/* Logo - lebih compact di mobile */}
-        <Link href="/" className="flex items-center gap-2 sm:gap-3 group">
-          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-cyan-500 to-violet-500 flex items-center justify-center shadow-lg shadow-cyan-500/20 transition-transform duration-300 group-hover:scale-105 flex-shrink-0">
-            <Icon name="hexagon" className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+        
+        {/* ============ LOGO UTAMA ============ */}
+        <Link href="/" className="flex items-center gap-2.5 sm:gap-3 group">
+          <div className="relative w-8 h-8 sm:w-9 sm:h-9 rounded-xl overflow-hidden flex items-center justify-center flex-shrink-0 transition-transform duration-300 group-hover:scale-105">
+            {/* 🔴 IMPLEMENTASI LOGO GAMBAR DENGAN FALLBACK ICON */}
+            <Image
+              src={LOGO_SRC}
+              alt="Logo KKNT-KP UH"
+              width={36}
+              height={36}
+              className="w-full h-full object-contain"
+              onError={(e) => {
+                // Sembunyikan elemen jika gambar belum diupload di public/
+                e.currentTarget.style.display = 'none'
+              }}
+            />
           </div>
+
           <div className="hidden xs:block">
             <span className="font-display font-bold text-sm sm:text-base block leading-tight text-white">
               KKNT-KP<span className="text-cyan-400"> UH</span>
@@ -78,7 +96,7 @@ export function Navbar({ transparent = false }: NavbarProps) {
           </div>
         </Link>
 
-        {/* Desktop Menu - Responsive */}
+        {/* Desktop Menu */}
         <div className="hidden md:flex items-center gap-4 lg:gap-8">
           <Link href="#program" className="text-sm text-white/60 hover:text-white transition-colors duration-300 relative after:absolute after:bottom-0 after:left-0 after:h-px after:w-0 hover:after:w-full after:bg-cyan-400 after:transition-all">
             Program
@@ -90,9 +108,9 @@ export function Navbar({ transparent = false }: NavbarProps) {
             Galeri
           </Link>
           
-          {/* Dashboard Menu - Hanya muncul jika login & punya akses admin */}
+          {/* Dashboard Menu - Hanya jika login & punya akses admin */}
           {hasAdminAccess && (
-            <Link href="/dashboard/overview" className="text-sm text-cyan-400 hover:text-cyan-300 transition-colors duration-300">
+            <Link href="/dashboard/overview" className="text-sm text-cyan-400 hover:text-cyan-300 transition-colors duration-300 font-medium">
               Dashboard
             </Link>
           )}
@@ -117,34 +135,35 @@ export function Navbar({ transparent = false }: NavbarProps) {
         </button>
       </div>
 
-      {/* Mobile Menu - Responsive */}
+      {/* Mobile Menu */}
       {isMobileMenuOpen && (
         <div className="md:hidden mt-3 p-4 rounded-2xl bg-[#0a0a16]/95 backdrop-blur-2xl border border-white/[0.06] space-y-2 max-h-[80vh] overflow-y-auto">
-          <Link href="#program" className="block px-3 py-2.5 text-sm text-white/60 hover:text-white hover:bg-white/[0.05] rounded-lg transition-colors">
+          <Link href="#program" onClick={() => setIsMobileMenuOpen(false)} className="block px-3 py-2.5 text-sm text-white/60 hover:text-white hover:bg-white/[0.05] rounded-lg transition-colors">
             Program
           </Link>
-          <Link href="#edukasi" className="block px-3 py-2.5 text-sm text-white/60 hover:text-white hover:bg-white/[0.05] rounded-lg transition-colors">
+          <Link href="#edukasi" onClick={() => setIsMobileMenuOpen(false)} className="block px-3 py-2.5 text-sm text-white/60 hover:text-white hover:bg-white/[0.05] rounded-lg transition-colors">
             Edukasi
           </Link>
-          <Link href="#galeri" className="block px-3 py-2.5 text-sm text-white/60 hover:text-white hover:bg-white/[0.05] rounded-lg transition-colors">
+          <Link href="#galeri" onClick={() => setIsMobileMenuOpen(false)} className="block px-3 py-2.5 text-sm text-white/60 hover:text-white hover:bg-white/[0.05] rounded-lg transition-colors">
             Galeri
           </Link>
           
-          {/* Dashboard di mobile - Hanya jika login */}
           {hasAdminAccess && (
-            <Link href="/dashboard/overview" className="block px-3 py-2.5 text-sm text-cyan-400 hover:text-cyan-300 hover:bg-white/[0.05] rounded-lg transition-colors">
+            <Link href="/dashboard/overview" onClick={() => setIsMobileMenuOpen(false)} className="block px-3 py-2.5 text-sm text-cyan-400 hover:text-cyan-300 hover:bg-white/[0.05] rounded-lg transition-colors font-medium">
               Dashboard
             </Link>
           )}
           
           <button
-            onClick={openCodeModal}
+            onClick={() => {
+              setIsMobileMenuOpen(false)
+              openCodeModal()
+            }}
             className="w-full mt-2 px-4 py-3 rounded-xl bg-gradient-to-r from-cyan-600 to-violet-600 hover:from-cyan-500 hover:to-violet-500 text-white text-sm font-medium transition-all flex items-center justify-center gap-2"
           >
             <Icon name="key" className="w-4 h-4" /> Akses Form
           </button>
           
-          {/* Tampilkan info user di mobile jika login */}
           {isAuthenticated && (
             <div className="pt-3 mt-3 border-t border-white/[0.06] flex items-center gap-3 px-3 py-2">
               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-violet-500 flex items-center justify-center text-xs font-bold text-white">
