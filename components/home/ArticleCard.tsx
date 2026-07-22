@@ -3,7 +3,7 @@
 import { Icon } from '@/components/ui/Icons'
 
 interface Article {
-  id: number
+  id: string | number
   title: string
   slug: string
   excerpt: string
@@ -11,9 +11,11 @@ interface Article {
   author: string
   date: string
   readTime: number
-  gradient: string
-  icon: string
-  iconColor: string
+  gradient?: string
+  icon?: string
+  iconColor?: string
+  image?: string | null
+  featuredImage?: string | null
 }
 
 interface ArticleCardProps {
@@ -23,21 +25,35 @@ interface ArticleCardProps {
 }
 
 export function ArticleCard({ article, onClick, categoryBadgeColors }: ArticleCardProps) {
+  const displayImage = article.image || article.featuredImage || null
+
   return (
     <div
       onClick={() => onClick(article)}
       className="group cursor-pointer relative rounded-2xl bg-white/[0.02] backdrop-blur-2xl border border-white/[0.05] hover:border-emerald-500/20 transition-all duration-500 hover:-translate-y-2 hover:bg-white/[0.04] overflow-hidden glass-edge"
     >
       <div className="relative h-44 overflow-hidden">
-        <div className={`absolute inset-0 bg-gradient-to-br ${article.gradient}`} />
-        <div className="absolute inset-0 flex items-center justify-center">
-          <Icon name={article.icon as any} className={`w-16 h-16 ${article.iconColor} opacity-30 group-hover:opacity-50 transition-opacity`} />
-        </div>
+        {displayImage ? (
+          <img 
+            src={displayImage} 
+            alt={article.title} 
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+          />
+        ) : (
+          <>
+            <div className={`absolute inset-0 bg-gradient-to-br ${article.gradient || 'from-emerald-700/40 to-cyan-800/40'}`} />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Icon name={(article.icon as any) || 'fileText'} className={`w-16 h-16 ${article.iconColor || 'text-emerald-400'} opacity-30 group-hover:opacity-50 transition-opacity`} />
+            </div>
+          </>
+        )}
+        
         <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-emerald-400/20 to-transparent" />
-        <div className={`absolute top-3 right-3 px-2.5 py-1 rounded-full bg-black/30 backdrop-blur-sm border border-white/10 text-xs font-medium ${categoryBadgeColors[article.category]}`}>
+        <div className={`absolute top-3 right-3 px-2.5 py-1 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-xs font-medium ${categoryBadgeColors[article.category] || 'text-emerald-400'}`}>
           {article.category}
         </div>
       </div>
+
       <div className="p-5">
         <div className="flex items-center gap-2 text-xs text-white/35 mb-3">
           <Icon name="calendar" className="w-3.5 h-3.5" />
