@@ -6,10 +6,6 @@ import {
 } from '@/lib/firebaseClient'
 import {
   signInWithEmailAndPassword,
-  signInWithPopup,
-  signInWithRedirect,
-  getRedirectResult,
-  GoogleAuthProvider,
   signOut,
   sendPasswordResetEmail,
   updateProfile,
@@ -18,7 +14,6 @@ import {
 import {
   doc,
   getDoc,
-  setDoc,
   updateDoc,
   serverTimestamp,
   collection,
@@ -42,6 +37,25 @@ export interface LoginResult {
   user: User
   role: UserRole
   userData: UserData | null
+}
+
+// ============ HELPER COOKIE FUNCTIONS ============
+
+/**
+ * Sync cookie auth & role ke browser agar middleware server-side bisa membacanya
+ */
+export const setAuthCookies = (role: UserRole) => {
+  if (typeof window === 'undefined') return
+
+  if (role) {
+    // Simpan role dan token indikator selama 24 jam (86400 detik)
+    document.cookie = `user_role=${role}; path=/; max-age=86400; SameSite=Lax; Secure`
+    document.cookie = `auth_token=true; path=/; max-age=86400; SameSite=Lax; Secure`
+  } else {
+    // Hapus cookies saat logout / unauthenticated
+    document.cookie = `user_role=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`
+    document.cookie = `auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`
+  }
 }
 
 // ============ HELPER FUNCTIONS ============
@@ -77,6 +91,9 @@ export const getUserRole = async (uid: string): Promise<UserRole> => {
 
 // ============ AUTH FUNCTIONS ============
 
+/**
+ * Login murni dengan Email & Password
+ */
 export const loginWithEmail = async (
   email: string,
   password: string
@@ -88,107 +105,21 @@ export const loginWithEmail = async (
     const userData = await getUserData(user.uid)
     const role = userData?.role || null
     
+    // Cek apakah user terdaftar sebagai admin/super_admin
+    if (!role || (role !== 'admin' && role !== 'super_admin')) {
+      await signOut(auth)
+      setAuthCookies(null)
+      throw new Error('Akun Anda tidak memiliki hak akses ke Dashboard Admin.')
+    }
+    
+    // Set cookie untuk Next.js middleware
+    setAuthCookies(role)
+    
     return { user, role, userData }
   } catch (error: any) {
     console.error('Login error:', error)
+    setAuthCookies(null)
     throw new Error(error.message || 'Login gagal. Silakan coba lagi.')
-  }
-}
-
-/**
- * ✅ Login dengan Google (deteksi otomatis popup/redirect)
- * Di mobile/tunnel → pakai redirect
- * Di desktop local → pakai popup
- */
-export const loginWithGoogle = async (): Promise<LoginResult> => {
-  try {
-    const provider = new GoogleAuthProvider()
-    
-    // Deteksi apakah ini mobile atau desktop
-    const isMobile = typeof window !== 'undefined' && 
-      (/Android|iPhone|iPad|iPod|webOS/i.test(navigator.userAgent) || 
-       window.innerWidth < 768)
-    
-    // Deteksi apakah di localhost
-    const isLocalhost = typeof window !== 'undefined' && 
-      (window.location.hostname === 'localhost' || 
-       window.location.hostname === '127.0.0.1')
-    
-    if (isMobile || !isLocalhost) {
-      // ✅ Mobile / Tunnel → pakai Redirect (tidak kena popup blocker)
-      await signInWithRedirect(auth, provider)
-      // Redirect akan reload halaman, jadi return dummy
-      return { user: {} as User, role: null, userData: null }
-    } else {
-      // ✅ Desktop Local → pakai Popup
-      const userCredential = await signInWithPopup(auth, provider)
-      const { user } = userCredential
-      
-      const userData = await getUserData(user.uid)
-      
-      if (!userData) {
-        const newUserData: Omit<UserData, 'uid'> = {
-          email: user.email || '',
-          displayName: user.displayName || '',
-          role: 'admin',
-          photoURL: user.photoURL || '',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        }
-        
-        await setDoc(doc(firestore, 'users', user.uid), newUserData)
-        
-        return {
-          user,
-          role: 'admin',
-          userData: { uid: user.uid, ...newUserData },
-        }
-      }
-      
-      return { user, role: userData.role, userData }
-    }
-  } catch (error: any) {
-    console.error('Google login error:', error)
-    throw new Error(error.message || 'Login dengan Google gagal.')
-  }
-}
-
-/**
- * ✅ Handle redirect result (dipanggil setelah halaman reload dari redirect)
- * Panggil ini di useEffect saat halaman login mount
- */
-export const handleGoogleRedirectResult = async (): Promise<LoginResult | null> => {
-  try {
-    const result = await getRedirectResult(auth)
-    if (!result) return null
-    
-    const { user } = result
-    
-    const userData = await getUserData(user.uid)
-    
-    if (!userData) {
-      const newUserData: Omit<UserData, 'uid'> = {
-        email: user.email || '',
-        displayName: user.displayName || '',
-        role: 'admin',
-        photoURL: user.photoURL || '',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      }
-      
-      await setDoc(doc(firestore, 'users', user.uid), newUserData)
-      
-      return {
-        user,
-        role: 'admin',
-        userData: { uid: user.uid, ...newUserData },
-      }
-    }
-    
-    return { user, role: userData.role, userData }
-  } catch (error: any) {
-    console.error('Redirect result error:', error)
-    throw new Error(error.message || 'Login dengan Google gagal.')
   }
 }
 
@@ -198,6 +129,8 @@ export const handleGoogleRedirectResult = async (): Promise<LoginResult | null> 
 export const logout = async (): Promise<void> => {
   try {
     await signOut(auth)
+    // Hapus cookies saat logout
+    setAuthCookies(null)
   } catch (error: any) {
     console.error('Logout error:', error)
     throw new Error(error.message || 'Logout gagal.')
