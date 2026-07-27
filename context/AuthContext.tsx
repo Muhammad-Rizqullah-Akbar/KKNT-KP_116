@@ -1,5 +1,4 @@
-// contexts/AuthContext.tsx
-
+// context/AuthContext.tsx
 'use client'
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
@@ -7,13 +6,12 @@ import { onAuthStateChanged, type User } from 'firebase/auth'
 import { auth } from '@/lib/firebaseClient'
 import { 
   loginWithEmail, 
-  loginWithGoogle, 
-  logout,
-  getUserData,
-  handleGoogleRedirectResult,
-  type UserRole,
-  type UserData,
-  type LoginResult,
+  logout, 
+  getUserData, 
+  setAuthCookies,
+  type UserRole, 
+  type UserData, 
+  type LoginResult, 
 } from '@/lib/auth.repo'
 
 // ============ TYPES ============
@@ -24,7 +22,6 @@ interface AuthContextType {
   loading: boolean
   isAuthenticated: boolean
   login: (email: string, password: string) => Promise<LoginResult>
-  loginWithGoogle: () => Promise<LoginResult>
   logout: () => Promise<void>
   refreshUser: () => Promise<void>
 }
@@ -43,34 +40,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (user) {
       const data = await getUserData(user.uid)
       setUserData(data)
+      setAuthCookies(data?.role || null)
     } else {
       setUserData(null)
+      setAuthCookies(null)
     }
   }
 
-  // ✅ Handle Google redirect result saat halaman dimuat
-  useEffect(() => {
-    const checkRedirectResult = async () => {
-      try {
-        await handleGoogleRedirectResult()
-        // onAuthStateChanged akan otomatis trigger setelah ini
-      } catch (error) {
-        console.error('Redirect result error:', error)
-      }
-    }
-    checkRedirectResult()
-  }, [])
-
-  // Listen to auth state changes
+  // Listen to auth state changes & Sinkronisasi Cookie untuk Middleware
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser)
       
       if (currentUser) {
         const data = await getUserData(currentUser.uid)
-        setUserData(data)
+        
+        // Cek jika user terdaftar sebagai admin/super_admin
+        if (data && (data.role === 'admin' || data.role === 'super_admin')) {
+          setUserData(data)
+          setAuthCookies(data.role)
+        } else {
+          // Jika bukan admin/super_admin, bersihkan session
+          setUserData(null)
+          setAuthCookies(null)
+        }
       } else {
         setUserData(null)
+        setAuthCookies(null)
       }
       
       setLoading(false)
@@ -79,23 +75,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => unsubscribe()
   }, [])
 
-  // Login wrapper
+  // Login Email & Password wrapper
   const login = async (email: string, password: string) => {
     const result = await loginWithEmail(email, password)
     setUser(result.user)
     setUserData(result.userData)
-    return result
-  }
-
-  // Login with Google wrapper
-  const handleLoginWithGoogle = async () => {
-    const result = await loginWithGoogle()
-    // Kalau redirect, result.user akan kosong (halaman reload)
-    // Kalau popup, result.user ada
-    if (result.user && result.user.uid) {
-      setUser(result.user)
-      setUserData(result.userData)
-    }
+    setAuthCookies(result.role)
     return result
   }
 
@@ -104,6 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await logout()
     setUser(null)
     setUserData(null)
+    setAuthCookies(null)
   }
 
   const userRole = userData?.role || null
@@ -115,9 +101,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         userData,
         userRole,
         loading,
-        isAuthenticated: !!user,
+        isAuthenticated: !!user && (userRole === 'admin' || userRole === 'super_admin'),
         login,
-        loginWithGoogle: handleLoginWithGoogle,
         logout: handleLogout,
         refreshUser,
       }}
