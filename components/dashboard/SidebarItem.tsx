@@ -23,7 +23,13 @@ export function SidebarItem({
   onClick,
 }: SidebarItemProps) {
   const pathname = usePathname()
-  const isActive = propIsActive ?? pathname === href
+  const isActive =
+    propIsActive ??
+    (pathname === href ||
+      (href !== '/dashboard/overview' &&
+        href !== '/dashboard' &&
+        href !== '/dashboard/forms' &&
+        pathname.startsWith(href)))
 
   return (
     <Link
@@ -41,8 +47,16 @@ export function SidebarItem({
       {badge && (
         <span
           className={clsx(
-            'text-xs px-2 py-0.5 rounded-full',
-            isActive
+            'text-[10px] font-semibold px-2 py-0.5 rounded-md transition-colors',
+            badge === 'V1.5' || badge === 'Baru'
+              ? 'bg-gradient-to-r from-cyan-500/20 to-emerald-500/20 text-cyan-300 border border-cyan-500/30 font-bold'
+              : badge === 'V1.0' || badge === 'Lama'
+              ? 'bg-slate-800/80 text-slate-400 border border-slate-700/50'
+              : badge === 'CMS'
+              ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+              : badge === 'Admin'
+              ? 'bg-rose-500/15 text-rose-300 border border-rose-500/30'
+              : isActive
               ? 'bg-cyan-500/20 text-cyan-300'
               : 'bg-white/[0.05] text-white/40'
           )}

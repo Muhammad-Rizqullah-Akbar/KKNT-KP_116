@@ -49,11 +49,13 @@ export default function ResponsesDashboardPage() {
 
   const filteredResponses = useMemo(() => {
     return responses.filter((r) => {
+      const term = searchTerm.toLowerCase()
       const matchesSearch =
-        r.responseId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        r.distributionCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        r.formId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (r.respondent?.name && r.respondent.name.toLowerCase().includes(searchTerm.toLowerCase()))
+        (r.responseId || '').toLowerCase().includes(term) ||
+        (r.distributionCode || '').toLowerCase().includes(term) ||
+        (r.formId || '').toLowerCase().includes(term) ||
+        (r.respondent?.name || '').toLowerCase().includes(term) ||
+        (r.respondent?.email || '').toLowerCase().includes(term)
 
       const matchesStatus = statusFilter === 'all' || r.status === statusFilter
 

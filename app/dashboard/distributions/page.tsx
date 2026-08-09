@@ -81,11 +81,12 @@ export default function DistributionsDashboardPage() {
   // Filtered List Client-Side
   const filteredDistributions = useMemo(() => {
     return distributions.filter((d) => {
+      const term = searchTerm.toLowerCase()
       const matchesSearch =
-        d.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        d.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        d.ownerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        d.formId.toLowerCase().includes(searchTerm.toLowerCase())
+        (d.title || '').toLowerCase().includes(term) ||
+        (d.code || '').toLowerCase().includes(term) ||
+        (d.ownerName || '').toLowerCase().includes(term) ||
+        (d.formId || '').toLowerCase().includes(term)
 
       const matchesStatus = statusFilter === 'all' || d.status === statusFilter
       const matchesOwner = ownerFilter === 'all' || d.ownerType === ownerFilter
@@ -419,11 +420,20 @@ export default function DistributionsDashboardPage() {
                     onChange={(e) => setSelectedFormId(e.target.value)}
                     className="w-full bg-slate-950 border border-slate-700 text-slate-100 rounded-xl px-3.5 py-2.5"
                   >
-                    {publishedForms.map((f) => (
-                      <option key={f.formId} value={f.formId}>
-                        {f.metadata.title} ({f.formId} — v{f.activeVersionNumber})
-                      </option>
-                    ))}
+                    {publishedForms.map((f: any) => {
+                      const title =
+                        f?.metadata?.title ||
+                        f?.publicForm?.metadata?.title ||
+                        f?.title ||
+                        f?.formId ||
+                        'Formulir Tanpa Judul'
+                      const vNum = f?.activeVersionNumber || f?.versionNumber || 1
+                      return (
+                        <option key={f.formId || Math.random().toString()} value={f.formId}>
+                          {title} ({f.formId} — v{vNum})
+                        </option>
+                      )
+                    })}
                   </select>
                 )}
               </div>
