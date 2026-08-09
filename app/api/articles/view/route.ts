@@ -1,11 +1,5 @@
 import { NextResponse } from 'next/server'
-import { firestore as db } from '@/lib/firebaseClient'
-import { 
-  doc, 
-  getDoc, 
-  runTransaction, 
-  serverTimestamp 
-} from 'firebase/firestore'
+import { adminFirestore as db } from '@/lib/firebaseAdmin'
 import { createHash } from 'crypto'
 
 /**
@@ -56,11 +50,11 @@ export async function POST(request: Request) {
     const ipHash = generateIpHash(clientIp, todayStr)
     const logId = `${articleId}_${ipHash.substring(0, 24)}_${todayStr}`
     
-    const logRef = doc(db, 'view_logs', logId)
-    const articleRef = doc(db, 'articles', articleId)
+    const logRef = db.collection('view_logs').doc(logId)
+    const articleRef = db.collection('articles').doc(articleId)
 
     // 3. Jalankan Firestore Atomic Transaction
-    const result = await runTransaction(db, async (transaction) => {
+    const result = await db.runTransaction(async (transaction) => {
       // Cek apakah log untuk IP ini hari ini sudah ada
       const logDoc = await transaction.get(logRef)
       if (logDoc.exists()) {
@@ -78,7 +72,7 @@ export async function POST(request: Request) {
         articleId,
         ipHash: ipHash.substring(0, 16), // Simpan porsi hash untuk keperluan audit
         userAgent: request.headers.get('user-agent') || 'Unknown',
-        createdAt: serverTimestamp(),
+        createdAt: new Date(),
         date: todayStr
       })
 
@@ -86,7 +80,7 @@ export async function POST(request: Request) {
       const currentViews = articleDoc.data()?.views || 0
       transaction.update(articleRef, {
         views: currentViews + 1,
-        updatedAt: serverTimestamp()
+        updatedAt: new Date()
       })
 
       return { recorded: true, newViews: currentViews + 1 }
@@ -109,8 +103,8 @@ export async function POST(request: Request) {
       { status: 200 }
     )
 
-  } catch (error: any) {
-    if (error.message === 'ARTICLE_NOT_FOUND') {
+  } catch (error: unknown) {
+    if (error instanceof Error && error.message === 'ARTICLE_NOT_FOUND') {
       return NextResponse.json(
         { error: 'Article not found' }, 
         { status: 404 }

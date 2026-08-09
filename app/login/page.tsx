@@ -34,7 +34,7 @@ export default function LoginPage() {
 
     try {
       await login(email, password)
-      // Redirect akan dihandle oleh useEffect di atas setelah state AuthContext diperbarui
+      router.push('/dashboard/overview')
     } catch (err: any) {
       setError(err.message || 'Login gagal. Silakan periksa kembali email dan password Anda.')
     } finally {
