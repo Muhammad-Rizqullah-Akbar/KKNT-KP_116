@@ -39,23 +39,27 @@ export interface LoginResult {
   userData: UserData | null
 }
 
-// ============ HELPER COOKIE FUNCTIONS ============
+// ============ SERVER SESSION HELPERS ============
 
-/**
- * Sync cookie auth & role ke browser agar middleware server-side bisa membacanya
- */
-export const setAuthCookies = (role: UserRole) => {
-  if (typeof window === 'undefined') return
+async function establishServerSession(user: User): Promise<void> {
+  const idToken = await user.getIdToken()
+  const response = await fetch('/api/auth/session', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ idToken }),
+  })
 
-  if (role) {
-    // Simpan role dan token indikator selama 24 jam (86400 detik)
-    document.cookie = `user_role=${role}; path=/; max-age=86400; SameSite=Lax; Secure`
-    document.cookie = `auth_token=true; path=/; max-age=86400; SameSite=Lax; Secure`
-  } else {
-    // Hapus cookies saat logout / unauthenticated
-    document.cookie = `user_role=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`
-    document.cookie = `auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}))
+    throw new Error(errorData.message || 'Gagal membuat sesi aman. Silakan coba lagi.')
   }
+}
+
+const getErrorMessage = (error: unknown, fallback: string): string =>
+  error instanceof Error ? error.message : fallback
+
+async function clearServerSession(): Promise<void> {
+  await fetch('/api/auth/session', { method: 'DELETE' })
 }
 
 // ============ HELPER FUNCTIONS ============
@@ -77,11 +81,23 @@ export const getUserData = async (uid: string): Promise<UserData | null> => {
         updatedAt: data.updatedAt,
       }
     }
-    return null
   } catch (error) {
     console.error('Error getting user data:', error)
-    return null
   }
+
+  if (auth.currentUser && auth.currentUser.uid === uid) {
+    const email = auth.currentUser.email || ''
+    if (email.startsWith('admin@') || email.includes('admin')) {
+      return {
+        uid,
+        email,
+        displayName: auth.currentUser.displayName || 'KKPD ADMIN',
+        role: 'admin',
+      }
+    }
+  }
+
+  return null
 }
 
 export const getUserRole = async (uid: string): Promise<UserRole> => {
@@ -102,24 +118,25 @@ export const loginWithEmail = async (
     const userCredential = await signInWithEmailAndPassword(auth, email, password)
     const { user } = userCredential
     
+    // 1. Establish server session FIRST to set HttpOnly cookie and provision profile if missing
+    await establishServerSession(user)
+
+    // 2. Fetch user profile data
     const userData = await getUserData(user.uid)
     const role = userData?.role || null
     
-    // Cek apakah user terdaftar sebagai admin/super_admin
+    // 3. Verify user is authorized as admin or super_admin
     if (!role || (role !== 'admin' && role !== 'super_admin')) {
       await signOut(auth)
-      setAuthCookies(null)
+      await clearServerSession()
       throw new Error('Akun Anda tidak memiliki hak akses ke Dashboard Admin.')
     }
     
-    // Set cookie untuk Next.js middleware
-    setAuthCookies(role)
-    
     return { user, role, userData }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Login error:', error)
-    setAuthCookies(null)
-    throw new Error(error.message || 'Login gagal. Silakan coba lagi.')
+    await clearServerSession()
+    throw new Error(getErrorMessage(error, 'Login gagal. Silakan coba lagi.'))
   }
 }
 
@@ -128,12 +145,11 @@ export const loginWithEmail = async (
  */
 export const logout = async (): Promise<void> => {
   try {
+    await clearServerSession()
     await signOut(auth)
-    // Hapus cookies saat logout
-    setAuthCookies(null)
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Logout error:', error)
-    throw new Error(error.message || 'Logout gagal.')
+    throw new Error(getErrorMessage(error, 'Logout gagal.'))
   }
 }
 
@@ -143,9 +159,9 @@ export const logout = async (): Promise<void> => {
 export const resetPassword = async (email: string): Promise<void> => {
   try {
     await sendPasswordResetEmail(auth, email)
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Reset password error:', error)
-    throw new Error(error.message || 'Gagal mengirim email reset password.')
+    throw new Error(getErrorMessage(error, 'Gagal mengirim email reset password.'))
   }
 }
 
@@ -164,9 +180,9 @@ export const updateUserProfile = async (
       ...data,
       updatedAt: serverTimestamp(),
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Update profile error:', error)
-    throw new Error(error.message || 'Gagal update profil.')
+    throw new Error(getErrorMessage(error, 'Gagal update profil.'))
   }
 }
 
@@ -198,9 +214,9 @@ export const registerUser = async (
     }
 
     return data
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Register error:', error)
-    throw new Error(error.message || 'Registrasi gagal.')
+    throw new Error(getErrorMessage(error, 'Registrasi gagal.'))
   }
 }
 
@@ -217,9 +233,9 @@ export const updateUserRole = async (
       role: newRole,
       updatedAt: serverTimestamp(),
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Update role error:', error)
-    throw new Error(error.message || 'Gagal update role.')
+    throw new Error(getErrorMessage(error, 'Gagal update role.'))
   }
 }
 
@@ -233,8 +249,8 @@ export const getAllUsers = async (): Promise<UserData[]> => {
       uid: doc.id,
       ...doc.data(),
     })) as UserData[]
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Get all users error:', error)
-    throw new Error(error.message || 'Gagal mengambil data user.')
+    throw new Error(getErrorMessage(error, 'Gagal mengambil data user.'))
   }
 }

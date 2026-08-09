@@ -1,544 +1,367 @@
-// app/dashboard/forms/page.tsx
-
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Topbar } from '@/components/dashboard/Topbar'
 import { Icon } from '@/components/ui/Icons'
-import { PreviewModal } from '@/components/form-builder/PreviewModal'
-import Link from 'next/link'
-import { 
-  getForms, 
-  deleteForm, 
-  updateFormStatus,
-  createForm,
-  getFormGroups,
-  type FormData,
-  type FormGroup,
-} from '@/lib/firebase/repositories/forms.repo'
+import { FormVersionHistoryModal } from '@/components/forms/v1_5/FormVersionHistoryModal'
+import { FormPreviewModal } from '@/components/forms/v1_5/FormPreviewModal'
+import type { FormAggregateDoc } from '@/lib/firebase/repositories/v1_5/v1_5Forms.repo'
 import { useAuth } from '@/context/AuthContext'
 
-// ============ HELPERS ============
-const generateId = () => Math.random().toString(36).substring(2, 9)
-
-// ============ STATUS MAPPING ============
-const statusColors: Record<string, string> = {
-  draft: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
-  published: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
-  archived: 'text-rose-400 bg-rose-500/10 border-rose-500/20',
-}
-
-const statusLabels: Record<string, string> = {
-  draft: 'Draft',
-  published: 'Published',
-  archived: 'Diarsipkan',
-}
-
-const statusOptions = [
-  { value: 'draft', label: 'Draft', color: 'text-amber-400' },
-  { value: 'published', label: 'Published', color: 'text-emerald-400' },
-  { value: 'archived', label: 'Diarsipkan', color: 'text-rose-400' },
-]
-
-// ============ CATEGORY COLORS ============
-const categoryColors: Record<string, string> = {
-  'Kuesioner': 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20',
-  'Fasilitasi': 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
-  'Observasi': 'text-violet-400 bg-violet-500/10 border-violet-500/20',
-  'Evaluasi': 'text-amber-400 bg-amber-500/10 border-amber-500/20',
-}
-
-// ============ GENERATE FORM CODE ============
-const generateFormCode = () => {
-  const prefix = 'FRM'
-  const random = Math.random().toString(36).substring(2, 6).toUpperCase()
-  return `${prefix}-${random}`
-}
-
-// ============ CONVERT QUESTIONS TO FLEXIBLE QUESTION FORMAT ============
-const convertToFlexibleQuestions = (questions: any[]) => {
-  return (questions || []).map((q: any, index: number) => {
-    // Dapatkan answerType dari berbagai kemungkinan field
-    const answerType = q.answerType || q.type || 'short-text'
-    
-    // Bangun config dari berbagai kemungkinan field
-    const config: any = {
-      options: q.options || q.config?.options || [],
-      placeholder: q.placeholder || q.config?.placeholder || '',
-      statements: q.statements || q.config?.statements || [],
-      scale: q.scale || q.config?.scale || 5,
-      min: q.min || q.config?.min || 0,
-      max: q.max || q.config?.max || 100,
-      step: q.step || q.config?.step || 1,
-      ratingMax: q.ratingMax || q.config?.ratingMax || 5,
-      ratingMin: q.ratingMin || q.config?.ratingMin || 1,
-      indicators: q.indicators || q.config?.indicators || [],
-      indicatorScales: q.indicatorScales || q.config?.indicatorScales || [
-        { value: 1, label: 'STS' },
-        { value: 2, label: 'TS' },
-        { value: 3, label: 'N' },
-        { value: 4, label: 'S' },
-        { value: 5, label: 'SS' },
-      ],
-      indicatorTitle: q.indicatorTitle || q.config?.indicatorTitle || 'Pertanyaan',
-      showTotalScore: q.showTotalScore || q.config?.showTotalScore || false,
-      showWeightedScore: q.showWeightedScore || q.config?.showWeightedScore || false,
-      correctAnswer: q.correctAnswer || q.config?.correctAnswer || '',
-      signatureWidth: q.signatureWidth || q.config?.signatureWidth || 400,
-      signatureHeight: q.signatureHeight || q.config?.signatureHeight || 200,
-      signaturePenColor: q.signaturePenColor || q.config?.signaturePenColor || '#000000',
-      signatureBgColor: q.signatureBgColor || q.config?.signatureBgColor || '#ffffff',
-      signatureLabel: q.signatureLabel || q.config?.signatureLabel || 'Tanda Tangan',
-      fileTypes: q.fileTypes || q.config?.fileTypes || ['image/*', 'application/pdf'],
-      maxFileSize: q.maxFileSize || q.config?.maxFileSize || 5,
-      dateFormat: q.dateFormat || q.config?.dateFormat || 'DD/MM/YYYY',
-      rows: q.rows || q.config?.rows || 4,
-      maxLength: q.maxLength || q.config?.maxLength || 500,
-      minLength: q.minLength || q.config?.minLength || 0,
-    }
-
-    // Merge dengan config yang sudah ada
-    if (q.config) {
-      Object.assign(config, q.config)
-    }
-
-    return {
-      id: q.id || `q-${generateId()}`,
-      question: q.question || q.label || `Pertanyaan ${index + 1}`,
-      description: q.description || '',
-      required: q.required || false,
-      order: q.order || index,
-      media: q.media || { 
-        type: q.imageUrl ? 'image' : 'none' as const, 
-        url: q.imageUrl || '', 
-        caption: q.mediaCaption || '' 
-      },
-      answerType: answerType,
-      config: config,
-      isIdentifier: q.isIdentifier || false,
-      identifierType: q.identifierType || 'none',
-      scoring: q.scoring || { scheme: 'none' as const, weight: 1 },
-      // ===== NEW FIELDS UNTUK KOMPATIBILITAS =====
-      stageId: q.stageId || null,
-      overridePoints: q.overridePoints || null,
-    }
-  })
-}
-
-// ============ COMPONENT ============
-export default function FormsPage() {
+export default function FormsDashboardPage() {
+  const router = useRouter()
   const { user } = useAuth()
-  const [forms, setForms] = useState<FormData[]>([])
-  const [groups, setGroups] = useState<FormGroup[]>([])
-  const [loading, setLoading] = useState(true)
+
+  const [forms, setForms] = useState<FormAggregateDoc[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  // Filters
   const [searchTerm, setSearchTerm] = useState('')
-  const [filterStatus, setFilterStatus] = useState('Semua Status')
-  const [filterCategory, setFilterCategory] = useState('Semua Kategori')
-  const [filterGroup, setFilterGroup] = useState('Semua Group')
-  const [selectedForms, setSelectedForms] = useState<string[]>([])
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
-  const [formToDelete, setFormToDelete] = useState<string | null>(null)
-  
-  // ============ PREVIEW MODAL ============
-  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false)
-  const [previewForm, setPreviewForm] = useState<FormData | null>(null)
-  
-  // ============ LOAD DATA ============
-  const loadData = async () => {
-    setLoading(true)
+  const [statusFilter, setStatusFilter] = useState<'all' | 'draft' | 'published' | 'archived'>('all')
+  const [categoryFilter, setCategoryFilter] = useState('all')
+
+  // Modals
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  const [newTitle, setNewTitle] = useState('')
+  const [newCategory, setNewCategory] = useState('Kuesioner Evaluasi')
+  const [newKind, setNewKind] = useState<'official' | 'user-created'>('official')
+  const [isCreating, setIsCreating] = useState(false)
+
+  // Version History Modal
+  const [selectedHistoryFormId, setSelectedHistoryFormId] = useState<string | null>(null)
+
+  // Preview Modal
+  const [previewFormDoc, setPreviewFormDoc] = useState<FormAggregateDoc | null>(null)
+
+  // Toast
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg)
+    setTimeout(() => setToastMessage(null), 3500)
+  }
+
+  // Load Forms List from API
+  const fetchForms = async () => {
+    setIsLoading(true)
+    setError(null)
     try {
-      const [formsData, groupsData] = await Promise.all([
-        getForms(),
-        getFormGroups(),
-      ])
-      setForms(formsData)
-      setGroups(groupsData)
-    } catch (error) {
-      console.error('Error loading data:', error)
+      const queryParams = new URLSearchParams()
+      if (statusFilter !== 'all') queryParams.set('status', statusFilter)
+      if (categoryFilter !== 'all') queryParams.set('category', categoryFilter)
+      if (searchTerm) queryParams.set('search', searchTerm)
+
+      const res = await fetch(`/api/v1_5/forms?${queryParams.toString()}`)
+      const data = await res.json()
+
+      if (data.success && Array.isArray(data.forms)) {
+        setForms(data.forms)
+      } else {
+        setError(data.message || 'Gagal memuat daftar formulir.')
+      }
+    } catch (err: any) {
+      setError(err.message || 'Gagal terhubung ke server.')
     } finally {
-      setLoading(false)
+      setIsLoading(false)
     }
   }
 
   useEffect(() => {
-    loadData()
-  }, [])
+    fetchForms()
+  }, [statusFilter, categoryFilter])
 
-  // ============ GET UNIQUE GROUPS FOR FILTER ============
-  const groupOptions = useMemo(() => {
-    const groupSet = new Set<string>()
-    forms.forEach(f => {
-      if (f.groupId) {
-        const group = groups.find(g => g.id === f.groupId)
-        if (group) groupSet.add(group.title)
-      }
-    })
-    return ['Semua Group', ...Array.from(groupSet)]
-  }, [forms, groups])
-
-  // ============ FILTER FORMS ============
+  // Filtered List Client-Side Search Backup
   const filteredForms = useMemo(() => {
-    return forms.filter(form => {
-      const matchesSearch = form.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                            form.code.toLowerCase().includes(searchTerm.toLowerCase())
-      
-      const matchesStatus = filterStatus === 'Semua Status' || 
-                            statusLabels[form.status] === filterStatus ||
-                            form.status === filterStatus
-      
-      const matchesCategory = filterCategory === 'Semua Kategori' || 
-                              form.category === filterCategory
-      
-      let matchesGroup = true
-      if (filterGroup !== 'Semua Group') {
-        const group = groups.find(g => g.id === form.groupId)
-        matchesGroup = group?.title === filterGroup
-      }
-      
-      return matchesSearch && matchesStatus && matchesCategory && matchesGroup
+    return forms.filter((f) => {
+      const term = searchTerm.toLowerCase()
+      const titleMatch = f.metadata?.title?.toLowerCase().includes(term)
+      const codeMatch = f.formId?.toLowerCase().includes(term)
+      return titleMatch || codeMatch
     })
-  }, [forms, searchTerm, filterStatus, filterCategory, filterGroup, groups])
+  }, [forms, searchTerm])
 
-  // ============ STATS ============
+  // Stats
   const stats = useMemo(() => {
     const total = forms.length
-    const active = forms.filter(f => f.status === 'published').length
-    const draft = forms.filter(f => f.status === 'draft').length
-    const totalGroups = groups.length
-    const totalFilled = forms.reduce((acc, f) => acc + (f.filledCount || 0), 0)
-    return { total, active, draft, totalGroups, totalFilled }
-  }, [forms, groups])
+    const published = forms.filter((f) => f.status === 'published').length
+    const draft = forms.filter((f) => f.status === 'draft').length
+    const archived = forms.filter((f) => f.status === 'archived').length
+    return { total, published, draft, archived }
+  }, [forms])
 
-  // ============ UPDATE STATUS ============
-  const handleStatusChange = async (formId: string, newStatus: 'draft' | 'published' | 'archived') => {
-    try {
-      await updateFormStatus(formId, newStatus)
-      setForms(prev => prev.map(f => 
-        f.id === formId ? { ...f, status: newStatus } : f
-      ))
-    } catch (error) {
-      console.error('Error updating status:', error)
-      alert('Gagal mengubah status formulir')
-    }
-  }
+  // Create Form Handler
+  const handleCreateForm = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newTitle.trim()) return
 
-  // ============ DUPLICATE FORM ============
-  const handleDuplicate = async (form: FormData) => {
+    setIsCreating(true)
     try {
-      const newCode = generateFormCode()
-      
-      // Konversi questions dengan benar
-      const duplicatedQuestions = (form.questions || []).map((q: any) => {
-        const answerType = q.answerType || q.type || 'short-text'
-        return {
-          ...q,
-          id: generateId(),
-          answerType: answerType,
-          // Pastikan config lengkap
-          config: q.config || {},
-          // Pastikan scoring
-          scoring: q.scoring || { scheme: 'none', weight: 1 },
-          // Pastikan stageId
-          stageId: q.stageId || null,
-          overridePoints: q.overridePoints || null,
-        }
+      const res = await fetch('/api/v1_5/forms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          metadata: {
+            title: newTitle.trim(),
+            category: newCategory,
+            kind: newKind,
+            target: 'Komunitas & Cadre Pangan',
+            description: 'Formulir penilaian BPOM V1.5...',
+            status: 'draft',
+          },
+        }),
       })
-      
-      const newForm: Omit<FormData, 'id' | 'createdAt' | 'updatedAt'> = {
-        title: `${form.title} (Copy)`,
-        code: newCode,
-        description: form.description || '',
-        target: form.target || '',
-        category: form.category || '',
-        status: 'draft',
-        groupId: form.groupId || null,
-        groupCode: form.groupCode || null,
-        questions: duplicatedQuestions,
-        createdBy: user?.uid || '',
-        filledCount: 0,
-        // ===== TAMBAHKAN FIELD DARI FORM BUILDER =====
-        validation: form.validation || { mode: 'all_required', exceptions: [], allowOverride: true },
-        stages: form.stages || [{ id: generateId(), name: 'Tahap 1', order: 0, questionIds: duplicatedQuestions.map((q: any) => q.id) }],
-        scoring: form.scoring || { totalPoints: 100, mode: 'auto', distribution: {}, overrides: {}, allowOverride: true, autoBalance: true },
+      const data = await res.json()
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Gagal membuat formulir baru.')
       }
-      
-      await createForm(newForm)
-      await loadData()
-    } catch (error: any) {
-      console.error('Error duplicating form:', error)
-      alert(error.message || 'Gagal menduplikasi formulir')
+
+      showToast('Formulir baru berhasil dibuat!')
+      setIsCreateModalOpen(false)
+      setNewTitle('')
+      router.push(`/dashboard/forms/${data.form.formId}/builder`)
+    } catch (err: any) {
+      showToast(`Error: ${err.message}`)
+    } finally {
+      setIsCreating(false)
     }
   }
 
-  // ============ DELETE ============
-  const handleDelete = (id: string) => {
-    setFormToDelete(id)
-    setIsDeleteModalOpen(true)
-  }
+  // Archive Form Handler
+  const handleArchiveForm = async (formId: string) => {
+    if (!confirm(`Apakah Anda yakin ingin mengarsipkan formulir "${formId}"?`)) return
 
-  const confirmDelete = async () => {
-    if (formToDelete) {
-      try {
-        await deleteForm(formToDelete)
-        setForms(forms.filter(f => f.id !== formToDelete))
-        setSelectedForms(selectedForms.filter(id => id !== formToDelete))
-      } catch (error) {
-        console.error('Error deleting form:', error)
+    try {
+      const res = await fetch(`/api/v1_5/forms/${formId}/archive`, {
+        method: 'POST',
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Gagal mengarsipkan formulir.')
       }
-    }
-    setIsDeleteModalOpen(false)
-    setFormToDelete(null)
-  }
 
-  // ============ PREVIEW ============
-  const handlePreview = (form: FormData) => {
-    setPreviewForm(form)
-    setIsPreviewModalOpen(true)
-  }
-
-  // ============ SELECT HANDLERS ============
-  const handleSelectAll = () => {
-    if (selectedForms.length === filteredForms.length) {
-      setSelectedForms([])
-    } else {
-      setSelectedForms(filteredForms.map(f => f.id || '').filter(Boolean))
+      showToast('Formulir berhasil diarsipkan.')
+      fetchForms()
+    } catch (err: any) {
+      showToast(`Error: ${err.message}`)
     }
   }
 
-  const handleSelectOne = (id: string) => {
-    setSelectedForms(prev =>
-      prev.includes(id) ? prev.filter(fid => fid !== id) : [...prev, id]
-    )
-  }
-
-  // ============ GET GROUP NAME ============
-  const getGroupName = (groupId: string | null | undefined) => {
-    if (!groupId) return '- (Mandiri)'
-    const group = groups.find(g => g.id === groupId)
-    return group?.title || '- (Mandiri)'
-  }
-
-  // ============ RENDER ============
   return (
-    <div className="flex flex-col min-h-screen">
-      <Topbar 
-        title="Daftar Formulir" 
-        subtitle="Kelola semua formulir dan konfigurasi visualisasinya" 
+    <div className="flex flex-col min-h-screen bg-slate-950 text-slate-100 font-sans">
+      <Topbar
+        title="Manajemen Formulir V1.5"
+        subtitle="Kelola instrumen penilaian, versi terpublikasi, kunci jawaban, dan distribusi kader"
       />
 
-      <div className="flex-1 p-6 space-y-6">
-        {/* Action Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="flex-1 p-4 sm:p-6 space-y-6 max-w-7xl mx-auto w-full">
+        {/* Header Action Bar */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
           <div className="flex flex-wrap items-center gap-3">
-            <div className="relative">
-              <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/25" />
+            {/* Search Input */}
+            <div className="relative flex-1 sm:flex-initial">
+              <Icon name="search" className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
               <input
                 type="text"
-                placeholder="Cari formulir..."
+                placeholder="Cari judul / Form ID..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 pr-4 py-2.5 rounded-xl bg-white/3 border border-white/6 text-sm text-white placeholder-white/25 focus:outline-none focus:border-cyan-400/40 transition-all w-64"
+                onKeyDown={(e) => e.key === 'Enter' && fetchForms()}
+                className="pl-10 pr-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500 w-full sm:w-64"
               />
             </div>
 
-            <select 
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="px-4 py-2.5 rounded-xl bg-white/3 border border-white/6 text-sm text-white/70 focus:outline-none focus:border-cyan-400/40 transition-all cursor-pointer"
-            >
-              <option value="Semua Status" className="bg-[#080812]">Semua Status</option>
-              <option value="published" className="bg-[#080812]">Published</option>
-              <option value="draft" className="bg-[#080812]">Draft</option>
-              <option value="archived" className="bg-[#080812]">Diarsipkan</option>
-            </select>
-
-            <select 
-              value={filterCategory}
-              onChange={(e) => setFilterCategory(e.target.value)}
-              className="px-4 py-2.5 rounded-xl bg-white/3 border border-white/6 text-sm text-white/70 focus:outline-none focus:border-cyan-400/40 transition-all cursor-pointer"
-            >
-              <option value="Semua Kategori" className="bg-[#080812]">Semua Kategori</option>
-              <option value="Kuesioner" className="bg-[#080812]">Kuesioner</option>
-              <option value="Fasilitasi" className="bg-[#080812]">Fasilitasi</option>
-              <option value="Observasi" className="bg-[#080812]">Observasi</option>
-              <option value="Evaluasi" className="bg-[#080812]">Evaluasi</option>
-            </select>
-
-            <select 
-              value={filterGroup}
-              onChange={(e) => setFilterGroup(e.target.value)}
-              className="px-4 py-2.5 rounded-xl bg-white/3 border border-white/6 text-sm text-white/70 focus:outline-none focus:border-cyan-400/40 transition-all cursor-pointer"
-            >
-              {groupOptions.map(group => (
-                <option key={group} value={group} className="bg-[#080812]">{group}</option>
+            {/* Status Filter */}
+            <div className="flex items-center p-1 bg-slate-900 border border-slate-800 rounded-xl text-xs">
+              {(['all', 'draft', 'published', 'archived'] as const).map((st) => (
+                <button
+                  key={st}
+                  onClick={() => setStatusFilter(st)}
+                  className={`px-3 py-1.5 rounded-lg font-semibold capitalize transition-all ${
+                    statusFilter === st
+                      ? 'bg-cyan-500/20 text-cyan-200 border border-cyan-500/40 shadow-sm'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {st === 'all' ? 'Semua Status' : st === 'published' ? 'Terpublikasi' : st === 'archived' ? 'Arsip' : 'Draft'}
+                </button>
               ))}
-            </select>
+            </div>
           </div>
 
-          <Link href="/dashboard/form-builder">
-            <button className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-sm font-medium text-white transition-all shadow-lg shadow-cyan-600/25">
-              <Icon name="plus" className="w-4 h-4" /> Buat Formulir
-            </button>
-          </Link>
+          <button
+            onClick={() => setIsCreateModalOpen(true)}
+            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-xs font-bold text-white transition-all shadow-lg shadow-cyan-600/20"
+          >
+            <Icon name="plus" className="w-4 h-4" />
+            <span>+ Buat Formulir Baru</span>
+          </button>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="rounded-2xl bg-[#080812] border border-white/5 p-4">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-white/40 uppercase tracking-wider">Total Formulir</span>
+        {/* Quick Stats Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4 shadow-sm">
+            <div className="flex items-center justify-between text-xs text-slate-400">
+              <span>Total Formulir</span>
               <Icon name="fileText" className="w-4 h-4 text-cyan-400" />
             </div>
-            <p className="text-2xl font-bold font-display mt-2">{stats.total}</p>
+            <p className="text-2xl font-bold font-mono text-slate-100 mt-2">{stats.total}</p>
           </div>
-          <div className="rounded-2xl bg-[#080812] border border-white/5 p-4">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-white/40 uppercase tracking-wider">Published</span>
+
+          <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4 shadow-sm">
+            <div className="flex items-center justify-between text-xs text-slate-400">
+              <span>Terpublikasi (Aktif)</span>
               <Icon name="checkCircle" className="w-4 h-4 text-emerald-400" />
             </div>
-            <p className="text-2xl font-bold font-display mt-2">{stats.active}</p>
+            <p className="text-2xl font-bold font-mono text-emerald-300 mt-2">{stats.published}</p>
           </div>
-          <div className="rounded-2xl bg-[#080812] border border-white/5 p-4">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-white/40 uppercase tracking-wider">Draft</span>
+
+          <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4 shadow-sm">
+            <div className="flex items-center justify-between text-xs text-slate-400">
+              <span>Draft (Pengembangan)</span>
               <Icon name="edit" className="w-4 h-4 text-amber-400" />
             </div>
-            <p className="text-2xl font-bold font-display mt-2">{stats.draft}</p>
+            <p className="text-2xl font-bold font-mono text-amber-300 mt-2">{stats.draft}</p>
           </div>
-          <div className="rounded-2xl bg-[#080812] border border-white/5 p-4">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-white/40 uppercase tracking-wider">Total Group</span>
-              <Icon name="users" className="w-4 h-4 text-violet-400" />
+
+          <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4 shadow-sm">
+            <div className="flex items-center justify-between text-xs text-slate-400">
+              <span>Diarsipkan</span>
+              <Icon name="archive" className="w-4 h-4 text-rose-400" />
             </div>
-            <p className="text-2xl font-bold font-display mt-2">{stats.totalGroups}</p>
+            <p className="text-2xl font-bold font-mono text-rose-300 mt-2">{stats.archived}</p>
           </div>
         </div>
 
-        {/* Table */}
-        <div className="rounded-2xl bg-[#080812] border border-white/5 overflow-hidden">
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <Icon name="loader" className="w-8 h-8 text-cyan-400 animate-spin" />
-              <span className="ml-3 text-white/40">Memuat data...</span>
+        {/* Main Table */}
+        <div className="rounded-2xl bg-slate-900 border border-slate-800 overflow-hidden shadow-md">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-16 text-slate-400 text-xs gap-3">
+              <Icon name="loader" className="w-5 h-5 text-cyan-400 animate-spin" />
+              <span>Memuat daftar formulir V1.5...</span>
+            </div>
+          ) : error ? (
+            <div className="p-8 text-center text-xs text-rose-300 space-y-2">
+              <p className="font-semibold">{error}</p>
+              <button
+                onClick={fetchForms}
+                className="px-3 py-1.5 rounded-lg bg-rose-950 border border-rose-500/40 text-rose-200"
+              >
+                Coba Ulang
+              </button>
+            </div>
+          ) : filteredForms.length === 0 ? (
+            <div className="text-center py-16 text-slate-500 space-y-2">
+              <Icon name="fileText" className="w-10 h-10 mx-auto text-slate-700" />
+              <p className="text-sm font-semibold text-slate-300">Belum Ada Formulir</p>
+              <p className="text-xs text-slate-500">Klik tombol "+ Buat Formulir Baru" untuk memulai authoring.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto custom-scrollbar">
-              <table className="w-full text-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left">
                 <thead>
-                  <tr className="border-b border-white/5 bg-white/1">
-                    <th className="text-left px-4 py-3 text-xs text-white/35 uppercase tracking-wider font-medium w-10">
-                      <input
-                        type="checkbox"
-                        checked={selectedForms.length === filteredForms.length && filteredForms.length > 0}
-                        onChange={handleSelectAll}
-                        className="accent-cyan-400 w-4 h-4 cursor-pointer"
-                      />
-                    </th>
-                    <th className="text-left px-4 py-3 text-xs text-white/35 uppercase tracking-wider font-medium">Kode</th>
-                    <th className="text-left px-4 py-3 text-xs text-white/35 uppercase tracking-wider font-medium">Judul</th>
-                    <th className="text-left px-4 py-3 text-xs text-white/35 uppercase tracking-wider font-medium">Kategori</th>
-                    <th className="text-left px-4 py-3 text-xs text-white/35 uppercase tracking-wider font-medium">Target</th>
-                    <th className="text-left px-4 py-3 text-xs text-white/35 uppercase tracking-wider font-medium">Status</th>
-                    <th className="text-left px-4 py-3 text-xs text-white/35 uppercase tracking-wider font-medium">Group</th>
-                    <th className="text-left px-4 py-3 text-xs text-white/35 uppercase tracking-wider font-medium">Diisi</th>
-                    <th className="text-left px-4 py-3 text-xs text-white/35 uppercase tracking-wider font-medium">Aksi</th>
+                  <tr className="border-b border-slate-800 bg-slate-950/60 text-slate-400 font-mono uppercase text-[10px]">
+                    <th className="px-4 py-3.5">Form ID & Judul</th>
+                    <th className="px-4 py-3.5">Versi Aktif</th>
+                    <th className="px-4 py-3.5">Kategori</th>
+                    <th className="px-4 py-3.5">Status</th>
+                    <th className="px-4 py-3.5">Struktur</th>
+                    <th className="px-4 py-3.5">Pembaruan</th>
+                    <th className="px-4 py-3.5 text-right">Aksi Management</th>
                   </tr>
                 </thead>
-                <tbody>
-                  {filteredForms.length === 0 ? (
-                    <tr>
-                      <td colSpan={9} className="text-center py-8 text-white/30">
-                        <Icon name="fileText" className="w-8 h-8 mx-auto mb-2 text-white/10" />
-                        <p>Tidak ada formulir yang ditemukan</p>
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredForms.map((form) => {
-                      const groupName = getGroupName(form.groupId)
-                      const isMandiri = groupName === '- (Mandiri)'
-                      
-                      return (
-                        <tr key={form.id} className="border-b border-white/3 hover:bg-white/2 transition-colors group">
-                          <td className="px-4 py-3">
-                            <input
-                              type="checkbox"
-                              checked={selectedForms.includes(form.id || '')}
-                              onChange={() => handleSelectOne(form.id || '')}
-                              className="accent-cyan-400 w-4 h-4 cursor-pointer"
-                            />
-                          </td>
-                          <td className="px-4 py-3 font-mono text-xs text-cyan-400 font-medium">{form.code}</td>
-                          <td className="px-4 py-3 text-white/80 font-medium">{form.title}</td>
-                          <td className="px-4 py-3">
-                            <span className={`px-2.5 py-1 rounded-full border text-xs ${categoryColors[form.category as keyof typeof categoryColors] || 'text-white/40 bg-white/5 border-white/5'}`}>
-                              {form.category || 'Umum'}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-400">
-                              {form.target || 'Umum'}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <select
-                              value={form.status}
-                              onChange={(e) => handleStatusChange(form.id || '', e.target.value as 'draft' | 'published' | 'archived')}
-                              className={`px-2.5 py-1 rounded-full border text-xs font-medium cursor-pointer transition-all focus:outline-none focus:ring-2 focus:ring-cyan-400/20 ${
-                                statusColors[form.status]
-                              }`}
+                <tbody className="divide-y divide-slate-800/80">
+                  {filteredForms.map((f) => {
+                    const isPublished = f.status === 'published'
+
+                    return (
+                      <tr key={f.formId} className="hover:bg-slate-800/40 transition-colors">
+                        <td className="px-4 py-4 space-y-0.5 max-w-xs">
+                          <div className="font-bold text-slate-100 text-sm truncate">{f.metadata?.title}</div>
+                          <div className="font-mono text-[11px] text-cyan-400 truncate">{f.formId}</div>
+                        </td>
+
+                        <td className="px-4 py-4 font-mono font-bold text-cyan-300">
+                          v{f.activeVersionNumber || 1}
+                        </td>
+
+                        <td className="px-4 py-4">
+                          <span className="px-2.5 py-1 rounded-md bg-slate-950 border border-slate-800 text-slate-300 font-medium">
+                            {f.metadata?.category || 'Kuesioner'}
+                          </span>
+                        </td>
+
+                        <td className="px-4 py-4">
+                          <span
+                            className={`px-2.5 py-1 rounded-md text-[11px] font-bold uppercase border ${
+                              isPublished
+                                ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+                                : f.status === 'archived'
+                                ? 'bg-rose-500/10 text-rose-400 border-rose-500/30'
+                                : 'bg-amber-500/10 text-amber-300 border-amber-500/30'
+                            }`}
+                          >
+                            {f.status}
+                          </span>
+                        </td>
+
+                        <td className="px-4 py-4 text-slate-400 font-mono">
+                          {f.aspects?.length || 0} Aspek • {f.questions?.length || 0} Soal
+                        </td>
+
+                        <td className="px-4 py-4 text-slate-400 font-mono text-[11px]">
+                          {f.updatedAt ? new Date(f.updatedAt).toLocaleDateString('id-ID') : '-'}
+                        </td>
+
+                        <td className="px-4 py-4 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            {/* Edit / Open Builder */}
+                            <Link
+                              href={`/dashboard/forms/${f.formId}/builder`}
+                              className="px-3 py-1.5 rounded-lg bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-200 border border-cyan-500/40 font-semibold text-xs transition-colors"
                             >
-                              {statusOptions.map((opt) => (
-                                <option key={opt.value} value={opt.value} className="bg-[#080812]">
-                                  {opt.label}
-                                </option>
-                              ))}
-                            </select>
-                          </td>
-                          <td className="px-4 py-3">
-                            {isMandiri ? (
-                              <span className="text-xs text-white/30">-</span>
-                            ) : (
-                              <span className="px-2.5 py-1 rounded-full bg-violet-500/10 border border-violet-500/20 text-xs text-violet-400 flex items-center gap-1 w-fit">
-                                <Icon name="users" className="w-3 h-3" />
-                                {groupName}
-                              </span>
+                              {isPublished ? 'Kelola Versi' : 'Edit Draft'}
+                            </Link>
+
+                            {/* Preview */}
+                            <button
+                              type="button"
+                              onClick={() => setPreviewFormDoc(f)}
+                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
+                              title="Pratinjau Publik"
+                            >
+                              <Icon name="eye" className="w-4 h-4 text-cyan-400" />
+                            </button>
+
+                            {/* Version History */}
+                            <button
+                              type="button"
+                              onClick={() => setSelectedHistoryFormId(f.formId)}
+                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
+                              title="Riwayat Versi Snapshot"
+                            >
+                              <Icon name="history" className="w-4 h-4 text-purple-400" />
+                            </button>
+
+                            {/* Archive */}
+                            {f.status !== 'archived' && (
+                              <button
+                                type="button"
+                                onClick={() => handleArchiveForm(f.formId)}
+                                className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-300 border border-slate-700 hover:border-rose-800 transition-colors"
+                                title="Arsipkan Formulir"
+                              >
+                                <Icon name="archive" className="w-4 h-4" />
+                              </button>
                             )}
-                          </td>
-                          <td className="px-4 py-3 text-white/60">{form.filledCount || 0}</td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-1">
-                              <Link href={`/dashboard/form-builder?id=${form.id}`}>
-                                <button className="p-1.5 rounded-lg hover:bg-white/5 transition-colors" title="Edit">
-                                  <Icon name="pencil" className="w-4 h-4 text-white/50 hover:text-cyan-400 transition-colors" />
-                                </button>
-                              </Link>
-                              <button 
-                                onClick={() => handlePreview(form)}
-                                className="p-1.5 rounded-lg hover:bg-white/5 transition-colors"
-                                title="Preview Formulir"
-                              >
-                                <Icon name="eye" className="w-4 h-4 text-white/50 hover:text-sky-400 transition-colors" />
-                              </button>
-                              <button 
-                                onClick={() => handleDuplicate(form)}
-                                className="p-1.5 rounded-lg hover:bg-white/5 transition-colors"
-                                title="Duplikat Formulir"
-                              >
-                                <Icon name="copy" className="w-4 h-4 text-white/50 hover:text-amber-400 transition-colors" />
-                              </button>
-                              <button 
-                                onClick={() => handleDelete(form.id || '')}
-                                className="p-1.5 rounded-lg hover:bg-red-500/10 transition-colors"
-                                title="Hapus"
-                              >
-                                <Icon name="trash" className="w-4 h-4 text-white/50 hover:text-red-400 transition-colors" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      )
-                    })
-                  )}
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
@@ -546,53 +369,128 @@ export default function FormsPage() {
         </div>
       </div>
 
-      {/* ========== PREVIEW MODAL (MENGGUNAKAN PreviewModal DARI FORM BUILDER) ========== */}
-      {isPreviewModalOpen && previewForm && (
-        <PreviewModal
-          isOpen={isPreviewModalOpen}
-          onClose={() => setIsPreviewModalOpen(false)}
-          elements={convertToFlexibleQuestions(previewForm.questions || [])}
-          formTitle={previewForm.title}
-          stages={previewForm.stages || []}
-          stageMode={previewForm.stages && previewForm.stages.length > 1 ? 'multi' : 'single'}
-        />
-      )}
+      {/* Modal: Buat Formulir Baru */}
+      {isCreateModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
+                <Icon name="plus" className="w-5 h-5 text-cyan-400" />
+                <span>Buat Formulir Penilaian Baru</span>
+              </h3>
+              <button
+                onClick={() => setIsCreateModalOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-white rounded-lg bg-slate-800"
+              >
+                <Icon name="x" className="w-4 h-4" />
+              </button>
+            </div>
 
-      {/* ========== DELETE CONFIRMATION MODAL ========== */}
-      {isDeleteModalOpen && (
-        <div 
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ backgroundColor: 'rgba(0, 0, 0, 0.7)' }}
-          onClick={() => setIsDeleteModalOpen(false)}
-        >
-          <div 
-            className="relative w-full max-w-md bg-[#0e0e1a] border border-white/8 rounded-2xl shadow-2xl p-6"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="text-center">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-rose-500/10 border border-rose-500/20 flex items-center justify-center">
-                <Icon name="alertCircle" className="w-8 h-8 text-rose-400" />
+            <form onSubmit={handleCreateForm} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                  Judul Formulir Penilaian <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Contoh: Evaluasi Hygiene Sarana Pangan Sekolah..."
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 text-slate-100 text-xs rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-cyan-400"
+                />
               </div>
-              <h3 className="font-display text-lg font-semibold text-white mb-2">Hapus Formulir</h3>
-              <p className="text-sm text-white/50 mb-6">
-                Apakah Anda yakin ingin menghapus formulir ini? Tindakan ini tidak dapat dibatalkan.
-              </p>
-              <div className="flex gap-3 justify-center">
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">Kategori</label>
+                  <select
+                    value={newCategory}
+                    onChange={(e) => setNewCategory(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-xl px-3 py-2.5"
+                  >
+                    <option value="Kuesioner Evaluasi">Kuesioner Evaluasi</option>
+                    <option value="Fasilitasi Hygiene">Fasilitasi Hygiene</option>
+                    <option value="Observasi Pangan">Observasi Pangan</option>
+                    <option value="Pre-Test & Post-Test">Pre-Test & Post-Test</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">Jenis Formulir</label>
+                  <select
+                    value={newKind}
+                    onChange={(e) => setNewKind(e.target.value as any)}
+                    className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-xl px-3 py-2.5"
+                  >
+                    <option value="official">Official (BPOM Resmi)</option>
+                    <option value="user-created">User-created</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="pt-2 flex justify-end gap-2">
                 <button
-                  onClick={() => setIsDeleteModalOpen(false)}
-                  className="px-5 py-2.5 rounded-xl bg-white/3 border border-white/6 text-sm text-white/70 hover:text-white transition-all"
+                  type="button"
+                  onClick={() => setIsCreateModalOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold"
                 >
                   Batal
                 </button>
                 <button
-                  onClick={confirmDelete}
-                  className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-sm font-medium text-white transition-all"
+                  type="submit"
+                  disabled={isCreating}
+                  className="px-5 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-800 text-white text-xs font-bold shadow-lg shadow-cyan-600/20 flex items-center gap-1.5"
                 >
-                  Ya, Hapus
+                  {isCreating ? <Icon name="loader" className="w-4 h-4 animate-spin" /> : <Icon name="check" className="w-4 h-4" />}
+                  <span>{isCreating ? 'Membuat...' : 'Buat & Buka Editor'}</span>
                 </button>
               </div>
-            </div>
+            </form>
           </div>
+        </div>
+      )}
+
+      {/* Version History Snapshot Modal */}
+      {selectedHistoryFormId && (
+        <FormVersionHistoryModal
+          isOpen={Boolean(selectedHistoryFormId)}
+          formId={selectedHistoryFormId}
+          onClose={() => setSelectedHistoryFormId(null)}
+        />
+      )}
+
+      {/* Public Preview Modal */}
+      {previewFormDoc && (
+        <FormPreviewModal
+          isOpen={Boolean(previewFormDoc)}
+          canonicalForm={{
+            form: {
+              formId: previewFormDoc.formId,
+              metadata: previewFormDoc.metadata,
+              activeVersionId: previewFormDoc.activeVersionId,
+              createdAt: previewFormDoc.createdAt,
+              updatedAt: previewFormDoc.updatedAt,
+            },
+            version: {
+              versionId: previewFormDoc.activeVersionId,
+              formId: previewFormDoc.formId,
+              versionNumber: previewFormDoc.activeVersionNumber,
+              status: previewFormDoc.status,
+              questions: previewFormDoc.questions,
+              scoring: previewFormDoc.scoring,
+              validation: previewFormDoc.validation,
+              createdAt: previewFormDoc.createdAt,
+            },
+          }}
+          onClose={() => setPreviewFormDoc(null)}
+        />
+      )}
+
+      {/* Toast */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 p-4 rounded-xl bg-slate-900 border border-slate-700 text-slate-100 text-xs font-semibold shadow-2xl animate-in slide-in-from-bottom-3">
+          {toastMessage}
         </div>
       )}
     </div>

@@ -8,7 +8,6 @@ import {
   loginWithEmail, 
   logout, 
   getUserData, 
-  setAuthCookies,
   type UserRole, 
   type UserData, 
   type LoginResult, 
@@ -40,10 +39,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (user) {
       const data = await getUserData(user.uid)
       setUserData(data)
-      setAuthCookies(data?.role || null)
     } else {
       setUserData(null)
-      setAuthCookies(null)
     }
   }
 
@@ -58,15 +55,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Cek jika user terdaftar sebagai admin/super_admin
         if (data && (data.role === 'admin' || data.role === 'super_admin')) {
           setUserData(data)
-          setAuthCookies(data.role)
         } else {
           // Jika bukan admin/super_admin, bersihkan session
           setUserData(null)
-          setAuthCookies(null)
         }
       } else {
         setUserData(null)
-        setAuthCookies(null)
       }
       
       setLoading(false)
@@ -80,7 +74,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const result = await loginWithEmail(email, password)
     setUser(result.user)
     setUserData(result.userData)
-    setAuthCookies(result.role)
     return result
   }
 
@@ -89,7 +82,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await logout()
     setUser(null)
     setUserData(null)
-    setAuthCookies(null)
   }
 
   const userRole = userData?.role || null
