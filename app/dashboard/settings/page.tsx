@@ -1,14 +1,25 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Topbar } from '@/components/dashboard/Topbar'
 import { Icon } from '@/components/ui/Icons'
-import { Button } from '@/components/shared/Button'
+import { 
+  getLandingPageSettings, 
+  updateLandingPageSettings,
+  type LandingPageSettings 
+} from '@/lib/firebase/repositories/settings.repo'
+import { uploadSettingsImage, uploadGalleryImage } from '@/lib/firebase/storage'
 
-// ============ DATA DUMMY ============
-// Data Partnership (Section 2 dari example.html)
-const initialPartnership = {
-  // KKN-UH
+// ============ DATA DEFAULT / FALLBACK ============
+const defaultHeroData = {
+  titlePrefix: 'Membangun',
+  titleGradient: 'Desa Pangan Aman',
+  titleSuffix: 'Wilayah Indonesia',
+  description: 'Ekosistem terpadu yang menciptakan masyarakat sadar akan keamanan pangan melalui kolaborasi mahasiswa, teknologi, dan mitra strategis.',
+  bgImageUrl: '/background.jpg',
+}
+
+const defaultPartnershipData = {
   kkn: {
     title: 'Program Kuliah Kerja Nyata Tematik Keamanan Pangan Universitas Hasanuddin',
     description: 'Program Akselerator Terbaik Universitas Hasanuddin untuk Meningkatkan Wawasan dan Pengalaman Bekerja serta meningkatkan kualitas kinerja Mahasiswa',
@@ -20,7 +31,6 @@ const initialPartnership = {
       'Upgrading dengan Pembekalan Umum'
     ]
   },
-  // BPOM
   bpom: {
     title: 'Badan Pengawas Obat dan Makanan',
     description: 'BPOM Berkolaborasi dengan kampus-kampus pada program Kuliah Kerja Nyata dalam rangka Membangun Desa yang Sadar akan Keamanan Pangan',
@@ -32,16 +42,9 @@ const initialPartnership = {
   }
 }
 
-// Data Galeri Dokumentasi (Section 4 dari example.html)
-const initialGallery = [
-  { id: 1, title: 'Keynote: Masa Depan AI', location: 'Jakarta Convention Center', category: 'Summit 2026', gradient: 'from-amber-700/40 via-orange-800/30 to-rose-900/40' },
-  { id: 2, title: 'UI/UX Masterclass', location: 'Bandung Creative Hub', category: 'Workshop', gradient: 'from-violet-700/40 via-purple-800/30 to-indigo-900/40' },
-  { id: 3, title: 'Tech Expo 2026', location: 'Surabaya Grand Hall', category: 'Pameran', gradient: 'from-cyan-700/40 via-teal-800/30 to-emerald-900/40' },
-  { id: 4, title: 'Innovation Award Night', location: 'Bali Nusa Dua', category: 'Award', gradient: 'from-rose-700/40 via-pink-800/30 to-fuchsia-900/40' },
-  { id: 5, title: '48-Hour Code Sprint', location: 'Yogyakarta Digital Valley', category: 'Hackathon', gradient: 'from-lime-700/40 via-green-800/30 to-teal-900/40' },
-  { id: 6, title: 'Startup Founder Meetup', location: 'Semarang Creative Space', category: 'Meetup', gradient: 'from-sky-700/40 via-blue-800/30 to-cyan-900/40' },
-  { id: 7, title: 'Women in Tech Talks', location: 'Medan Innovation Center', category: 'Talkshow', gradient: 'from-fuchsia-700/40 via-purple-800/30 to-violet-900/40' },
-  { id: 8, title: 'Grand Closing Gala', location: 'Makassar Waterfront', category: 'Closing', gradient: 'from-orange-700/40 via-amber-800/30 to-yellow-900/40' },
+const defaultGalleryData = [
+  { id: 1, title: 'Sosialisasi Keamanan Pangan', location: 'Desa Bontoatu', category: 'Sosialisasi', gradient: 'from-amber-700/40 via-orange-800/30 to-rose-900/40', imageUrl: '' },
+  { id: 2, title: 'Edukasi UMKM Olahan Pangan', location: 'Makassar', category: 'Workshop', gradient: 'from-violet-700/40 via-purple-800/30 to-indigo-900/40', imageUrl: '' },
 ]
 
 const gradientOptions = [
@@ -53,67 +56,126 @@ const gradientOptions = [
   'from-sky-700/40 via-blue-800/30 to-cyan-900/40',
   'from-fuchsia-700/40 via-purple-800/30 to-violet-900/40',
   'from-orange-700/40 via-amber-800/30 to-yellow-900/40',
-  'from-emerald-700/40 via-teal-800/30 to-cyan-900/40',
-  'from-rose-700/40 via-pink-800/30 to-rose-900/40',
 ]
 
-type GalleryItem = typeof initialGallery[0]
+type GalleryItem = {
+  id: number
+  title: string
+  location: string
+  category: string
+  gradient: string
+  imageUrl?: string
+}
 
 export default function SettingsPage() {
-  // ============ STATE ============
-  const [activeTab, setActiveTab] = useState<'partnership' | 'gallery' | 'articles'>('partnership')
-  
-  // Partnership state
-  const [partnership, setPartnership] = useState(initialPartnership)
-  const [isPartnershipEditing, setIsPartnershipEditing] = useState(false)
-  const [partnershipForm, setPartnershipForm] = useState(initialPartnership)
-  
-  // Gallery state
-  const [gallery, setGallery] = useState(initialGallery)
-  const [isGalleryModalOpen, setIsGalleryModalOpen] = useState(false)
-  const [editingGalleryItem, setEditingGalleryItem] = useState<GalleryItem | null>(null)
-  const [galleryForm, setGalleryForm] = useState<Partial<GalleryItem>>({})
-  const [isDeleteGalleryModalOpen, setIsDeleteGalleryModalOpen] = useState(false)
-  const [galleryToDelete, setGalleryToDelete] = useState<number | null>(null)
-  
-  // Articles state (dari dashboard/articles)
-  const [articles, setArticles] = useState([
-    { id: 1, title: 'Tren Teknologi 2026: AI & Beyond', category: 'Teknologi', status: 'Published' },
-    { id: 2, title: 'Strategi Fundraising Startup', category: 'Bisnis', status: 'Draft' },
-    { id: 3, title: 'Membangun Personal Brand', category: 'Karir', status: 'Published' },
-    { id: 4, title: 'Data Analytics untuk Bisnis', category: 'Data', status: 'Published' },
-  ])
-  
+  // ============ STATE UTAMA ============
+  const [activeTab, setActiveTab] = useState<'hero' | 'partnership' | 'gallery'>('hero')
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
   const [successMessage, setSuccessMessage] = useState('')
 
-  // ============ PARTNERSHIP HANDLERS ============
-  const handlePartnershipEdit = () => {
-    setPartnershipForm(partnership)
-    setIsPartnershipEditing(true)
+  // 1. Hero State
+  const [heroForm, setHeroForm] = useState(defaultHeroData)
+  const [uploadingHeroBg, setUploadingHeroBg] = useState(false)
+  const heroFileInputRef = useRef<HTMLInputElement>(null)
+
+  // 2. Partnership State
+  const [partnershipForm, setPartnershipForm] = useState(defaultPartnershipData)
+
+  // 3. Gallery State
+  const [gallery, setGallery] = useState<GalleryItem[]>(defaultGalleryData)
+  const [isGalleryModalOpen, setIsGalleryModalOpen] = useState(false)
+  const [editingGalleryItem, setEditingGalleryItem] = useState<GalleryItem | null>(null)
+  const [galleryForm, setGalleryForm] = useState<Partial<GalleryItem>>({})
+  const [uploadingGalleryImg, setUploadingGalleryImg] = useState(false)
+  const galleryFileInputRef = useRef<HTMLInputElement>(null)
+  const [isDeleteGalleryModalOpen, setIsDeleteGalleryModalOpen] = useState(false)
+  const [galleryToDelete, setGalleryToDelete] = useState<number | null>(null)
+
+  // ============ FETCH DATA DARI FIRESTORE ============
+  useEffect(() => {
+    const fetchSettings = async () => {
+      setLoading(true)
+      try {
+        const settings = await getLandingPageSettings()
+        if (settings) {
+          if (settings.hero) {
+            setHeroForm({ ...defaultHeroData, ...settings.hero })
+          }
+          if (settings.partnership) {
+            setPartnershipForm({
+              kkn: { ...defaultPartnershipData.kkn, ...settings.partnership.kkn },
+              bpom: { ...defaultPartnershipData.bpom, ...settings.partnership.bpom },
+            })
+          }
+          if (settings.gallery && settings.gallery.length > 0) {
+            setGallery(settings.gallery as GalleryItem[])
+          }
+        }
+      } catch (error) {
+        console.error('Gagal memuat pengaturan dari Firestore:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchSettings()
+  }, [])
+
+  // ============ HANDLER HERO SECTION ============
+  const handleHeroSave = async () => {
+    setSaving(true)
+    try {
+      await updateLandingPageSettings({ hero: heroForm })
+      setSuccessMessage('Hero Section berhasil diperbarui!')
+      setShowSuccess(true)
+      setTimeout(() => setShowSuccess(false), 3000)
+    } catch (error: any) {
+      alert('Gagal menyimpan Hero Section: ' + error.message)
+    } finally {
+      setSaving(false)
+    }
   }
 
-  const handlePartnershipSave = () => {
-    setPartnership(partnershipForm)
-    setIsPartnershipEditing(false)
-    setSuccessMessage('Data partnership berhasil diperbarui!')
-    setShowSuccess(true)
-    setTimeout(() => setShowSuccess(false), 3000)
+  const handleHeroBgUpload = async (file: File) => {
+    setUploadingHeroBg(true)
+    try {
+      const url = await uploadSettingsImage(file, 'hero_bg')
+      setHeroForm(prev => ({ ...prev, bgImageUrl: url }))
+      setSuccessMessage('Foto background Hero berhasil diunggah!')
+      setShowSuccess(true)
+      setTimeout(() => setShowSuccess(false), 3000)
+    } catch (error: any) {
+      alert('Gagal mengunggah foto background: ' + error.message)
+    } finally {
+      setUploadingHeroBg(false)
+    }
   }
 
-  const handlePartnershipCancel = () => {
-    setPartnershipForm(partnership)
-    setIsPartnershipEditing(false)
+  // ============ HANDLER PARTNERSHIP SECTION ============
+  const handlePartnershipSave = async () => {
+    setSaving(true)
+    try {
+      await updateLandingPageSettings({ partnership: partnershipForm })
+      setSuccessMessage('Data Partnership & KKN berhasil diperbarui di database!')
+      setShowSuccess(true)
+      setTimeout(() => setShowSuccess(false), 3000)
+    } catch (error: any) {
+      alert('Gagal menyimpan Partnership: ' + error.message)
+    } finally {
+      setSaving(false)
+    }
   }
 
-  // ============ GALLERY HANDLERS ============
+  // ============ HANDLER GALLERY SECTION ============
   const handleGalleryAdd = () => {
     setEditingGalleryItem(null)
     setGalleryForm({
       title: '',
-      location: '',
-      category: '',
+      location: 'Desa Bontoatu, Makassar',
+      category: 'Sosialisasi',
       gradient: gradientOptions[0],
+      imageUrl: '',
     })
     setIsGalleryModalOpen(true)
   }
@@ -124,36 +186,59 @@ export default function SettingsPage() {
     setIsGalleryModalOpen(true)
   }
 
-  const handleGallerySave = () => {
+  const handleGalleryImageUpload = async (file: File) => {
+    setUploadingGalleryImg(true)
+    try {
+      const url = await uploadGalleryImage(file)
+      setGalleryForm(prev => ({ ...prev, imageUrl: url }))
+      setSuccessMessage('Foto galeri berhasil diunggah ke Storage!')
+      setShowSuccess(true)
+      setTimeout(() => setShowSuccess(false), 3000)
+    } catch (error: any) {
+      alert('Gagal mengunggah foto galeri: ' + error.message)
+    } finally {
+      setUploadingGalleryImg(false)
+    }
+  }
+
+  const handleGallerySave = async () => {
     if (!galleryForm.title || !galleryForm.location || !galleryForm.category) {
-      alert('Semua field harus diisi!')
+      alert('Judul, Lokasi, dan Kategori wajib diisi!')
       return
     }
 
+    let updatedGallery: GalleryItem[] = []
     if (editingGalleryItem) {
-      // Update
-      setGallery(prev => prev.map(item => 
-        item.id === editingGalleryItem.id 
-          ? { ...item, ...galleryForm as GalleryItem }
+      updatedGallery = gallery.map(item =>
+        item.id === editingGalleryItem.id
+          ? { ...item, ...(galleryForm as GalleryItem) }
           : item
-      ))
-      setSuccessMessage('Galeri berhasil diperbarui!')
+      )
     } else {
-      // Create
       const newItem: GalleryItem = {
-        id: Math.max(...gallery.map(g => g.id)) + 1,
+        id: Math.max(0, ...gallery.map(g => g.id)) + 1,
         title: galleryForm.title || '',
         location: galleryForm.location || '',
         category: galleryForm.category || '',
         gradient: galleryForm.gradient || gradientOptions[0],
+        imageUrl: galleryForm.imageUrl || '',
       }
-      setGallery(prev => [...prev, newItem])
-      setSuccessMessage('Galeri berhasil ditambahkan!')
+      updatedGallery = [...gallery, newItem]
     }
 
-    setIsGalleryModalOpen(false)
-    setShowSuccess(true)
-    setTimeout(() => setShowSuccess(false), 3000)
+    setSaving(true)
+    try {
+      await updateLandingPageSettings({ gallery: updatedGallery })
+      setGallery(updatedGallery)
+      setIsGalleryModalOpen(false)
+      setSuccessMessage('Galeri berhasil diperbarui di database!')
+      setShowSuccess(true)
+      setTimeout(() => setShowSuccess(false), 3000)
+    } catch (error: any) {
+      alert('Gagal menyimpan Galeri: ' + error.message)
+    } finally {
+      setSaving(false)
+    }
   }
 
   const handleGalleryDelete = (id: number) => {
@@ -161,32 +246,41 @@ export default function SettingsPage() {
     setIsDeleteGalleryModalOpen(true)
   }
 
-  const confirmGalleryDelete = () => {
-    if (galleryToDelete) {
-      setGallery(prev => prev.filter(item => item.id !== galleryToDelete))
-      setSuccessMessage('Galeri berhasil dihapus!')
+  const confirmGalleryDelete = async () => {
+    if (galleryToDelete === null) return
+    const updatedGallery = gallery.filter(item => item.id !== galleryToDelete)
+
+    setSaving(true)
+    try {
+      await updateLandingPageSettings({ gallery: updatedGallery })
+      setGallery(updatedGallery)
+      setSuccessMessage('Item galeri berhasil dihapus!')
       setShowSuccess(true)
       setTimeout(() => setShowSuccess(false), 3000)
+    } catch (error: any) {
+      alert('Gagal menghapus Galeri: ' + error.message)
+    } finally {
+      setIsDeleteGalleryModalOpen(false)
+      setGalleryToDelete(null)
+      setSaving(false)
     }
-    setIsDeleteGalleryModalOpen(false)
-    setGalleryToDelete(null)
   }
 
-  // ============ RENDER ============
+  // ============ RENDER UI ============
   return (
-    <div className="flex flex-col min-h-screen">
-      <Topbar 
-        title="Pengaturan Konten" 
-        subtitle="Kelola konten website (Partnership, Galeri, & Artikel)" 
+    <div className="flex flex-col min-h-screen bg-[#06060E]">
+      <Topbar
+        title="Pengaturan Konten Website"
+        subtitle="Kelola konten publik (Hero, Partnership, & Galeri Dokumentasi)"
       />
 
       <div className="flex-1 p-6 space-y-6">
-        {/* Success Notification */}
+        {/* Toast Notifikasi */}
         {showSuccess && (
           <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-3 animate-slideUp">
             <Icon name="checkCircle" className="w-5 h-5 text-emerald-400" />
             <p className="text-sm text-white">{successMessage}</p>
-            <button 
+            <button
               onClick={() => setShowSuccess(false)}
               className="ml-auto p-1 rounded-lg hover:bg-white/[0.05] transition-colors"
             >
@@ -195,67 +289,186 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {/* Tabs */}
-        <div className="flex gap-2 border-b border-white/[0.06] pb-4">
+        {/* Navigation Tabs */}
+        <div className="flex gap-2 border-b border-white/[0.06] pb-4 overflow-x-auto custom-scrollbar">
+          <button
+            onClick={() => setActiveTab('hero')}
+            className={`px-4 py-2.5 rounded-xl text-sm font-medium transition-all whitespace-nowrap flex items-center gap-2 ${
+              activeTab === 'hero'
+                ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20'
+                : 'text-white/50 hover:text-white hover:bg-white/[0.03]'
+            }`}
+          >
+            <Icon name="sparkles" className="w-4 h-4" />
+            Hero Section
+          </button>
           <button
             onClick={() => setActiveTab('partnership')}
-            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+            className={`px-4 py-2.5 rounded-xl text-sm font-medium transition-all whitespace-nowrap flex items-center gap-2 ${
               activeTab === 'partnership'
                 ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20'
                 : 'text-white/50 hover:text-white hover:bg-white/[0.03]'
             }`}
           >
-            <Icon name="link2" className="w-4 h-4 inline mr-2" />
-            Partnership
+            <Icon name="link2" className="w-4 h-4" />
+            Partnership & KKN
           </button>
           <button
             onClick={() => setActiveTab('gallery')}
-            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+            className={`px-4 py-2.5 rounded-xl text-sm font-medium transition-all whitespace-nowrap flex items-center gap-2 ${
               activeTab === 'gallery'
                 ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20'
                 : 'text-white/50 hover:text-white hover:bg-white/[0.03]'
             }`}
           >
-            <Icon name="image" className="w-4 h-4 inline mr-2" />
+            <Icon name="image" className="w-4 h-4" />
             Galeri Dokumentasi
-          </button>
-          <button
-            onClick={() => setActiveTab('articles')}
-            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-              activeTab === 'articles'
-                ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20'
-                : 'text-white/50 hover:text-white hover:bg-white/[0.03]'
-            }`}
-          >
-            <Icon name="bookOpen" className="w-4 h-4 inline mr-2" />
-            Artikel Edukasi
           </button>
         </div>
 
-        {/* ============ TAB 1: PARTNERSHIP ============ */}
-        {activeTab === 'partnership' && (
-          <div className="space-y-6">
-            {/* KKN-UH Card */}
-            <div className="rounded-2xl bg-[#080812] border border-white/[0.05] p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-display text-lg font-semibold text-white flex items-center gap-2">
-                  <Icon name="rocket" className="w-5 h-5 text-cyan-400" />
-                  Program KKN-UH
-                </h3>
-                {!isPartnershipEditing && (
-                  <button
-                    onClick={handlePartnershipEdit}
-                    className="p-2 rounded-lg hover:bg-white/[0.05] transition-colors"
-                  >
-                    <Icon name="pencil" className="w-4 h-4 text-white/50 hover:text-cyan-400" />
-                  </button>
-                )}
-              </div>
+        {loading ? (
+          <div className="flex items-center justify-center py-16 text-white/40">
+            <Icon name="loader" className="w-8 h-8 text-cyan-400 animate-spin mr-3" />
+            <span>Memuat pengaturan dari database...</span>
+          </div>
+        ) : (
+          <>
+            {/* ============================================================ */}
+            {/* TAB 1: HERO SECTION                                          */}
+            {/* ============================================================ */}
+            {activeTab === 'hero' && (
+              <div className="space-y-6 animate-fadeIn">
+                <div className="rounded-2xl bg-[#080812] border border-white/[0.05] p-6 space-y-5">
+                  <div className="flex items-center justify-between border-b border-white/[0.05] pb-4">
+                    <div>
+                      <h3 className="font-display text-lg font-semibold text-white flex items-center gap-2">
+                        <Icon name="sparkles" className="w-5 h-5 text-cyan-400" />
+                        Pengaturan Hero Section
+                      </h3>
+                      <p className="text-xs text-white/40 mt-1">Ubah judul, deskripsi, dan gambar latar utama</p>
+                    </div>
+                    <button
+                      onClick={handleHeroSave}
+                      disabled={saving}
+                      className="px-5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-sm font-medium text-white transition-all shadow-lg shadow-cyan-600/25 flex items-center gap-2 disabled:opacity-50"
+                    >
+                      {saving ? <Icon name="loader" className="w-4 h-4 animate-spin" /> : <Icon name="save" className="w-4 h-4" />}
+                      Simpan Hero
+                    </button>
+                  </div>
 
-              {isPartnershipEditing ? (
-                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="text-xs text-white/50 uppercase tracking-wider block mb-1.5">Prefix Judul</label>
+                      <input
+                        type="text"
+                        value={heroForm.titlePrefix}
+                        onChange={(e) => setHeroForm({ ...heroForm, titlePrefix: e.target.value })}
+                        className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white text-sm focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-white/50 uppercase tracking-wider block mb-1.5">Judul Utama (Gradient)</label>
+                      <input
+                        type="text"
+                        value={heroForm.titleGradient}
+                        onChange={(e) => setHeroForm({ ...heroForm, titleGradient: e.target.value })}
+                        className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white text-sm focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-white/50 uppercase tracking-wider block mb-1.5">Suffix Judul</label>
+                      <input
+                        type="text"
+                        value={heroForm.titleSuffix}
+                        onChange={(e) => setHeroForm({ ...heroForm, titleSuffix: e.target.value })}
+                        className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white text-sm focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
                   <div>
-                    <label className="text-xs text-white/50 uppercase tracking-wider block mb-1">Judul</label>
+                    <label className="text-xs text-white/50 uppercase tracking-wider block mb-1.5">Deskripsi Singkat</label>
+                    <textarea
+                      value={heroForm.description}
+                      onChange={(e) => setHeroForm({ ...heroForm, description: e.target.value })}
+                      rows={3}
+                      className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white text-sm focus:outline-none resize-none"
+                    />
+                  </div>
+
+                  <div className="pt-2 border-t border-white/[0.05]">
+                    <label className="text-xs text-white/50 uppercase tracking-wider block mb-2">Foto Background Hero</label>
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                      <div className="relative w-full sm:w-48 h-28 rounded-xl overflow-hidden border border-white/10 bg-black/40 shrink-0">
+                        <img
+                          src={heroForm.bgImageUrl || '/background.jpg'}
+                          alt="Background Preview"
+                          className="w-full h-full object-cover"
+                          onError={(e) => { e.currentTarget.src = '/background.jpg' }}
+                        />
+                      </div>
+                      <div className="space-y-2 flex-1 w-full">
+                        <input
+                          ref={heroFileInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            if (file) handleHeroBgUpload(file)
+                          }}
+                        />
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={heroForm.bgImageUrl}
+                            onChange={(e) => setHeroForm({ ...heroForm, bgImageUrl: e.target.value })}
+                            className="flex-1 px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white text-xs focus:outline-none"
+                            placeholder="URL Gambar"
+                          />
+                          <button
+                            type="button"
+                            disabled={uploadingHeroBg}
+                            onClick={() => heroFileInputRef.current?.click()}
+                            className="px-4 py-2.5 rounded-xl bg-cyan-600/20 border border-cyan-500/30 text-cyan-400 text-xs font-medium hover:bg-cyan-600/30 transition-all flex items-center gap-1.5 shrink-0 disabled:opacity-50"
+                          >
+                            {uploadingHeroBg ? <Icon name="loader" className="w-4 h-4 animate-spin" /> : <Icon name="upload" className="w-4 h-4" />}
+                            <span>{uploadingHeroBg ? 'Mengunggah...' : 'Upload Foto'}</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ============================================================ */}
+            {/* TAB 2: PARTNERSHIP & KKN                                     */}
+            {/* ============================================================ */}
+            {activeTab === 'partnership' && (
+              <div className="space-y-6 animate-fadeIn">
+                <div className="flex justify-end">
+                  <button
+                    onClick={handlePartnershipSave}
+                    disabled={saving}
+                    className="px-5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-sm font-medium text-white transition-all shadow-lg shadow-cyan-600/25 flex items-center gap-2 disabled:opacity-50"
+                  >
+                    {saving ? <Icon name="loader" className="w-4 h-4 animate-spin" /> : <Icon name="save" className="w-4 h-4" />}
+                    Simpan Partnership
+                  </button>
+                </div>
+
+                {/* KKN UH Card */}
+                <div className="rounded-2xl bg-[#080812] border border-white/[0.05] p-6 space-y-4">
+                  <h3 className="font-display text-lg font-semibold text-white flex items-center gap-2 border-b border-white/[0.05] pb-3">
+                    <Icon name="rocket" className="w-5 h-5 text-cyan-400" />
+                    Program Kuliah Kerja Nyata (KKN-UH)
+                  </h3>
+
+                  <div>
+                    <label className="text-xs text-white/50 uppercase tracking-wider block mb-1">Judul Program</label>
                     <input
                       type="text"
                       value={partnershipForm.kkn.title}
@@ -263,11 +476,12 @@ export default function SettingsPage() {
                         ...partnershipForm,
                         kkn: { ...partnershipForm.kkn, title: e.target.value }
                       })}
-                      className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white placeholder-white/20 focus:outline-none focus:border-cyan-400/40 transition-all"
+                      className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white text-sm focus:outline-none"
                     />
                   </div>
+
                   <div>
-                    <label className="text-xs text-white/50 uppercase tracking-wider block mb-1">Deskripsi</label>
+                    <label className="text-xs text-white/50 uppercase tracking-wider block mb-1">Deskripsi Ringkas</label>
                     <textarea
                       value={partnershipForm.kkn.description}
                       onChange={(e) => setPartnershipForm({
@@ -275,9 +489,10 @@ export default function SettingsPage() {
                         kkn: { ...partnershipForm.kkn, description: e.target.value }
                       })}
                       rows={3}
-                      className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white placeholder-white/20 focus:outline-none focus:border-cyan-400/40 transition-all resize-none"
+                      className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white text-sm focus:outline-none resize-none"
                     />
                   </div>
+
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="text-xs text-white/50 uppercase tracking-wider block mb-1">Peserta Aktif</label>
@@ -288,11 +503,11 @@ export default function SettingsPage() {
                           ...partnershipForm,
                           kkn: { ...partnershipForm.kkn, participants: parseInt(e.target.value) || 0 }
                         })}
-                        className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white placeholder-white/20 focus:outline-none focus:border-cyan-400/40 transition-all"
+                        className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white text-sm focus:outline-none"
                       />
                     </div>
                     <div>
-                      <label className="text-xs text-white/50 uppercase tracking-wider block mb-1">Desa/Wilayah</label>
+                      <label className="text-xs text-white/50 uppercase tracking-wider block mb-1">Desa Binaan</label>
                       <input
                         type="number"
                         value={partnershipForm.kkn.villages}
@@ -300,12 +515,13 @@ export default function SettingsPage() {
                           ...partnershipForm,
                           kkn: { ...partnershipForm.kkn, villages: parseInt(e.target.value) || 0 }
                         })}
-                        className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white placeholder-white/20 focus:outline-none focus:border-cyan-400/40 transition-all"
+                        className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white text-sm focus:outline-none"
                       />
                     </div>
                   </div>
+
                   <div>
-                    <label className="text-xs text-white/50 uppercase tracking-wider block mb-1">Program Highlights</label>
+                    <label className="text-xs text-white/50 uppercase tracking-wider block mb-2">Program Highlights</label>
                     {partnershipForm.kkn.highlights.map((highlight, index) => (
                       <div key={index} className="flex items-center gap-2 mb-2">
                         <input
@@ -319,9 +535,10 @@ export default function SettingsPage() {
                               kkn: { ...partnershipForm.kkn, highlights: newHighlights }
                             })
                           }}
-                          className="flex-1 px-4 py-2 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white placeholder-white/20 focus:outline-none focus:border-cyan-400/40 transition-all"
+                          className="flex-1 px-4 py-2 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white text-sm focus:outline-none"
                         />
                         <button
+                          type="button"
                           onClick={() => {
                             const newHighlights = partnershipForm.kkn.highlights.filter((_, i) => i !== index)
                             setPartnershipForm({
@@ -336,89 +553,32 @@ export default function SettingsPage() {
                       </div>
                     ))}
                     <button
+                      type="button"
                       onClick={() => {
                         setPartnershipForm({
                           ...partnershipForm,
-                          kkn: { 
-                            ...partnershipForm.kkn, 
-                            highlights: [...partnershipForm.kkn.highlights, ''] 
+                          kkn: {
+                            ...partnershipForm.kkn,
+                            highlights: [...partnershipForm.kkn.highlights, '']
                           }
                         })
                       }}
-                      className="text-sm text-cyan-400 hover:text-cyan-300 transition-colors flex items-center gap-1"
+                      className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors flex items-center gap-1 mt-1"
                     >
                       <Icon name="plus" className="w-3 h-3" /> Tambah Highlight
                     </button>
                   </div>
-                  <div className="flex gap-3 pt-4 border-t border-white/[0.06]">
-                    <button
-                      onClick={handlePartnershipCancel}
-                      className="px-4 py-2 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-white/70 hover:text-white transition-all"
-                    >
-                      Batal
-                    </button>
-                    <button
-                      onClick={handlePartnershipSave}
-                      className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-sm font-medium text-white transition-all shadow-lg shadow-cyan-600/25 flex items-center gap-2"
-                    >
-                      <Icon name="save" className="w-4 h-4" /> Simpan
-                    </button>
-                  </div>
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  <h4 className="text-xl font-semibold text-white">{partnership.kkn.title}</h4>
-                  <p className="text-white/55 text-sm leading-relaxed">{partnership.kkn.description}</p>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.05]">
-                      <div className="flex items-center gap-2">
-                        <Icon name="users" className="w-4 h-4 text-cyan-400" />
-                        <span className="text-2xl font-bold text-white font-display">{partnership.kkn.participants}</span>
-                      </div>
-                      <p className="text-xs text-white/40 uppercase">Peserta Aktif</p>
-                    </div>
-                    <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.05]">
-                      <div className="flex items-center gap-2">
-                        <Icon name="globe" className="w-4 h-4 text-teal-400" />
-                        <span className="text-2xl font-bold text-white font-display">{partnership.kkn.villages}</span>
-                      </div>
-                      <p className="text-xs text-white/40 uppercase">Desa/Wilayah</p>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <p className="text-xs uppercase tracking-[0.2em] text-white/35 font-medium">Program Highlights</p>
-                    {partnership.kkn.highlights.map((highlight, index) => (
-                      <div key={index} className="flex items-center gap-3 text-sm text-white/60">
-                        <Icon name="sparkles" className="w-4 h-4 text-cyan-400 flex-shrink-0" />
-                        <span>{highlight}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
 
-            {/* BPOM Card */}
-            <div className="rounded-2xl bg-[#080812] border border-white/[0.05] p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-display text-lg font-semibold text-white flex items-center gap-2">
-                  <Icon name="gem" className="w-5 h-5 text-violet-400" />
-                  Badan Pengawas Obat dan Makanan (BPOM)
-                </h3>
-                {!isPartnershipEditing && (
-                  <button
-                    onClick={handlePartnershipEdit}
-                    className="p-2 rounded-lg hover:bg-white/[0.05] transition-colors"
-                  >
-                    <Icon name="pencil" className="w-4 h-4 text-white/50 hover:text-cyan-400" />
-                  </button>
-                )}
-              </div>
+                {/* Card BPOM */}
+                <div className="rounded-2xl bg-[#080812] border border-white/[0.05] p-6 space-y-4">
+                  <h3 className="font-display text-lg font-semibold text-white flex items-center gap-2 border-b border-white/[0.05] pb-3">
+                    <Icon name="gem" className="w-5 h-5 text-violet-400" />
+                    Mitra Strategis BPOM RI
+                  </h3>
 
-              {isPartnershipEditing ? (
-                <div className="space-y-4">
                   <div>
-                    <label className="text-xs text-white/50 uppercase tracking-wider block mb-1">Judul</label>
+                    <label className="text-xs text-white/50 uppercase tracking-wider block mb-1">Judul Instansi</label>
                     <input
                       type="text"
                       value={partnershipForm.bpom.title}
@@ -426,11 +586,12 @@ export default function SettingsPage() {
                         ...partnershipForm,
                         bpom: { ...partnershipForm.bpom, title: e.target.value }
                       })}
-                      className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white placeholder-white/20 focus:outline-none focus:border-cyan-400/40 transition-all"
+                      className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white text-sm focus:outline-none"
                     />
                   </div>
+
                   <div>
-                    <label className="text-xs text-white/50 uppercase tracking-wider block mb-1">Deskripsi</label>
+                    <label className="text-xs text-white/50 uppercase tracking-wider block mb-1">Deskripsi Kolaborasi</label>
                     <textarea
                       value={partnershipForm.bpom.description}
                       onChange={(e) => setPartnershipForm({
@@ -438,11 +599,12 @@ export default function SettingsPage() {
                         bpom: { ...partnershipForm.bpom, description: e.target.value }
                       })}
                       rows={3}
-                      className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white placeholder-white/20 focus:outline-none focus:border-cyan-400/40 transition-all resize-none"
+                      className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white text-sm focus:outline-none resize-none"
                     />
                   </div>
+
                   <div>
-                    <label className="text-xs text-white/50 uppercase tracking-wider block mb-1">Fitur</label>
+                    <label className="text-xs text-white/50 uppercase tracking-wider block mb-2">Fitur & Fasilitas Kolaborasi</label>
                     {partnershipForm.bpom.features.map((feature, index) => (
                       <div key={index} className="flex items-center gap-2 mb-2">
                         <input
@@ -456,9 +618,10 @@ export default function SettingsPage() {
                               bpom: { ...partnershipForm.bpom, features: newFeatures }
                             })
                           }}
-                          className="flex-1 px-4 py-2 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white placeholder-white/20 focus:outline-none focus:border-cyan-400/40 transition-all"
+                          className="flex-1 px-4 py-2 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white text-sm focus:outline-none"
                         />
                         <button
+                          type="button"
                           onClick={() => {
                             const newFeatures = partnershipForm.bpom.features.filter((_, i) => i !== index)
                             setPartnershipForm({
@@ -473,168 +636,100 @@ export default function SettingsPage() {
                       </div>
                     ))}
                     <button
+                      type="button"
                       onClick={() => {
                         setPartnershipForm({
                           ...partnershipForm,
-                          bpom: { 
-                            ...partnershipForm.bpom, 
-                            features: [...partnershipForm.bpom.features, ''] 
+                          bpom: {
+                            ...partnershipForm.bpom,
+                            features: [...partnershipForm.bpom.features, '']
                           }
                         })
                       }}
-                      className="text-sm text-cyan-400 hover:text-cyan-300 transition-colors flex items-center gap-1"
+                      className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors flex items-center gap-1 mt-1"
                     >
                       <Icon name="plus" className="w-3 h-3" /> Tambah Fitur
                     </button>
                   </div>
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  <h4 className="text-xl font-semibold text-white">{partnership.bpom.title}</h4>
-                  <p className="text-white/55 text-sm leading-relaxed">{partnership.bpom.description}</p>
-                  <div className="space-y-3">
-                    {partnership.bpom.features.map((feature, index) => (
-                      <div key={index} className="flex items-start gap-4 p-3.5 rounded-xl bg-white/[0.01] border border-white/[0.04]">
-                        <div className="w-8 h-8 rounded-lg bg-violet-500/10 border border-violet-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                          <Icon name="check" className="w-4 h-4 text-violet-400" />
-                        </div>
-                        <div>
-                          <p className="text-white/85 text-sm font-medium">{feature}</p>
+              </div>
+            )}
+
+            {/* ============================================================ */}
+            {/* TAB 3: GALERI DOKUMENTASI                                    */}
+            {/* ============================================================ */}
+            {activeTab === 'gallery' && (
+              <div className="space-y-6 animate-fadeIn">
+                <div className="flex justify-between items-center">
+                  <p className="text-sm text-white/40">Total {gallery.length} item dokumentasi di halaman publik</p>
+                  <button
+                    onClick={handleGalleryAdd}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-sm font-medium text-white transition-all shadow-lg shadow-cyan-600/25"
+                  >
+                    <Icon name="plus" className="w-4 h-4" /> Tambah Galeri
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {gallery.map((item) => (
+                    <div key={item.id} className="group relative rounded-2xl overflow-hidden bg-white/[0.02] border border-white/[0.05] hover:border-cyan-500/20 transition-all">
+                      <div className={`aspect-[4/3] bg-gradient-to-br ${item.gradient} flex items-center justify-center relative`}>
+                        {item.imageUrl ? (
+                          <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover" />
+                        ) : (
+                          <Icon name="image" className="w-12 h-12 text-white/20 group-hover:text-white/40 transition-colors" />
+                        )}
+                        <div className="absolute inset-0 bg-black/30 group-hover:bg-black/10 transition-colors" />
+                        <div className="absolute bottom-3 left-3 px-2.5 py-1 rounded-full bg-black/50 backdrop-blur-sm border border-white/10 text-xs font-medium text-amber-300">
+                          {item.category}
                         </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ============ TAB 2: GALERI DOKUMENTASI ============ */}
-        {activeTab === 'gallery' && (
-          <div className="space-y-6">
-            <div className="flex justify-between items-center">
-              <p className="text-sm text-white/40">{gallery.length} item galeri</p>
-              <button
-                onClick={handleGalleryAdd}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-sm font-medium text-white transition-all shadow-lg shadow-cyan-600/25"
-              >
-                <Icon name="plus" className="w-4 h-4" /> Tambah Galeri
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {gallery.map((item) => (
-                <div key={item.id} className="group relative rounded-2xl overflow-hidden bg-white/[0.02] border border-white/[0.05] hover:border-cyan-500/20 transition-all">
-                  <div className={`aspect-[4/3] bg-gradient-to-br ${item.gradient} flex items-center justify-center relative`}>
-                    <Icon name="image" className="w-12 h-12 text-white/20 group-hover:text-white/40 transition-colors" />
-                    <div className="absolute inset-0 bg-black/30 group-hover:bg-black/10 transition-colors" />
-                    <div className="absolute bottom-3 left-3 px-2.5 py-1 rounded-full bg-black/50 backdrop-blur-sm border border-white/10 text-xs font-medium text-amber-300">
-                      {item.category}
-                    </div>
-                  </div>
-                  <div className="p-4">
-                    <h4 className="font-display font-semibold text-white text-base group-hover:text-cyan-300 transition-colors">
-                      {item.title}
-                    </h4>
-                    <p className="text-white/40 text-xs mt-1 flex items-center gap-1">
-                      <Icon name="mapPin" className="w-3 h-3" /> {item.location}
-                    </p>
-                  </div>
-                  <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={() => handleGalleryEdit(item)}
-                      className="p-1.5 rounded-lg bg-black/60 hover:bg-black/80 transition-colors"
-                    >
-                      <Icon name="pencil" className="w-3.5 h-3.5 text-white" />
-                    </button>
-                    <button
-                      onClick={() => handleGalleryDelete(item.id)}
-                      className="p-1.5 rounded-lg bg-black/60 hover:bg-red-500/60 transition-colors"
-                    >
-                      <Icon name="trash" className="w-3.5 h-3.5 text-white" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ============ TAB 3: ARTIKEL EDUKASI ============ */}
-        {activeTab === 'articles' && (
-          <div className="rounded-2xl bg-[#080812] border border-white/[0.05] overflow-hidden">
-            <div className="p-4 border-b border-white/[0.05]">
-              <p className="text-sm text-white/40">
-                Data artikel diambil dari halaman <span className="text-cyan-400">Materi Edukasi</span>. 
-                Kelola artikel di menu tersebut.
-              </p>
-            </div>
-            <div className="overflow-x-auto custom-scrollbar">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-white/[0.05] bg-white/[0.01]">
-                    <th className="text-left px-6 py-4 text-xs text-white/35 uppercase tracking-wider font-medium">Judul</th>
-                    <th className="text-left px-6 py-4 text-xs text-white/35 uppercase tracking-wider font-medium">Kategori</th>
-                    <th className="text-left px-6 py-4 text-xs text-white/35 uppercase tracking-wider font-medium">Status</th>
-                    <th className="text-left px-6 py-4 text-xs text-white/35 uppercase tracking-wider font-medium">Aksi</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {articles.map((article) => (
-                    <tr key={article.id} className="border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors">
-                      <td className="px-6 py-4 text-white/80">{article.title}</td>
-                      <td className="px-6 py-4">
-                        <span className={`px-2.5 py-1 rounded-full border text-xs ${
-                          article.category === 'Teknologi' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' :
-                          article.category === 'Bisnis' ? 'text-rose-400 bg-rose-500/10 border-rose-500/20' :
-                          article.category === 'Karir' ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' :
-                          'text-sky-400 bg-sky-500/10 border-sky-500/20'
-                        }`}>
-                          {article.category}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`px-2.5 py-1 rounded-full border text-xs flex items-center gap-1.5 w-fit ${
-                          article.status === 'Published'
-                            ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
-                            : 'text-amber-400 bg-amber-500/10 border-amber-500/20'
-                        }`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${article.status === 'Published' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-                          {article.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
+                      <div className="p-4">
+                        <h4 className="font-display font-semibold text-white text-base group-hover:text-cyan-300 transition-colors truncate">
+                          {item.title}
+                        </h4>
+                        <p className="text-white/40 text-xs mt-1 flex items-center gap-1 truncate">
+                          <Icon name="mapPin" className="w-3 h-3 shrink-0" /> {item.location}
+                        </p>
+                      </div>
+                      <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
-                          onClick={() => window.location.href = '/dashboard/articles'}
-                          className="text-sm text-cyan-400 hover:text-cyan-300 transition-colors"
+                          onClick={() => handleGalleryEdit(item)}
+                          className="p-1.5 rounded-lg bg-black/60 hover:bg-black/80 transition-colors"
                         >
-                          Kelola di sini →
+                          <Icon name="pencil" className="w-3.5 h-3.5 text-white" />
                         </button>
-                      </td>
-                    </tr>
+                        <button
+                          onClick={() => handleGalleryDelete(item.id)}
+                          className="p-1.5 rounded-lg bg-black/60 hover:bg-red-500/60 transition-colors"
+                        >
+                          <Icon name="trash" className="w-3.5 h-3.5 text-white" />
+                        </button>
+                      </div>
+                    </div>
                   ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 
-      {/* ============ GALLERY MODAL ============ */}
+      {/* ============================================================ */}
+      {/* MODAL TAMBAH / EDIT GALERI (LENGKAP DENGAN UPLOAD FOTO)      */}
+      {/* ============================================================ */}
       {isGalleryModalOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ backgroundColor: 'rgba(0, 0, 0, 0.7)' }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
           onClick={() => setIsGalleryModalOpen(false)}
         >
           <div
-            className="relative w-full max-w-lg bg-[#0e0e1a] border border-white/[0.08] rounded-2xl shadow-2xl p-6"
+            className="relative w-full max-w-lg bg-[#0e0e1a] border border-white/[0.08] rounded-2xl shadow-2xl p-6 space-y-4"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
               <h3 className="font-display text-lg font-semibold text-white">
-                {editingGalleryItem ? 'Edit Galeri' : 'Tambah Galeri'}
+                {editingGalleryItem ? 'Edit Dokumentasi' : 'Tambah Dokumentasi Baru'}
               </h3>
               <button
                 onClick={() => setIsGalleryModalOpen(false)}
@@ -646,65 +741,103 @@ export default function SettingsPage() {
 
             <div className="space-y-4">
               <div>
-                <label className="text-xs text-white/50 uppercase tracking-wider block mb-1">Judul</label>
+                <label className="text-xs text-white/50 uppercase tracking-wider block mb-1">Judul Acara / Kegiatan</label>
                 <input
                   type="text"
                   value={galleryForm.title || ''}
                   onChange={(e) => setGalleryForm({ ...galleryForm, title: e.target.value })}
-                  placeholder="Masukkan judul..."
-                  className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white placeholder-white/20 focus:outline-none focus:border-cyan-400/40 transition-all"
+                  placeholder="Contoh: Penyuluhan Pangan Desa Bontoatu"
+                  className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white text-sm focus:outline-none"
                 />
               </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-white/50 uppercase tracking-wider block mb-1">Lokasi</label>
+                  <input
+                    type="text"
+                    value={galleryForm.location || ''}
+                    onChange={(e) => setGalleryForm({ ...galleryForm, location: e.target.value })}
+                    placeholder="Contoh: Desa Bontoatu, Makassar"
+                    className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white text-sm focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-white/50 uppercase tracking-wider block mb-1">Kategori</label>
+                  <input
+                    type="text"
+                    value={galleryForm.category || ''}
+                    onChange={(e) => setGalleryForm({ ...galleryForm, category: e.target.value })}
+                    placeholder="Contoh: Sosialisasi, Workshop"
+                    className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white text-sm focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Upload Foto Asli / Pilihan Gradient Fallback */}
               <div>
-                <label className="text-xs text-white/50 uppercase tracking-wider block mb-1">Lokasi</label>
+                <label className="text-xs text-white/50 uppercase tracking-wider block mb-1.5">Foto Kegiatan Asli</label>
                 <input
-                  type="text"
-                  value={galleryForm.location || ''}
-                  onChange={(e) => setGalleryForm({ ...galleryForm, location: e.target.value })}
-                  placeholder="Masukkan lokasi..."
-                  className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white placeholder-white/20 focus:outline-none focus:border-cyan-400/40 transition-all"
+                  ref={galleryFileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) handleGalleryImageUpload(file)
+                  }}
                 />
+                <div className="flex items-center gap-2 mb-2">
+                  <input
+                    type="text"
+                    value={galleryForm.imageUrl || ''}
+                    onChange={(e) => setGalleryForm({ ...galleryForm, imageUrl: e.target.value })}
+                    placeholder="URL foto atau klik upload"
+                    className="flex-1 px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white text-xs focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    disabled={uploadingGalleryImg}
+                    onClick={() => galleryFileInputRef.current?.click()}
+                    className="px-4 py-2.5 rounded-xl bg-cyan-600/20 border border-cyan-500/30 text-cyan-400 text-xs font-medium hover:bg-cyan-600/30 transition-all flex items-center gap-1.5 shrink-0 disabled:opacity-50"
+                  >
+                    {uploadingGalleryImg ? <Icon name="loader" className="w-4 h-4 animate-spin" /> : <Icon name="upload" className="w-4 h-4" />}
+                    <span>{uploadingGalleryImg ? 'Uploading...' : 'Upload Foto'}</span>
+                  </button>
+                </div>
               </div>
+
               <div>
-                <label className="text-xs text-white/50 uppercase tracking-wider block mb-1">Kategori</label>
-                <input
-                  type="text"
-                  value={galleryForm.category || ''}
-                  onChange={(e) => setGalleryForm({ ...galleryForm, category: e.target.value })}
-                  placeholder="Contoh: Summit 2026, Workshop, dll"
-                  className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white placeholder-white/20 focus:outline-none focus:border-cyan-400/40 transition-all"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-white/50 uppercase tracking-wider block mb-1">Skema Warna</label>
-                <div className="grid grid-cols-5 gap-2">
-                  {gradientOptions.slice(0, 10).map((gradient, index) => (
+                <label className="text-xs text-white/50 uppercase tracking-wider block mb-2">Aksen Warna (Fallback tanpa foto)</label>
+                <div className="grid grid-cols-4 gap-2">
+                  {gradientOptions.map((gradient, index) => (
                     <button
                       key={index}
+                      type="button"
                       onClick={() => setGalleryForm({ ...galleryForm, gradient })}
-                      className={`w-full aspect-square rounded-lg border-2 transition-all ${
-                        galleryForm.gradient === gradient
-                          ? 'border-cyan-400'
-                          : 'border-transparent hover:border-white/20'
+                      className={`h-10 rounded-xl border-2 transition-all ${
+                        galleryForm.gradient === gradient ? 'border-cyan-400 scale-105' : 'border-transparent hover:border-white/20'
                       }`}
-                      style={{ background: `linear-gradient(to bottom right, ${gradient.replace(/\/\d+\)/g, ')')})` }}
+                      style={{ background: `linear-gradient(to bottom right, ${gradient.replace(/from-|via-|to-/g, '')})` }}
                     />
                   ))}
                 </div>
               </div>
             </div>
 
-            <div className="flex gap-3 justify-end mt-6 pt-4 border-t border-white/[0.06]">
+            <div className="flex gap-3 justify-end pt-4 border-t border-white/[0.06]">
               <button
                 onClick={() => setIsGalleryModalOpen(false)}
-                className="px-5 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-white/70 hover:text-white transition-all"
+                className="px-5 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-white/70 hover:text-white"
               >
                 Batal
               </button>
               <button
                 onClick={handleGallerySave}
-                className="px-5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-sm font-medium text-white transition-all shadow-lg shadow-cyan-600/25"
+                disabled={saving}
+                className="px-5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-sm font-medium text-white shadow-lg shadow-cyan-600/25 flex items-center gap-2 disabled:opacity-50"
               >
+                {saving ? <Icon name="loader" className="w-4 h-4 animate-spin" /> : <Icon name="save" className="w-4 h-4" />}
                 {editingGalleryItem ? 'Perbarui' : 'Tambah'}
               </button>
             </div>
@@ -712,39 +845,40 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {/* ============ GALLERY DELETE CONFIRMATION ============ */}
+      {/* ============================================================ */}
+      {/* MODAL DELETE CONFIRMATION                                    */}
+      {/* ============================================================ */}
       {isDeleteGalleryModalOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ backgroundColor: 'rgba(0, 0, 0, 0.7)' }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
           onClick={() => setIsDeleteGalleryModalOpen(false)}
         >
           <div
-            className="relative w-full max-w-md bg-[#0e0e1a] border border-white/[0.08] rounded-2xl shadow-2xl p-6"
+            className="relative w-full max-w-md bg-[#0e0e1a] border border-white/[0.08] rounded-2xl shadow-2xl p-6 text-center"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="text-center">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-rose-500/10 border border-rose-500/20 flex items-center justify-center">
-                <Icon name="alertCircle" className="w-8 h-8 text-rose-400" />
-              </div>
-              <h3 className="font-display text-lg font-semibold text-white mb-2">Hapus Galeri</h3>
-              <p className="text-sm text-white/50 mb-6">
-                Apakah Anda yakin ingin menghapus item galeri ini? Tindakan ini tidak dapat dibatalkan.
-              </p>
-              <div className="flex gap-3 justify-center">
-                <button
-                  onClick={() => setIsDeleteGalleryModalOpen(false)}
-                  className="px-5 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-white/70 hover:text-white transition-all"
-                >
-                  Batal
-                </button>
-                <button
-                  onClick={confirmGalleryDelete}
-                  className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-sm font-medium text-white transition-all"
-                >
-                  Ya, Hapus
-                </button>
-              </div>
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-rose-500/10 border border-rose-500/20 flex items-center justify-center">
+              <Icon name="alertCircle" className="w-8 h-8 text-rose-400" />
+            </div>
+            <h3 className="font-display text-lg font-semibold text-white mb-2">Hapus Dokumentasi</h3>
+            <p className="text-sm text-white/50 mb-6">
+              Apakah Anda yakin ingin menghapus item galeri ini dari landing page?
+            </p>
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={() => setIsDeleteGalleryModalOpen(false)}
+                className="px-5 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-white/70 hover:text-white"
+              >
+                Batal
+              </button>
+              <button
+                onClick={confirmGalleryDelete}
+                disabled={saving}
+                className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-sm font-medium text-white transition-all disabled:opacity-50 flex items-center gap-2"
+              >
+                {saving ? <Icon name="loader" className="w-4 h-4 animate-spin" /> : <Icon name="trash" className="w-4 h-4" />}
+                Ya, Hapus
+              </button>
             </div>
           </div>
         </div>

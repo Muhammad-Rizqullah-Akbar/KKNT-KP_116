@@ -10,6 +10,7 @@ interface GalleryItemProps {
     location: string
     category: string
     gradient: string
+    imageUrl?: string
   }
   index: number
 }
@@ -19,16 +20,19 @@ export function GalleryItem({ item, index }: GalleryItemProps) {
   if (index % 4 === 1) offsetClass = 'lg:translate-y-10'
   else if (index % 4 === 2) offsetClass = 'lg:translate-y-20'
   else if (index % 4 === 3) offsetClass = 'lg:translate-y-30'
-  
   const mobileOffset = index % 2 === 1 ? 'sm:translate-y-8' : ''
-  
+
   return (
     <div
       className={`gallery-item relative group rounded-2xl overflow-hidden bg-white/[0.02] border border-white/[0.05] hover:border-amber-500/20 transition-all duration-500 hover:-translate-y-2 shadow-lg ${offsetClass} ${mobileOffset}`}
     >
       <Link href={`/gallery/${item.id}`}>
-        <div className={`aspect-[4/3] bg-gradient-to-br ${item.gradient} flex items-center justify-center relative`}>
-          <Icon name="image" className="w-12 h-12 text-white/20 group-hover:text-white/40 transition-colors" />
+        <div className={`aspect-[4/3] bg-gradient-to-br ${item.gradient} flex items-center justify-center relative overflow-hidden`}>
+          {item.imageUrl ? (
+            <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+          ) : (
+            <Icon name="image" className="w-12 h-12 text-white/20 group-hover:text-white/40 transition-colors" />
+          )}
           <div className="absolute inset-0 bg-black/30 group-hover:bg-black/10 transition-colors" />
           <div className="absolute bottom-3 left-3 px-2.5 py-1 rounded-full bg-black/50 backdrop-blur-sm border border-white/10 text-xs font-medium text-amber-300">
             {item.category}
