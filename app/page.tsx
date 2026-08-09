@@ -40,7 +40,7 @@ const defaultPartnershipData = {
   bpom: {
     title: 'Badan Pengawas Obat dan Makanan',
     description:
-      'BPOM Berkolaborasi dengan kampus-kampus pada program Kuliah Kerja Nyata dalam rangka Membangun Desa yang Sadar akan Keamanan Pangan',
+      'BPOM Berkolaborasi dengan kampus-kampus pada program Kuliah Kerja Nyata dalam rangka Mencetak Kader Keamanan Pangan Keamanan Pangan',
     features: [
       'Mentorship 1-on-1 dengan Mentor dari BPOM',
       'Akses Modul Pembelajaran tentang Keamanan Pangan dan lainnya',

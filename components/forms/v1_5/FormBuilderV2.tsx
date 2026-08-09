@@ -489,7 +489,7 @@ export function FormBuilderV2({
               }`}
             >
               <Icon name="shieldCheck" className="w-3.5 h-3.5" />
-              <span>Inspector Kunci</span>
+              <span>Kunci Jawaban</span>
             </button>
 
             <button

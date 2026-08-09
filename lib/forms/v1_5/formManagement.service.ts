@@ -127,3 +127,38 @@ export async function getFormVersionsWorkflow(
 ): Promise<FormVersionSnapshotDoc[]> {
   return await getFormVersionSnapshotsFromDb(formId)
 }
+
+export async function duplicateFormWorkflow(
+  sourceFormId: string,
+  sessionUid: string
+): Promise<FormAggregateDoc> {
+  const existing = await getFormAggregateFromDb(sourceFormId)
+  if (!existing) {
+    throw new Error(`Formulir asal dengan ID "${sourceFormId}" tidak ditemukan.`)
+  }
+
+  const cleanTitle = `[Salinan V1.5] ${existing.metadata.title}`
+  const slug = cleanTitle.toLowerCase().replace(/[^a-z0-9]/g, '_') || 'form'
+  const newFormId = `form_${slug}_${crypto.randomUUID().substring(0, 6)}`
+
+  const duplicatePayload: Partial<FormAggregateDoc> = {
+    formId: newFormId,
+    metadata: {
+      ...existing.metadata,
+      title: cleanTitle,
+      status: 'draft',
+    },
+    activeVersionId: `${newFormId}_v1`,
+    activeVersionNumber: 1,
+    status: 'draft',
+    aspects: existing.aspects || [],
+    questions: existing.questions || [],
+    scoring: existing.scoring,
+    validation: existing.validation,
+    thresholds: existing.thresholds,
+    recommendations: existing.recommendations,
+    distribution: existing.distribution,
+  }
+
+  return await saveFormAggregateToDb(newFormId, duplicatePayload, sessionUid)
+}
