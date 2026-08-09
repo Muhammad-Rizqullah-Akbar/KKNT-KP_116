@@ -12,6 +12,7 @@ import {
   type ArticleData 
 } from '@/lib/firebase/repositories/articles.repo'
 import { auth, storage } from '@/lib/firebaseClient'
+import { uploadOptimizedArticleImage } from '@/lib/firebase/storage'
 import { onAuthStateChanged } from 'firebase/auth'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 
@@ -212,22 +213,23 @@ export default function ArticleDetailPage({ params }: { params: Promise<{ slug: 
   }, [parsedHeadings, editedArticle?.content])
 
   // ============ 6. HANDLER SMOOTH SCROLL ============
-  // FIX: Hitung offset navbar sticky secara manual dengan window.scrollTo
-  // alih-alih hanya mengandalkan scrollIntoView + CSS scroll-margin-top,
-  // karena scroll-margin-top tidak selalu konsisten di semua browser
-  // (terutama Safari/webview mobile), sehingga posisi scroll suka meleset
-  // atau terlihat seperti tidak merespons klik.
   const handleScrollToHeading = (id: string) => {
     setIsTocPopoverOpen(false)
+    extractHeadings()
 
-    // Beri sedikit jeda 1 frame agar popover sempat menutup dulu
-    // sebelum kita hitung posisi elemen (menghindari salah hitung offset
-    // akibat layout shift saat popover hilang).
     requestAnimationFrame(() => {
-      const element = document.getElementById(id)
+      let element = document.getElementById(id)
+      if (!element && contentRef.current) {
+        const headings = contentRef.current.querySelectorAll('h2')
+        const idx = parseInt(id.replace('heading-section-', ''), 10) - 1
+        if (headings && headings[idx]) {
+          element = headings[idx] as HTMLElement
+          element.id = id
+        }
+      }
       if (!element) return
 
-      const NAV_OFFSET = 110 // tinggi navbar sticky + sedikit jarak aman
+      const NAV_OFFSET = 110
       const top = element.getBoundingClientRect().top + window.scrollY - NAV_OFFSET
 
       window.scrollTo({ top, behavior: 'smooth' })
@@ -287,10 +289,9 @@ export default function ArticleDetailPage({ params }: { params: Promise<{ slug: 
   // ============ UPLOAD FEATURED IMAGE INLINE ============
   const handleFeaturedImageUpload = async (file: File) => {
     try {
-      const storageRef = ref(storage, `articles/${Date.now()}_${file.name}`)
-      const snapshot = await uploadBytes(storageRef, file)
-      const url = await getDownloadURL(snapshot.ref)
-      setEditedArticle(prev => prev ? { ...prev, featuredImage: url } : prev)
+      const res = await uploadOptimizedArticleImage(file, 'articles')
+      setEditedArticle(prev => prev ? { ...prev, featuredImage: res.url } : prev)
+      alert(`⚡ Banner terkompresi otomatis (${res.savedPercent}% hemat storage)!`)
     } catch (err) {
       console.error('Gagal upload banner:', err)
       alert('Gagal mengunggah foto utama')

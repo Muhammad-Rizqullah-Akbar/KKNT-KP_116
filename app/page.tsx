@@ -131,6 +131,7 @@ const categoryGradients: Record<string, string> = {
 
 export default function HomePage() {
   // ✅ PENTING: Inisialisasi state partnershipData dari defaultPartnershipData
+  const [heroData, setHeroData] = useState<any>(null)
   const [partnershipData, setPartnershipData] = useState<any>(defaultPartnershipData)
   const [galleryData, setGalleryData] = useState<any[]>(defaultGalleryData)
 
@@ -161,6 +162,7 @@ export default function HomePage() {
       try {
         const settings = await getLandingPageSettings()
         if (settings) {
+          if (settings.hero) setHeroData(settings.hero)
           if (settings.partnership) setPartnershipData(settings.partnership)
           if (settings.gallery && settings.gallery.length > 0) setGalleryData(settings.gallery)
         }
@@ -287,7 +289,7 @@ export default function HomePage() {
       <Navbar transparent={true} onOpenCodeModal={() => setIsCodeModalOpen(true)} />
 
       {/* Hero Section */}
-      <HeroSection onOpenCodeModal={() => setIsCodeModalOpen(true)} />
+      <HeroSection heroData={heroData} onOpenCodeModal={() => setIsCodeModalOpen(true)} />
 
       {/* Program Section (Sudah aman & menggunakan state partnershipData) */}
       <ProgramSection data={partnershipData} />

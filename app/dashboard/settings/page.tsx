@@ -8,15 +8,19 @@ import {
   updateLandingPageSettings,
   type LandingPageSettings 
 } from '@/lib/firebase/repositories/settings.repo'
-import { uploadSettingsImage, uploadGalleryImage } from '@/lib/firebase/storage'
+import { uploadSettingsImage, uploadGalleryImage, uploadOptimizedArticleImage } from '@/lib/firebase/storage'
 
 // ============ DATA DEFAULT / FALLBACK ============
 const defaultHeroData = {
-  titlePrefix: 'Membangun',
-  titleGradient: 'Desa Pangan Aman',
+  badgeText: 'Universitas Hasanuddin x BPOM RI',
+  titlePrefix: 'Mencetak Kader',
+  titleGradient: 'Keamanan Pangan',
   titleSuffix: 'Wilayah Indonesia',
   description: 'Ekosistem terpadu yang menciptakan masyarakat sadar akan keamanan pangan melalui kolaborasi mahasiswa, teknologi, dan mitra strategis.',
   bgImageUrl: '/background.jpg',
+  statParticipants: '70+',
+  statVillages: '10',
+  statPartnerLabel: 'BPOM',
 }
 
 const defaultPartnershipData = {
@@ -140,9 +144,9 @@ export default function SettingsPage() {
   const handleHeroBgUpload = async (file: File) => {
     setUploadingHeroBg(true)
     try {
-      const url = await uploadSettingsImage(file, 'hero_bg')
-      setHeroForm(prev => ({ ...prev, bgImageUrl: url }))
-      setSuccessMessage('Foto background Hero berhasil diunggah!')
+      const res = await uploadOptimizedArticleImage(file, 'settings')
+      setHeroForm(prev => ({ ...prev, bgImageUrl: res.url }))
+      setSuccessMessage(`Foto background Hero terkompresi (${res.savedPercent}% hemat storage)!`)
       setShowSuccess(true)
       setTimeout(() => setShowSuccess(false), 3000)
     } catch (error: any) {
@@ -189,9 +193,9 @@ export default function SettingsPage() {
   const handleGalleryImageUpload = async (file: File) => {
     setUploadingGalleryImg(true)
     try {
-      const url = await uploadGalleryImage(file)
-      setGalleryForm(prev => ({ ...prev, imageUrl: url }))
-      setSuccessMessage('Foto galeri berhasil diunggah ke Storage!')
+      const res = await uploadOptimizedArticleImage(file, 'gallery')
+      setGalleryForm(prev => ({ ...prev, imageUrl: res.url }))
+      setSuccessMessage(`Foto galeri terkompresi (${res.savedPercent}% hemat storage)!`)
       setShowSuccess(true)
       setTimeout(() => setShowSuccess(false), 3000)
     } catch (error: any) {
@@ -357,6 +361,17 @@ export default function SettingsPage() {
                     </button>
                   </div>
 
+                  <div>
+                    <label className="text-xs text-white/50 uppercase tracking-wider block mb-1.5">Teks Badge Kemitraan (Atas Judul)</label>
+                    <input
+                      type="text"
+                      value={heroForm.badgeText || ''}
+                      onChange={(e) => setHeroForm({ ...heroForm, badgeText: e.target.value })}
+                      placeholder="Contoh: Universitas Hasanuddin x BPOM RI"
+                      className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white text-sm focus:outline-none"
+                    />
+                  </div>
+
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                       <label className="text-xs text-white/50 uppercase tracking-wider block mb-1.5">Prefix Judul</label>
@@ -388,13 +403,44 @@ export default function SettingsPage() {
                   </div>
 
                   <div>
-                    <label className="text-xs text-white/50 uppercase tracking-wider block mb-1.5">Deskripsi Singkat</label>
+                    <label className="text-xs text-white/50 uppercase tracking-wider block mb-1.5">Deskripsi Singkat Hero</label>
                     <textarea
                       value={heroForm.description}
                       onChange={(e) => setHeroForm({ ...heroForm, description: e.target.value })}
                       rows={3}
                       className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white text-sm focus:outline-none resize-none"
                     />
+                  </div>
+
+                  {/* Metrik Statistik Hero */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-white/[0.05]">
+                    <div>
+                      <label className="text-xs text-white/50 uppercase tracking-wider block mb-1.5">Metrik 1 (Jumlah Kader/Mahasiswa)</label>
+                      <input
+                        type="text"
+                        value={heroForm.statParticipants || '70+'}
+                        onChange={(e) => setHeroForm({ ...heroForm, statParticipants: e.target.value })}
+                        className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-cyan-300 font-bold text-sm focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-white/50 uppercase tracking-wider block mb-1.5">Metrik 2 (Jumlah Desa Binaan)</label>
+                      <input
+                        type="text"
+                        value={heroForm.statVillages || '10'}
+                        onChange={(e) => setHeroForm({ ...heroForm, statVillages: e.target.value })}
+                        className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-emerald-300 font-bold text-sm focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-white/50 uppercase tracking-wider block mb-1.5">Metrik 3 (Label Mitra Utama)</label>
+                      <input
+                        type="text"
+                        value={heroForm.statPartnerLabel || 'BPOM'}
+                        onChange={(e) => setHeroForm({ ...heroForm, statPartnerLabel: e.target.value })}
+                        className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-blue-300 font-bold text-sm focus:outline-none"
+                      />
+                    </div>
                   </div>
 
                   <div className="pt-2 border-t border-white/[0.05]">
