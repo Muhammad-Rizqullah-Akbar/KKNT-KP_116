@@ -635,13 +635,18 @@ export function FormBuilderV2({
                           aspect={asp}
                           aspectIndex={aspIdx}
                           totalAspects={state.aspects.length}
-                          allocatedPoints={state.scoring.stagePointDistribution[asp.aspectId] || 0}
+                          allocatedPoints={
+                            state.scoring?.stagePointDistribution?.[asp.aspectId] ??
+                            (state.scoring as any)?.distribution?.[asp.aspectId] ??
+                            0
+                          }
                           questions={aspectQuestions}
                           allAspects={state.aspects}
                           editingQuestionId={editingQuestionId}
                           onUpdateAspect={handleUpdateAspect}
                           onUpdateAllocatedPoints={(aspId, pts) => {
-                            const updatedDist = { ...state.scoring.stagePointDistribution, [aspId]: pts }
+                            const currentDist = state.scoring?.stagePointDistribution || (state.scoring as any)?.distribution || {}
+                            const updatedDist = { ...currentDist, [aspId]: pts }
                             handleStateChange(updateScoring(state, { stagePointDistribution: updatedDist }))
                           }}
                           onDeleteAspect={handleDeleteAspect}

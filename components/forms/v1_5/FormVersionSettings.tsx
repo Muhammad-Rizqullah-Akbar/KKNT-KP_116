@@ -73,13 +73,21 @@ export function FormVersionSettings({
     onScoringChange({ stagePointDistribution: updatedDist })
   }
 
-  // Auto-distribute 100% across aspects
+  // Auto-distribute 100% across scored aspects only
   const handleAutoDistributeAspects = () => {
-    if (aspects.length === 0) return
-    const autoPts = Math.floor(100 / aspects.length)
+    const scoredAspects = aspects.filter((a) => a.isScored !== false)
+    if (scoredAspects.length === 0) return
+    const autoPts = Math.floor(100 / scoredAspects.length)
     const updatedDist: Record<string, number> = {}
-    aspects.forEach((a, idx) => {
-      updatedDist[a.aspectId] = idx === aspects.length - 1 ? 100 - autoPts * (aspects.length - 1) : autoPts
+
+    aspects.forEach((a) => {
+      if (a.isScored === false) {
+        updatedDist[a.aspectId] = 0
+      }
+    })
+
+    scoredAspects.forEach((a, idx) => {
+      updatedDist[a.aspectId] = idx === scoredAspects.length - 1 ? 100 - autoPts * (scoredAspects.length - 1) : autoPts
     })
     onScoringChange({ stagePointDistribution: updatedDist })
   }
@@ -159,22 +167,34 @@ export function FormVersionSettings({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {aspects.map((asp) => (
-            <div key={asp.aspectId} className="flex items-center justify-between p-3 rounded-xl bg-slate-950 border border-slate-800">
-              <span className="text-xs font-semibold text-slate-200 truncate pr-2">{asp.title}</span>
-              <div className="flex items-center gap-1.5">
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={scoring.stagePointDistribution[asp.aspectId] ?? 0}
-                  onChange={(e) => updateAspectPoints(asp.aspectId, Number(e.target.value) || 0)}
-                  className="w-20 bg-slate-900 border border-slate-700 text-amber-300 font-bold text-center text-xs rounded-lg px-2 py-1 focus:outline-none focus:border-amber-500"
-                />
-                <span className="text-xs text-slate-400">%</span>
+          {aspects.map((asp) => {
+            const isScored = asp.isScored !== false
+            return (
+              <div key={asp.aspectId} className="flex items-center justify-between p-3 rounded-xl bg-slate-950 border border-slate-800">
+                <div className="min-w-0 pr-2">
+                  <span className="text-xs font-semibold text-slate-200 truncate block">{asp.title}</span>
+                  {!isScored && <span className="text-[10px] text-purple-300 font-mono">Biodata (Tanpa Skor)</span>}
+                </div>
+                {isScored ? (
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={scoring.stagePointDistribution[asp.aspectId] ?? 0}
+                      onChange={(e) => updateAspectPoints(asp.aspectId, Number(e.target.value) || 0)}
+                      className="w-20 bg-slate-900 border border-slate-700 text-amber-300 font-bold text-center text-xs rounded-lg px-2 py-1 focus:outline-none focus:border-amber-500"
+                    />
+                    <span className="text-xs text-slate-400">%</span>
+                  </div>
+                ) : (
+                  <span className="text-xs font-semibold text-purple-300 px-2 py-0.5 rounded bg-purple-950/60 border border-purple-500/30">
+                    Biodata (Non-penilaian)
+                  </span>
+                )}
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
 
