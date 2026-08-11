@@ -8,10 +8,15 @@ const DOC_ID = 'landing_page'
 
 export interface LandingPageSettings {
   hero?: {
+    badgeText?: string
     titlePrefix?: string
     titleGradient?: string
     titleSuffix?: string
     description?: string
+    bgImageUrl?: string
+    statParticipants?: string
+    statVillages?: string
+    statPartnerLabel?: string
   }
   partnership?: {
     kkn?: {
@@ -33,7 +38,15 @@ export interface LandingPageSettings {
     location: string
     category: string
     gradient: string
+    imageUrl?: string
   }>
+  branding?: {
+    siteName?: string
+    subtitle?: string
+    copyright?: string
+    contactEmail?: string
+    contactPhone?: string
+  }
   updatedAt?: any
 }
 

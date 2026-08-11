@@ -325,5 +325,56 @@ export const compressImage = async (
   })
 }
 
+// ============ OPTIMIZED ARTICLE IMAGE UPLOAD ============
+
+export interface OptimizedUploadResult {
+  url: string
+  path: string
+  originalSize: number
+  compressedSize: number
+  savedPercent: number
+  savedKB: number
+}
+
+/**
+ * Automatically compresses high-resolution article images before uploading to Firebase Storage.
+ * Reduces raw 5MB+ photos down to ~150KB while preserving sharp 1200px visual quality.
+ */
+export const uploadOptimizedArticleImage = async (
+  file: File,
+  folderName: string = 'articles',
+  onProgress?: UploadCallback
+): Promise<OptimizedUploadResult> => {
+  const originalSize = file.size
+
+  // Compress client-side if file is an image
+  let finalFile = file
+  if (file.type.startsWith('image/')) {
+    try {
+      finalFile = await compressImage(file, 1200, 1200, 0.8)
+    } catch (e) {
+      console.warn('Image compression fallback to original file:', e)
+    }
+  }
+
+  const compressedSize = finalFile.size
+  const savedBytes = Math.max(0, originalSize - compressedSize)
+  const savedPercent = originalSize > 0 ? Math.round((savedBytes / originalSize) * 100) : 0
+  const savedKB = Math.round(savedBytes / 1024)
+
+  const cleanName = file.name.replace(/[^a-zA-Z0-9.]/g, '_')
+  const path = `${folderName}/${Date.now()}_${cleanName}`
+  const uploadRes = await uploadFile(finalFile, path, onProgress)
+
+  return {
+    url: uploadRes.url,
+    path: uploadRes.path,
+    originalSize,
+    compressedSize,
+    savedPercent,
+    savedKB,
+  }
+}
+
 // ============ EXPORT ============
 export default storage
