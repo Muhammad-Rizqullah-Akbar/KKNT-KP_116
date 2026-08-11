@@ -95,10 +95,26 @@ function toPublicQuestion(question: any): PublicQuestion {
 export function toPublicFormProjection(canonical: CanonicalForm): PublicCanonicalForm {
   const rawQuestions = Array.isArray(canonical.version?.questions) ? canonical.version.questions : []
   return {
-    form: canonical.form,
+    form: {
+      formId: canonical.form.formId,
+      metadata: {
+        title: canonical.form.metadata?.title || 'Formulir Evaluasi',
+        description: canonical.form.metadata?.description || '',
+        target: canonical.form.metadata?.target || '',
+        category: canonical.form.metadata?.category || '',
+        kind: canonical.form.metadata?.kind || 'official',
+        status: canonical.form.metadata?.status || 'published',
+        allowCadreDistribution: canonical.form.metadata?.allowCadreDistribution ?? true,
+      },
+      activeVersionId: canonical.form.activeVersionId,
+      createdAt: canonical.form.createdAt,
+    },
     version: {
-      ...canonical.version,
-      questions: rawQuestions.map(toPublicQuestion)
+      versionId: canonical.version?.versionId || 'v1',
+      formId: canonical.version?.formId || canonical.form.formId,
+      versionNumber: canonical.version?.versionNumber || 1,
+      status: canonical.version?.status || 'published',
+      questions: rawQuestions.map(toPublicQuestion),
     }
   }
 }

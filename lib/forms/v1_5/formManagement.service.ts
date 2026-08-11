@@ -54,8 +54,8 @@ export async function createFormWorkflow(
       },
     ],
     questions: [],
-    scoring: { totalPoints: 100, mode: 'auto', stagePointDistribution: {} },
-    validation: { mode: 'all_required', allowOverride: true },
+    scoring: { totalPoints: 100, mode: 'auto', stagePointDistribution: {}, allowOverride: true, autoBalance: true },
+    validation: { mode: 'all_required', exceptionQuestionIds: [], allowOverride: true },
     thresholds: [
       { id: 't_a', min: 90, max: 100, grade: 'A', title: 'Sangat Baik', description: 'Memenuhi seluruh standar hygiene dan sanitasi.' },
       { id: 't_b', min: 80, max: 89, grade: 'B', title: 'Baik', description: 'Memenuhi standar dasar dengan sedikit catatan.' },
