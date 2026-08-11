@@ -1,3 +1,4 @@
+import { NextResponse } from 'next/server'
 import { getAuthorizationContext } from '@/lib/auth/server'
 import { publishFormWorkflow } from '@/lib/forms/v1_5/formManagement.service'
 
@@ -12,10 +13,9 @@ interface RouteParams {
 export async function POST(_request: Request, { params }: RouteParams) {
   try {
     const { formId } = await params
-    const authContext = (await getAuthorizationContext()) || {
-      uid: 'dev-user',
-      role: 'admin' as const,
-      token: {} as any,
+    const authContext = await getAuthorizationContext()
+    if (!authContext) {
+      return NextResponse.json({ success: false, message: 'Otentikasi diperlukan.' }, { status: 401 })
     }
 
     const result = await publishFormWorkflow(formId, authContext.uid)

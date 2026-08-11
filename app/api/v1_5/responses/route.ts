@@ -23,7 +23,7 @@ export async function GET(request: Request) {
     const search = searchParams.get('search') || undefined
 
     let responses: any[] = []
-    let optionsMeta = { forms: [], distributions: [] }
+    let optionsMeta: { forms: any[]; distributions: any[] } = { forms: [], distributions: [] }
 
     try {
       const [respList, meta] = await Promise.all([
