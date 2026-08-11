@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '@/context/AuthContext'
+import { safeFetchJson } from '@/lib/shared/safeFetch'
 import { Icon, type IconName } from '@/components/ui/Icons'
 import { Topbar } from '@/components/dashboard/Topbar'
 import { Button } from '@/components/shared/Button'
@@ -93,16 +94,143 @@ export default function UserManagementPage() {
   const [editPhone, setEditPhone] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  // Inspection Analytics Modal State
+  const [inspectingUser, setInspectingUser] = useState<User | null>(null)
+  const [inspectData, setInspectData] = useState<{
+    articles: any[]
+    distributions: any[]
+    totalViews: number
+    responsesCount: number
+    isLoading: boolean
+  }>({
+    articles: [],
+    distributions: [],
+    totalViews: 0,
+    responsesCount: 0,
+    isLoading: false,
+  })
+
+  // Handler for Super Admin inspecting a user's analytics progress
+  const handleInspectUserProgress = async (userToInspect: User) => {
+    setInspectingUser(userToInspect)
+    setInspectData({
+      articles: [],
+      distributions: [],
+      totalViews: 0,
+      responsesCount: 0,
+      isLoading: true,
+    })
+
+    try {
+      // 1. Fetch CMS Articles strictly for author
+      const { getArticles } = await import('@/lib/firebase/repositories/articles.repo')
+      const allArticles = await getArticles()
+      const targetUid = userToInspect.uid
+      const targetEmail = (userToInspect.email || '').toLowerCase().trim()
+      const targetName = (userToInspect.displayName || '').toLowerCase().trim()
+
+      const userArticles = allArticles.filter((a) => {
+        if (a.authorId && targetUid && a.authorId === targetUid) return true
+        if (a.createdBy && targetUid && a.createdBy === targetUid) return true
+
+        const authorLower = (a.author || '').toLowerCase().trim()
+        if (targetEmail && authorLower === targetEmail) return true
+        if (targetName && targetName.length > 2 && authorLower === targetName) return true
+
+        return false
+      })
+      const views = userArticles.reduce((acc, a) => acc + (a.views || 0), 0)
+
+      // 2. Fetch Distributions for user
+      const distRes = await safeFetchJson('/api/v1_5/distributions')
+      let userDists: any[] = []
+      if (distRes.ok && distRes.data && Array.isArray(distRes.data.distributions)) {
+        userDists = distRes.data.distributions.filter(
+          (d: any) =>
+            d.createdBy === userToInspect.uid ||
+            d.cadreId === userToInspect.uid ||
+            (userToInspect.displayName && (d.ownerName || d.cadreName || '').toLowerCase().includes(userToInspect.displayName.toLowerCase())) ||
+            (userToInspect.organization && (d.ownerName || d.cadreName || '').toLowerCase().includes(userToInspect.organization.toLowerCase()))
+        )
+      }
+
+      // Extract target user's distribution codes
+      const targetCodesSet = new Set<string>()
+      userDists.forEach((d: any) => {
+        if (d.code) targetCodesSet.add(String(d.code).toLowerCase().trim())
+        if (d.distributionId) targetCodesSet.add(String(d.distributionId).toLowerCase().trim())
+      })
+
+      // 3. Fetch Responses & Filter specifically for target user's distribution codes or UID
+      const respRes = await safeFetchJson('/api/v1_5/responses')
+      let filteredCount = 0
+
+      if (respRes.ok && respRes.data && Array.isArray(respRes.data.responses)) {
+        const allResponses = respRes.data.responses
+
+        // Enrich userDists with specific per-code respondent counts
+        userDists = userDists.map((d: any) => {
+          const codeLower = String(d.code || '').toLowerCase().trim()
+          const distIdLower = String(d.distributionId || '').toLowerCase().trim()
+
+          const count = allResponses.filter((r: any) => {
+            const rCode = String(
+              r.distributionCode ||
+              r.code ||
+              r.metadata?.distributionCode ||
+              r.metadata?.cadreCode ||
+              r.cadreCode ||
+              ''
+            ).toLowerCase().trim()
+
+            const rDistId = String(r.distributionId || '').toLowerCase().trim()
+            return (codeLower && rCode === codeLower) || (distIdLower && rDistId === distIdLower)
+          }).length
+
+          return { ...d, respondentCount: count }
+        })
+
+        const userResponses = allResponses.filter((r: any) => {
+          const rCode = String(
+            r.distributionCode ||
+            r.code ||
+            r.metadata?.distributionCode ||
+            r.metadata?.cadreCode ||
+            r.cadreCode ||
+            ''
+          ).toLowerCase().trim()
+
+          const isMatchedCode = rCode !== '' && targetCodesSet.has(rCode)
+          const isMatchedUid = r.createdBy === userToInspect.uid || r.cadreId === userToInspect.uid || r.userId === userToInspect.uid
+
+          return isMatchedCode || isMatchedUid
+        })
+
+        filteredCount = userResponses.length
+      }
+
+      setInspectData({
+        articles: userArticles,
+        distributions: userDists,
+        totalViews: views,
+        responsesCount: filteredCount,
+        isLoading: false,
+      })
+    } catch (err) {
+      console.error('Error inspecting user progress:', err)
+      setInspectData((prev) => ({ ...prev, isLoading: false }))
+    }
+  }
+
   // Fetch All Users
   const fetchUsers = async () => {
     setLoading(true)
     setError(null)
     try {
-      const response = await fetch('/api/auth/users')
-      const data = await response.json()
+      const { ok, data, error: fetchErr } = await safeFetchJson('/api/auth/users')
 
-      if (!response.ok) {
-        throw new Error(data.message || 'Gagal mengambil data user')
+      if (!ok || !data) {
+        throw new Error(fetchErr || 'Gagal mengambil data user')
       }
 
       setUsers(data.users || [])
@@ -581,6 +709,16 @@ export default function UserManagementPage() {
                           <div className="flex items-center justify-end gap-2">
                             <button
                               type="button"
+                              onClick={() => handleInspectUserProgress(u)}
+                              className="px-2.5 py-1.5 rounded-xl bg-purple-950/70 hover:bg-purple-900 text-purple-200 border border-purple-500/40 text-[11px] font-bold flex items-center gap-1.5 transition-all shadow-sm"
+                              title="Inspeksi Analytics & Progress Profil User Ini"
+                            >
+                              <Icon name="barChart" className="w-3.5 h-3.5 text-purple-400" />
+                              <span className="hidden sm:inline">Analytics Progress</span>
+                            </button>
+
+                            <button
+                              type="button"
                               onClick={() => handleEdit(u)}
                               className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
                               title="Edit Role & Profil"
@@ -675,21 +813,135 @@ export default function UserManagementPage() {
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
-      {showDeleteModal && selectedUser && (
+      {/* Super Admin Analytics & Progress Inspection Modal */}
+      {inspectingUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-6 text-center space-y-4 shadow-2xl">
-            <Icon name="alertCircle" className="w-12 h-12 text-rose-400 mx-auto" />
-            <div>
-              <h3 className="text-base font-bold text-slate-100">Hapus Akun Pengguna</h3>
-              <p className="text-xs text-slate-400 mt-1">Hapus akun {selectedUser.email} secara permanen?</p>
-            </div>
-            <div className="flex justify-center gap-2 pt-2">
-              <button onClick={() => setShowDeleteModal(false)} className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold">
-                Batal
+          <div className="w-full max-w-3xl bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-5 max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-purple-600/20 border border-purple-500/40 flex items-center justify-center text-purple-300 font-extrabold text-sm">
+                  {getInitials(inspectingUser.displayName, inspectingUser.email)}
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-100">{inspectingUser.displayName || 'Akun User'}</h3>
+                  <span className="text-xs text-purple-300 font-mono">
+                    Role: {getRoleBadge(inspectingUser.role).label} • Instansi: {inspectingUser.organization || 'Umum'} • Email: {inspectingUser.email}
+                  </span>
+                </div>
+              </div>
+
+              <button onClick={() => setInspectingUser(null)} className="p-1.5 text-slate-400 hover:text-white rounded-lg bg-slate-800">
+                <Icon name="x" className="w-4 h-4" />
               </button>
-              <button onClick={confirmDelete} disabled={isSubmitting} className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold">
-                Ya, Hapus
+            </div>
+
+            {inspectData.isLoading ? (
+              <div className="flex items-center justify-center py-20 text-slate-400 text-xs gap-3">
+                <Icon name="loader" className="w-5 h-5 text-purple-400 animate-spin" />
+                <span>Mengakumulasi statistik progress artikel & distribusi user ini...</span>
+              </div>
+            ) : (
+              <div className="flex-1 overflow-y-auto space-y-5 pr-1 text-xs">
+                {/* Metric Summary Cards */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="rounded-2xl bg-slate-950 border border-slate-800 p-3.5 space-y-1">
+                    <span className="text-slate-400 text-[11px]">Artikel Edukasi (CMS)</span>
+                    <p className="text-xl font-bold font-mono text-cyan-300">{inspectData.articles.length}</p>
+                    <span className="text-[10px] text-slate-500 font-mono">{inspectData.articles.filter((a) => a.status === 'Published').length} Terpublikasi</span>
+                  </div>
+
+                  <div className="rounded-2xl bg-slate-950 border border-slate-800 p-3.5 space-y-1">
+                    <span className="text-slate-400 text-[11px]">Total Views Artikel</span>
+                    <p className="text-xl font-bold font-mono text-emerald-300">{inspectData.totalViews}</p>
+                    <span className="text-[10px] text-slate-500 font-mono">Diakses oleh pembaca</span>
+                  </div>
+
+                  <div className="rounded-2xl bg-slate-950 border border-slate-800 p-3.5 space-y-1">
+                    <span className="text-slate-400 text-[11px]">Kode Distribusi V1.5</span>
+                    <p className="text-xl font-bold font-mono text-purple-300">{inspectData.distributions.length}</p>
+                    <span className="text-[10px] text-slate-500 font-mono">Kode unik aktif</span>
+                  </div>
+
+                  <div className="rounded-2xl bg-slate-950 border border-slate-800 p-3.5 space-y-1">
+                    <span className="text-slate-400 text-[11px]">Total Tanggapan</span>
+                    <p className="text-xl font-bold font-mono text-amber-300">{inspectData.responsesCount}</p>
+                    <span className="text-[10px] text-slate-500 font-mono">Responden publik</span>
+                  </div>
+                </div>
+
+                {/* Section 1: User's CMS Articles */}
+                <div className="space-y-2">
+                  <h4 className="font-extrabold text-slate-200 flex items-center gap-2">
+                    <Icon name="bookOpen" className="w-4 h-4 text-purple-400" />
+                    <span>Artikel & Materi Edukasi yang Diterbitkan ({inspectData.articles.length})</span>
+                  </h4>
+
+                  {inspectData.articles.length === 0 ? (
+                    <div className="p-4 bg-slate-950 border border-slate-800 rounded-2xl text-slate-500 text-center">
+                      Belum ada artikel edukasi yang ditulis atau diterbitkan oleh akun ini.
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-slate-800 bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden">
+                      {inspectData.articles.map((art) => (
+                        <div key={art.id || art.slug} className="p-3 flex items-center justify-between">
+                          <div className="space-y-0.5 max-w-lg">
+                            <div className="flex items-center gap-2">
+                              <span className="px-2 py-0.5 rounded bg-purple-950 text-purple-300 text-[10px] font-bold">
+                                {art.category || 'CMS'}
+                              </span>
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${art.status === 'Published' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                                {art.status}
+                              </span>
+                            </div>
+                            <p className="font-bold text-slate-100">{art.title}</p>
+                          </div>
+                          <span className="font-mono text-emerald-400 text-[11px] font-bold">
+                            👁️ {art.views || 0} views
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Section 2: User's Distributions */}
+                <div className="space-y-2">
+                  <h4 className="font-extrabold text-slate-200 flex items-center gap-2">
+                    <Icon name="send" className="w-4 h-4 text-cyan-400" />
+                    <span>Kode Distribusi Instrumen V1.5 ({inspectData.distributions.length})</span>
+                  </h4>
+
+                  {inspectData.distributions.length === 0 ? (
+                    <div className="p-4 bg-slate-950 border border-slate-800 rounded-2xl text-slate-500 text-center">
+                      Belum ada kode distribusi instrumen yang dibuat oleh akun ini.
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-slate-800 bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden">
+                      {inspectData.distributions.map((d: any) => (
+                        <div key={d.distributionId} className="p-3 flex items-center justify-between">
+                          <div>
+                            <span className="font-mono text-cyan-400 font-extrabold text-xs px-2 py-0.5 rounded bg-cyan-950 border border-cyan-500/30">
+                              {d.code}
+                            </span>
+                            <p className="font-bold text-slate-100 mt-1">{d.title}</p>
+                          </div>
+                          <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 font-mono text-[10px] uppercase border border-emerald-500/30">
+                            {d.status}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div className="pt-3 border-t border-slate-800 flex justify-end">
+              <button
+                onClick={() => setInspectingUser(null)}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold"
+              >
+                Tutup Inspeksi Analytics
               </button>
             </div>
           </div>

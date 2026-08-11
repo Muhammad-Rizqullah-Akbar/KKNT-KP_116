@@ -75,8 +75,8 @@ export const uploadFile = async (
       if (onProgress) {
         onProgress({
           progress: 100,
-          bytesTransferred: snapshot.ref.totalBytes || 0,
-          totalBytes: snapshot.ref.totalBytes || 0,
+          bytesTransferred: (snapshot as any).bytesTransferred || 0,
+          totalBytes: (snapshot as any).totalBytes || 0,
           status: 'success',
         })
       }

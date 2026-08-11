@@ -82,11 +82,19 @@ export function validateResponseAnswers(
       case 'single-choice':
       case 'binary':
       case 'dropdown': {
-        const validOptionIds = (q.options || []).map((opt) => opt.optionId)
-        if (validOptionIds.length > 0 && !validOptionIds.includes(val)) {
+        const rawOpts = q.options || (q as any).config?.options || []
+        const validValues = rawOpts.flatMap((opt: any, idx: number) => {
+          if (typeof opt === 'string') return [opt, `opt_${q.questionId}_${idx}`]
+          if (opt && typeof opt === 'object') {
+            return [opt.optionId, opt.id, opt.label, opt.text, `opt_${q.questionId}_${idx}`].filter(Boolean)
+          }
+          return [String(opt), `opt_${q.questionId}_${idx}`]
+        })
+
+        if (validValues.length > 0 && !validValues.includes(val)) {
           errors.push({
             questionId: q.questionId,
-            message: `Pilihan opsi "${val}" tidak valid untuk pertanyaan "${q.prompt || q.questionId}".`,
+            message: `Pilihan opsi "${val}" tidak valid untuk pertanyaan "${q.prompt || (q as any).title || q.questionId}".`,
           })
         }
         break
@@ -96,12 +104,20 @@ export function validateResponseAnswers(
         if (!Array.isArray(val)) {
           errors.push({
             questionId: q.questionId,
-            message: `Jawaban untuk pertanyaan pilihan ganda "${q.prompt || q.questionId}" harus berupa daftar pilihan.`,
+            message: `Jawaban untuk pertanyaan pilihan ganda "${q.prompt || (q as any).title || q.questionId}" harus berupa daftar pilihan.`,
           })
         } else {
-          const validOptionIds = (q.options || []).map((opt) => opt.optionId)
-          if (validOptionIds.length > 0) {
-            const invalidOpts = val.filter((optId) => !validOptionIds.includes(optId))
+          const rawOpts = q.options || (q as any).config?.options || []
+          const validValues = rawOpts.flatMap((opt: any, idx: number) => {
+            if (typeof opt === 'string') return [opt, `opt_${q.questionId}_${idx}`]
+            if (opt && typeof opt === 'object') {
+              return [opt.optionId, opt.id, opt.label, opt.text, `opt_${q.questionId}_${idx}`].filter(Boolean)
+            }
+            return [String(opt), `opt_${q.questionId}_${idx}`]
+          })
+
+          if (validValues.length > 0) {
+            const invalidOpts = val.filter((optId) => !validValues.includes(optId))
             if (invalidOpts.length > 0) {
               errors.push({
                 questionId: q.questionId,

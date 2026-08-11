@@ -1,6 +1,4 @@
-import 'server-only'
-
-import { adminFirestore } from '@/lib/firebaseAdmin'
+import { safeGetDoc, safeGetCollectionDocs, safeSetDoc, safeDeleteDoc } from './safeFirestore'
 import type { DistributionDoc } from '@/lib/forms/v1_5/distributionTypes'
 
 const DISTRIBUTIONS_COLLECTION = 'distributions'
@@ -9,8 +7,7 @@ const DISTRIBUTIONS_COLLECTION = 'distributions'
  * Creates a new distribution document in Firestore.
  */
 export async function createDistributionDoc(docData: DistributionDoc): Promise<DistributionDoc> {
-  const docRef = adminFirestore.collection(DISTRIBUTIONS_COLLECTION).doc(docData.distributionId)
-  await docRef.set(docData)
+  await safeSetDoc(DISTRIBUTIONS_COLLECTION, docData.distributionId, docData)
   return docData
 }
 
@@ -18,9 +15,9 @@ export async function createDistributionDoc(docData: DistributionDoc): Promise<D
  * Gets a distribution document by distributionId.
  */
 export async function getDistributionDoc(distributionId: string): Promise<DistributionDoc | null> {
-  const docSnap = await adminFirestore.collection(DISTRIBUTIONS_COLLECTION).doc(distributionId).get()
-  if (!docSnap.exists) return null
-  return docSnap.data() as DistributionDoc
+  const docObj = await safeGetDoc(DISTRIBUTIONS_COLLECTION, distributionId)
+  if (!docObj) return null
+  return docObj.data as DistributionDoc
 }
 
 /**
@@ -28,14 +25,11 @@ export async function getDistributionDoc(distributionId: string): Promise<Distri
  */
 export async function getDistributionByCodeDoc(code: string): Promise<DistributionDoc | null> {
   const normalized = code.trim().toUpperCase()
-  const snapshot = await adminFirestore
-    .collection(DISTRIBUTIONS_COLLECTION)
-    .where('normalizedCode', '==', normalized)
-    .limit(1)
-    .get()
+  const docs = await safeGetCollectionDocs(DISTRIBUTIONS_COLLECTION)
+  const match = docs.find((d) => (d.data?.normalizedCode || d.data?.code?.toUpperCase()) === normalized)
 
-  if (snapshot.empty) return null
-  return snapshot.docs[0].data() as DistributionDoc
+  if (!match) return null
+  return match.data as DistributionDoc
 }
 
 /**
@@ -48,32 +42,30 @@ export async function listDistributionsDoc(options?: {
   formId?: string
   search?: string
 }): Promise<DistributionDoc[]> {
-  let query: FirebaseAdmin.Firestore.Query = adminFirestore.collection(DISTRIBUTIONS_COLLECTION)
+  const rawDocs = await safeGetCollectionDocs(DISTRIBUTIONS_COLLECTION)
+  let docs = rawDocs.map((d) => d.data as DistributionDoc)
 
   if (options?.ownerType && options.ownerType !== 'all') {
-    query = query.where('ownerType', '==', options.ownerType)
+    docs = docs.filter((d) => d.ownerType === options.ownerType)
   }
   if (options?.ownerId) {
-    query = query.where('ownerId', '==', options.ownerId)
+    docs = docs.filter((d) => d.ownerId === options.ownerId)
   }
   if (options?.formId) {
-    query = query.where('formId', '==', options.formId)
+    docs = docs.filter((d) => d.formId === options.formId)
   }
   if (options?.status && options.status !== 'all') {
-    query = query.where('status', '==', options.status)
+    docs = docs.filter((d) => d.status === options.status)
   }
-
-  const snapshot = await query.get()
-  let docs = snapshot.docs.map((d) => d.data() as DistributionDoc)
 
   if (options?.search) {
     const term = options.search.toLowerCase()
     docs = docs.filter(
       (d) =>
-        d.title.toLowerCase().includes(term) ||
-        d.code.toLowerCase().includes(term) ||
-        d.formId.toLowerCase().includes(term) ||
-        d.ownerName.toLowerCase().includes(term)
+        d.title?.toLowerCase().includes(term) ||
+        d.code?.toLowerCase().includes(term) ||
+        d.formId?.toLowerCase().includes(term) ||
+        d.ownerName?.toLowerCase().includes(term)
     )
   }
 
@@ -90,20 +82,19 @@ export async function updateDistributionDoc(
   distributionId: string,
   data: Partial<DistributionDoc>
 ): Promise<DistributionDoc> {
-  const docRef = adminFirestore.collection(DISTRIBUTIONS_COLLECTION).doc(distributionId)
-  const snap = await docRef.get()
-  if (!snap.exists) {
+  const existing = await safeGetDoc(DISTRIBUTIONS_COLLECTION, distributionId)
+  if (!existing) {
     throw new Error(`Distribusi dengan ID "${distributionId}" tidak ditemukan.`)
   }
 
-  const updatedData = {
+  const updatedData: DistributionDoc = {
+    ...existing.data,
     ...data,
     updatedAt: new Date().toISOString(),
   }
-  await docRef.update(updatedData)
+  await safeSetDoc(DISTRIBUTIONS_COLLECTION, distributionId, updatedData)
 
-  const newSnap = await docRef.get()
-  return newSnap.data() as DistributionDoc
+  return updatedData
 }
 
 /**
@@ -113,23 +104,24 @@ export async function pauseDistributionDoc(
   distributionId: string,
   sessionUid: string
 ): Promise<DistributionDoc> {
-  const docRef = adminFirestore.collection(DISTRIBUTIONS_COLLECTION).doc(distributionId)
-  const snap = await docRef.get()
-  if (!snap.exists) {
+  const existing = await safeGetDoc(DISTRIBUTIONS_COLLECTION, distributionId)
+  if (!existing) {
     throw new Error(`Distribusi dengan ID "${distributionId}" tidak ditemukan.`)
   }
 
-  const current = snap.data() as DistributionDoc
+  const current = existing.data as DistributionDoc
   const nextStatus = current.status === 'paused' ? 'active' : 'paused'
   const now = new Date().toISOString()
 
-  await docRef.update({
+  const updatedData: DistributionDoc = {
+    ...current,
     status: nextStatus,
     updatedAt: now,
     updatedBy: sessionUid,
-  })
+  }
 
-  return { ...current, status: nextStatus, updatedAt: now, updatedBy: sessionUid }
+  await safeSetDoc(DISTRIBUTIONS_COLLECTION, distributionId, updatedData)
+  return updatedData
 }
 
 /**
@@ -139,20 +131,37 @@ export async function archiveDistributionDoc(
   distributionId: string,
   sessionUid: string
 ): Promise<DistributionDoc> {
-  const docRef = adminFirestore.collection(DISTRIBUTIONS_COLLECTION).doc(distributionId)
-  const snap = await docRef.get()
-  if (!snap.exists) {
+  const existing = await safeGetDoc(DISTRIBUTIONS_COLLECTION, distributionId)
+  if (!existing) {
     throw new Error(`Distribusi dengan ID "${distributionId}" tidak ditemukan.`)
   }
 
-  const current = snap.data() as DistributionDoc
+  const current = existing.data as DistributionDoc
   const now = new Date().toISOString()
 
-  await docRef.update({
+  const updatedData: DistributionDoc = {
+    ...current,
     status: 'archived',
     updatedAt: now,
     updatedBy: sessionUid,
-  })
+  }
 
-  return { ...current, status: 'archived', updatedAt: now, updatedBy: sessionUid }
+  await safeSetDoc(DISTRIBUTIONS_COLLECTION, distributionId, updatedData)
+  return updatedData
+}
+
+/**
+ * Permanently delete a distribution document from all distribution collections.
+ */
+export async function deleteDistributionDoc(distributionId: string): Promise<void> {
+  try {
+    await safeDeleteDoc(DISTRIBUTIONS_COLLECTION, distributionId)
+  } catch (e) {
+    console.warn(`safeDeleteDoc warning for ${DISTRIBUTIONS_COLLECTION}:`, e)
+  }
+  try {
+    await safeDeleteDoc('v1_5_distributions', distributionId)
+  } catch (e) {
+    console.warn('safeDeleteDoc warning for v1_5_distributions:', e)
+  }
 }

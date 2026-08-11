@@ -6,36 +6,205 @@ import { Topbar } from '@/components/dashboard/Topbar'
 import { Icon } from '@/components/ui/Icons'
 import type { ResponseDoc } from '@/lib/forms/v1_5/responseTypes'
 import { useAuth } from '@/context/AuthContext'
+import { safeFetchJson } from '@/lib/shared/safeFetch'
+
+interface FormMetaItem {
+  formId: string
+  title: string
+  versionNumber: number
+  versionLabel: string
+}
+
+interface DistMetaItem {
+  distributionId: string
+  code: string
+  title: string
+  ownerName?: string
+  ownerType?: string
+  formId?: string
+}
+
+interface PersonAuthorOption {
+  ownerKey: string
+  ownerName: string
+  ownerType: string
+  codes: string[]
+  count: number
+}
+
+// CIRCULAR SCORE DONUT GAUGE COMPONENT (100% MATHEMATICAL CENTER ALIGNMENT)
+function CircularScoreGauge({ score, grade }: { score: number; grade: string }) {
+  const size = 96
+  const stroke = 7
+  const center = size / 2 // 48
+  const radius = center - stroke // 41
+  const circumference = 2 * Math.PI * radius
+  const strokeDashoffset = circumference - (Math.min(100, Math.max(0, score)) / 100) * circumference
+
+  const color = score >= 80 ? '#10b981' : score >= 60 ? '#06b6d4' : '#f59e0b'
+
+  return (
+    <div className="relative w-24 h-24 flex-shrink-0 flex items-center justify-center">
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="transform -rotate-90 w-24 h-24">
+        <circle
+          stroke="#1e293b"
+          fill="transparent"
+          strokeWidth={stroke}
+          r={radius}
+          cx={center}
+          cy={center}
+        />
+        <circle
+          stroke={color}
+          fill="transparent"
+          strokeWidth={stroke}
+          strokeDasharray={`${circumference} ${circumference}`}
+          style={{ strokeDashoffset }}
+          strokeLinecap="round"
+          r={radius}
+          cx={center}
+          cy={center}
+          className="transition-all duration-700 ease-out"
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none font-mono">
+        <span className="text-xl font-black text-slate-100 leading-none">{score}%</span>
+        <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider mt-1">{grade}</span>
+      </div>
+    </div>
+  )
+}
+
+// FORMAT ANSWER VALUE HELPER (MATCHING DATA RESPONDEN)
+const formatAnswerValue = (value: any): { type: 'text' | 'signature' | 'table' | 'array'; content: any } => {
+  if (value === null || value === undefined) return { type: 'text', content: '-' }
+  if (typeof value === 'string' && value.startsWith('data:image'))
+    return { type: 'signature', content: value }
+  if (Array.isArray(value)) return { type: 'array', content: value }
+  if (typeof value === 'object') return { type: 'table', content: value }
+  return { type: 'text', content: String(value) }
+}
 
 export default function ResponsesDashboardPage() {
   const { user } = useAuth()
   const [responses, setResponses] = useState<ResponseDoc[]>([])
+  const [dbForms, setDbForms] = useState<FormMetaItem[]>([])
+  const [dbDistributions, setDbDistributions] = useState<DistMetaItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Filters
-  const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState<string>('all')
+  // Respondent Preview Modal State
+  const [selectedRespondent, setSelectedRespondent] = useState<ResponseDoc | null>(null)
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false)
+  const [previewTab, setPreviewTab] = useState<'answers' | 'details' | 'codeAnalysis'>('answers')
 
-  // Toast
-  const [toastMessage, setToastMessage] = useState<string | null>(null)
+  // Delete Response Modal State
+  const [selectedResponse, setSelectedResponse] = useState<ResponseDoc | null>(null)
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
-  const showToast = (msg: string) => {
-    setToastMessage(msg)
-    setTimeout(() => setToastMessage(null), 3500)
+  // Bulk Delete State
+  const [selectedResponseIds, setSelectedResponseIds] = useState<string[]>([])
+  const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false)
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false)
+
+  const handleDeleteResponse = async () => {
+    if (!selectedResponse?.responseId) return
+    setIsDeleting(true)
+    try {
+      const res = await safeFetchJson(`/api/v1_5/responses?id=${selectedResponse.responseId}`, {
+        method: 'DELETE',
+      })
+      if (!res.ok) throw new Error(res.error || 'Gagal menghapus tanggapan.')
+
+      setResponses((prev) => prev.filter((r) => r.responseId !== selectedResponse.responseId))
+      setSelectedResponseIds((prev) => prev.filter((id) => id !== selectedResponse.responseId))
+      setIsDeleteModalOpen(false)
+      setSelectedResponse(null)
+    } catch (err: any) {
+      alert('Error: ' + err.message)
+    } finally {
+      setIsDeleting(false)
+    }
   }
+
+  const handleBulkDeleteResponses = async () => {
+    if (selectedResponseIds.length === 0) return
+    setIsBulkDeleting(true)
+    try {
+      const res = await safeFetchJson('/api/v1_5/responses', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: selectedResponseIds }),
+      })
+      if (!res.ok) throw new Error(res.error || 'Gagal menghapus tanggapan terpilih.')
+
+      setResponses((prev) => prev.filter((r) => !selectedResponseIds.includes(r.responseId)))
+      setSelectedResponseIds([])
+      setIsBulkDeleteModalOpen(false)
+    } catch (err: any) {
+      alert('Error: ' + err.message)
+    } finally {
+      setIsBulkDeleting(false)
+    }
+  }
+
+  const handleSelectResponseToggle = (id: string) => {
+    setSelectedResponseIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    )
+  }
+
+  // Layout View Mode (Cards vs Table)
+  const [viewLayout, setViewLayout] = useState<'cards' | 'table'>('cards')
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 6
+
+  // Pure Person-Based Cascading Filters: Kiri = Formulir, Kanan = Author / Orang (Superadmin, Kader, Mitra)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [selectedFormId, setSelectedFormId] = useState<string>('all')
+  const [selectedAuthorCode, setSelectedAuthorCode] = useState<string>('all')
 
   const loadResponses = async () => {
     setIsLoading(true)
     setError(null)
     try {
-      const res = await fetch('/api/v1_5/responses')
-      const data = await res.json()
-      if (data.success && Array.isArray(data.responses)) {
-        setResponses(data.responses)
+      const [respRes, userRes] = await Promise.all([
+        safeFetchJson('/api/v1_5/responses?status=submitted'),
+        safeFetchJson('/api/auth/users'),
+      ])
+
+      let combinedDistributions: DistMetaItem[] = []
+
+      if (respRes.ok && respRes.data) {
+        if (Array.isArray(respRes.data.responses)) {
+          const submittedOnly = respRes.data.responses.filter((r: ResponseDoc) => r.status === 'submitted')
+          setResponses(submittedOnly)
+        }
+        if (Array.isArray(respRes.data.availableForms)) {
+          setDbForms(respRes.data.availableForms)
+        }
+        if (Array.isArray(respRes.data.availableDistributions)) {
+          combinedDistributions = [...respRes.data.availableDistributions]
+        }
       } else {
-        setError(data.message || 'Gagal memuat daftar tanggapan.')
+        setError(respRes.error || 'Gagal memuat daftar hasil penilaian.')
       }
+
+      if (userRes.ok && userRes.data && Array.isArray(userRes.data.users)) {
+        const userDistItems: DistMetaItem[] = userRes.data.users.map((u: any) => ({
+          distributionId: `user_${u.uid}`,
+          code: `USER-${u.uid.substring(0, 6)}`,
+          title: `Kanal ${u.displayName || u.email}`,
+          ownerName: u.displayName || (u.email ? u.email.split('@')[0] : 'Pengguna Terdaftar'),
+          ownerType: u.role || 'cadre',
+        }))
+        combinedDistributions = [...combinedDistributions, ...userDistItems]
+      }
+
+      setDbDistributions(combinedDistributions)
     } catch (err: any) {
       setError(err.message || 'Terjadi kesalahan saat terhubung ke server.')
     } finally {
@@ -47,200 +216,862 @@ export default function ResponsesDashboardPage() {
     loadResponses()
   }, [])
 
+  // 1. KIRI: Dynamic Form options list from Firestore
+  const mergedFormOptions = useMemo(() => {
+    const map = new Map<string, FormMetaItem>()
+    dbForms.forEach((f) => map.set(f.formId, f))
+
+    responses.forEach((r) => {
+      if (r.formId && !map.has(r.formId)) {
+        map.set(r.formId, {
+          formId: r.formId,
+          title: (r as any).formTitle || 'Formulir Evaluasi Pangan',
+          versionNumber: r.versionNumber || 1.5,
+          versionLabel: r.versionNumber >= 1.5 ? `V1.5 (v${r.versionNumber})` : 'V1.0 Legacy',
+        })
+      }
+    })
+    return Array.from(map.values())
+  }, [dbForms, responses])
+
+  // 2. KANAN: Pure Person/Account Author options grouped by user identity (Superadmin, Kader 1, Mitra, dst)
+  const availableAuthors = useMemo(() => {
+    let dists = dbDistributions
+
+    if (selectedFormId !== 'all') {
+      dists = dists.filter((d) => d.formId === selectedFormId || !d.formId)
+    }
+
+    const map = new Map<string, PersonAuthorOption>()
+
+    dists.forEach((d) => {
+      const ownerName = d.ownerName || 'Kader Lapangan'
+      const ownerKey = ownerName.trim().toLowerCase()
+      const code = d.code || d.distributionId
+
+      if (!map.has(ownerKey)) {
+        map.set(ownerKey, {
+          ownerKey,
+          ownerName,
+          ownerType: d.ownerType || 'cadre',
+          codes: code ? [code] : [],
+          count: 1,
+        })
+      } else {
+        const existing = map.get(ownerKey)!
+        if (code && !existing.codes.includes(code)) {
+          existing.codes.push(code)
+        }
+        existing.count += 1
+      }
+    })
+
+    responses.forEach((r) => {
+      if (selectedFormId === 'all' || r.formId === selectedFormId || (r as any).formTitle === selectedFormId) {
+        const ownerName = (r as any).ownerName || 'Kader Lapangan'
+        const ownerKey = ownerName.trim().toLowerCase()
+        const code = r.distributionCode || (r as any).groupName || 'V1-DIST'
+
+        if (!map.has(ownerKey)) {
+          map.set(ownerKey, {
+            ownerKey,
+            ownerName,
+            ownerType: (r as any).ownerType || 'cadre',
+            codes: code ? [code] : [],
+            count: 1,
+          })
+        } else {
+          const existing = map.get(ownerKey)!
+          if (code && !existing.codes.includes(code)) {
+            existing.codes.push(code)
+          }
+        }
+      }
+    })
+
+    return Array.from(map.values())
+  }, [dbDistributions, responses, selectedFormId])
+
+  // Reset Author Selection if selected author is no longer in available list
+  useEffect(() => {
+    if (selectedAuthorCode !== 'all') {
+      const exists = availableAuthors.some((a) => a.ownerKey === selectedAuthorCode || a.ownerName === selectedAuthorCode)
+      if (!exists) setSelectedAuthorCode('all')
+    }
+  }, [selectedFormId, availableAuthors, selectedAuthorCode])
+
+  // Filtered & Strictly Submitted Responses
   const filteredResponses = useMemo(() => {
     return responses.filter((r) => {
       const term = searchTerm.toLowerCase()
+      const formTitle = (r as any).formTitle || 'Formulir Evaluasi Keamanan Pangan'
+      const distCode = r.distributionCode || 'V1-DIST'
+      const distTitle = (r as any).distributionTitle || (r as any).groupName || 'Kader Lapangan'
+      const ownerName = (r as any).ownerName || 'Kader Lapangan'
+      const ownerKey = ownerName.trim().toLowerCase()
+
       const matchesSearch =
         (r.responseId || '').toLowerCase().includes(term) ||
-        (r.distributionCode || '').toLowerCase().includes(term) ||
-        (r.formId || '').toLowerCase().includes(term) ||
+        distCode.toLowerCase().includes(term) ||
+        distTitle.toLowerCase().includes(term) ||
+        formTitle.toLowerCase().includes(term) ||
+        ownerName.toLowerCase().includes(term) ||
         (r.respondent?.name || '').toLowerCase().includes(term) ||
         (r.respondent?.email || '').toLowerCase().includes(term)
 
-      const matchesStatus = statusFilter === 'all' || r.status === statusFilter
+      const matchesForm = selectedFormId === 'all' || r.formId === selectedFormId || formTitle === selectedFormId
 
-      return matchesSearch && matchesStatus
+      let matchesAuthor = true
+      if (selectedAuthorCode !== 'all') {
+        const selectedPerson = availableAuthors.find((a) => a.ownerKey === selectedAuthorCode || a.ownerName === selectedAuthorCode)
+        if (selectedPerson) {
+          matchesAuthor =
+            ownerKey === selectedPerson.ownerKey ||
+            selectedPerson.codes.includes(distCode) ||
+            ownerName === selectedPerson.ownerName
+        } else {
+          matchesAuthor = ownerKey === selectedAuthorCode.toLowerCase() || distCode === selectedAuthorCode
+        }
+      }
+
+      return matchesSearch && matchesForm && matchesAuthor
     })
-  }, [responses, searchTerm, statusFilter])
+  }, [responses, searchTerm, selectedFormId, selectedAuthorCode, availableAuthors])
+
+  // Pagination Math
+  const totalPages = Math.ceil(filteredResponses.length / itemsPerPage) || 1
+  const paginatedResponses = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage
+    return filteredResponses.slice(start, start + itemsPerPage)
+  }, [filteredResponses, currentPage, itemsPerPage])
+
+  // Reset page to 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, selectedFormId, selectedAuthorCode])
 
   const stats = useMemo(() => {
     const total = responses.length
-    const submitted = responses.filter((r) => r.status === 'submitted').length
-    const inProgress = responses.filter((r) => r.status === 'in_progress').length
-    return { total, submitted, inProgress }
+    const scores = responses.map((r) => r.result?.percentage).filter((s): s is number => typeof s === 'number')
+    const avgScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0
+    const passCount = responses.filter((r) => r.result?.percentage && r.result.percentage >= 75).length
+
+    return { total, avgScore, passCount }
   }, [responses])
+
+  const openAnswerModal = (r: ResponseDoc, initialTab: 'answers' | 'details' | 'codeAnalysis' = 'answers') => {
+    setSelectedRespondent(r)
+    setPreviewTab(initialTab)
+    setIsPreviewModalOpen(true)
+  }
+
+  const handleResetFilters = () => {
+    setSearchTerm('')
+    setSelectedFormId('all')
+    setSelectedAuthorCode('all')
+    setCurrentPage(1)
+  }
 
   return (
     <div className="flex flex-col min-h-screen bg-slate-950 text-slate-100 font-sans">
       <Topbar
-        title="Manajemen Tanggapan & Hasil Kuesioner"
-        subtitle="Pantau tanggapan terkirim, status pengisian, dan riwayat versi responden"
+        title="Hasil Penilaian Resmi & Data Responden Terverifikasi"
+        subtitle="Auditing hasil kuesioner terkirim (submitted), analisis skor lingkaran, dan evaluasi kontribusi kader per orang"
       />
 
       <div className="flex-1 p-4 sm:p-6 space-y-6 max-w-7xl mx-auto w-full">
-        {/* Filter Action Bar */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="relative flex-1 sm:flex-initial">
-              <Icon name="search" className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-              <input
-                type="text"
-                placeholder="Cari ID respon / kode / responden..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 pr-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500 w-full sm:w-64"
-              />
-            </div>
-
-            <div className="flex items-center p-1 bg-slate-900 border border-slate-800 rounded-xl text-xs">
-              {(['all', 'submitted', 'in_progress'] as const).map((st) => (
-                <button
-                  key={st}
-                  onClick={() => setStatusFilter(st)}
-                  className={`px-3 py-1.5 rounded-lg font-semibold capitalize transition-all ${
-                    statusFilter === st
-                      ? 'bg-cyan-500/20 text-cyan-200 border border-cyan-500/40 shadow-sm'
-                      : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  {st === 'all' ? 'Semua' : st === 'submitted' ? 'Terkirim' : 'Sedang Diisi'}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <button
-            onClick={loadResponses}
-            className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-2 self-start sm:self-auto"
-          >
-            <Icon name="rotateCcw" className="w-4 h-4 text-cyan-400" />
-            <span>Refresh Data</span>
-          </button>
-        </div>
-
-        {/* Stats Summary */}
+        {/* KPI Summary Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4 shadow-sm">
+          <div className="rounded-3xl bg-slate-900 border border-slate-800 p-5 shadow-lg space-y-1">
             <div className="flex items-center justify-between text-xs text-slate-400">
-              <span>Total Tanggapan</span>
-              <Icon name="fileText" className="w-4 h-4 text-cyan-400" />
-            </div>
-            <p className="text-2xl font-bold font-mono text-slate-100 mt-2">{stats.total}</p>
-          </div>
-
-          <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4 shadow-sm">
-            <div className="flex items-center justify-between text-xs text-slate-400">
-              <span>Terkirim (Submitted)</span>
+              <span className="font-bold">Total Laporan Terverifikasi</span>
               <Icon name="checkCircle" className="w-4 h-4 text-emerald-400" />
             </div>
-            <p className="text-2xl font-bold font-mono text-emerald-300 mt-2">{stats.submitted}</p>
+            <p className="text-3xl font-black font-mono text-slate-100">{stats.total}</p>
+            <p className="text-[11px] text-emerald-400/80 font-mono">Status terkirim (Submitted) saja</p>
           </div>
 
-          <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4 shadow-sm">
+          <div className="rounded-3xl bg-slate-900 border border-slate-800 p-5 shadow-lg space-y-1">
             <div className="flex items-center justify-between text-xs text-slate-400">
-              <span>Sedang Berjalan (In Progress)</span>
-              <Icon name="clock" className="w-4 h-4 text-amber-400" />
+              <span className="font-bold">Rata-rata Skor Evaluasi</span>
+              <Icon name="award" className="w-4 h-4 text-purple-400" />
             </div>
-            <p className="text-2xl font-bold font-mono text-amber-300 mt-2">{stats.inProgress}</p>
+            <p className="text-3xl font-black font-mono text-purple-300">{stats.avgScore}%</p>
+            <p className="text-[11px] text-slate-500 font-mono">Skor rata-rata nasional</p>
+          </div>
+
+          <div className="rounded-3xl bg-slate-900 border border-slate-800 p-5 shadow-lg space-y-1">
+            <div className="flex items-center justify-between text-xs text-slate-400">
+              <span className="font-bold">Memenuhi Syarat (MS)</span>
+              <Icon name="shieldCheck" className="w-4 h-4 text-amber-400" />
+            </div>
+            <p className="text-3xl font-black font-mono text-amber-300">{stats.passCount}</p>
+            <p className="text-[11px] text-amber-400/80 font-mono">Skor kelayakan &ge; 75%</p>
           </div>
         </div>
 
-        {/* Response List */}
-        <div className="rounded-2xl bg-slate-900 border border-slate-800 overflow-hidden shadow-md">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-16 text-slate-400 text-xs gap-3">
-              <Icon name="loader" className="w-5 h-5 text-cyan-400 animate-spin" />
-              <span>Memuat daftar tanggapan kuesioner...</span>
+        {/* Pure Person Filter Action Bar: Kiri = Formulir, Kanan = Author / Orang (Superadmin, Kader, Mitra) */}
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 bg-slate-900 p-4 rounded-3xl border border-slate-800 shadow-md">
+          <div className="flex flex-wrap items-end gap-3 flex-1">
+            {/* Smart Search Bar */}
+            <div className="flex flex-col flex-1 sm:flex-initial">
+              <label className="text-[10px] font-mono text-slate-400 font-bold uppercase mb-1">Cari Responden</label>
+              <div className="relative">
+                <Icon name="search" className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                <input
+                  type="text"
+                  placeholder="Nama / email / lokasi..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 pr-4 py-2 rounded-2xl bg-slate-950 border border-slate-800 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500 w-full sm:w-48"
+                />
+              </div>
             </div>
-          ) : error ? (
-            <div className="p-8 text-center text-xs text-rose-300 space-y-2">
-              <p className="font-semibold">{error}</p>
-              <button onClick={loadResponses} className="px-3 py-1.5 rounded-lg bg-rose-950 border border-rose-500/40 text-rose-200">
-                Coba Ulang
+
+            {/* KIRI: Filter Formulir */}
+            <div className="flex flex-col flex-1 sm:flex-initial">
+              <label className="text-[10px] font-mono text-cyan-400 font-bold uppercase mb-1">1. Formulir (Kiri)</label>
+              <select
+                value={selectedFormId}
+                onChange={(e) => setSelectedFormId(e.target.value)}
+                className="px-3.5 py-2 rounded-2xl bg-slate-950 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 font-semibold w-full sm:w-56"
+              >
+                <option value="all">Semua Formulir ({mergedFormOptions.length})</option>
+                {mergedFormOptions.map((f) => (
+                  <option key={f.formId} value={f.formId}>
+                    {f.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* KANAN: Filter Author / Orang (Superadmin, Kader 1, Mitra, dst) */}
+            <div className="flex flex-col flex-1 sm:flex-initial">
+              <label className="text-[10px] font-mono text-purple-400 font-bold uppercase mb-1">2. Author / Orang (Kanan)</label>
+              <select
+                value={selectedAuthorCode}
+                onChange={(e) => setSelectedAuthorCode(e.target.value)}
+                className="px-3.5 py-2 rounded-2xl bg-slate-950 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:border-purple-500 font-semibold w-full sm:w-72"
+              >
+                <option value="all">Semua Author / Orang ({availableAuthors.length})</option>
+                {availableAuthors.map((a) => (
+                  <option key={a.ownerKey} value={a.ownerKey}>
+                    {a.ownerName} ({a.ownerType === 'admin' ? 'Super Admin' : a.ownerType === 'cadre' ? 'Kader' : 'Mitra'})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {(searchTerm || selectedFormId !== 'all' || selectedAuthorCode !== 'all') && (
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 text-xs font-bold transition-colors"
+                title="Reset Filter"
+              >
+                Reset
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center gap-3 self-start lg:self-auto">
+            {selectedResponseIds.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setIsBulkDeleteModalOpen(true)}
+                className="px-4 py-2.5 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-black shadow-lg shadow-rose-600/30 flex items-center gap-2 transition-all animate-pulse"
+              >
+                <Icon name="trash" className="w-4 h-4" />
+                <span>Hapus {selectedResponseIds.length} Terpilih (Bulk Delete)</span>
+              </button>
+            )}
+
+            {/* View Layout Switcher (Cards vs Table) */}
+            <div className="flex items-center p-1 bg-slate-950 border border-slate-800 rounded-2xl text-xs font-mono">
+              <button
+                type="button"
+                onClick={() => setViewLayout('cards')}
+                className={`px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5 transition-all ${
+                  viewLayout === 'cards' ? 'bg-cyan-500 text-slate-950 shadow-sm' : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="Tampilan Kartu Skor Lingkaran"
+              >
+                <Icon name="grid" className="w-3.5 h-3.5" />
+                <span>Kartu</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewLayout('table')}
+                className={`px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5 transition-all ${
+                  viewLayout === 'table' ? 'bg-cyan-500 text-slate-950 shadow-sm' : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="Tampilan Tabel Ringkas"
+              >
+                <Icon name="list" className="w-3.5 h-3.5" />
+                <span>Tabel</span>
               </button>
             </div>
-          ) : filteredResponses.length === 0 ? (
-            <div className="text-center py-16 text-slate-500 space-y-2">
-              <Icon name="fileText" className="w-10 h-10 mx-auto text-slate-700" />
-              <p className="text-sm font-semibold text-slate-300">Belum Ada Tanggapan Terdeteksi</p>
-              <p className="text-xs text-slate-500">Tanggapan responden yang telah memulai/mengirimkan kuesioner akan muncul di sini.</p>
-            </div>
-          ) : (
+
+            <button
+              type="button"
+              onClick={loadResponses}
+              className="px-3.5 py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold flex items-center gap-2 transition-colors"
+            >
+              <Icon name="rotateCcw" className="w-4 h-4 text-cyan-400" />
+              <span className="hidden sm:inline">Refresh</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Content Workspace Canvas */}
+        {isLoading ? (
+          <div className="flex items-center justify-center py-20 text-slate-400 text-xs gap-3 rounded-3xl bg-slate-900 border border-slate-800">
+            <Icon name="loader" className="w-6 h-6 text-cyan-400 animate-spin" />
+            <span>Memuat data responden dan hasil evaluasi...</span>
+          </div>
+        ) : error ? (
+          <div className="p-8 text-center text-xs text-rose-300 space-y-2 rounded-3xl bg-slate-900 border border-slate-800">
+            <p className="font-semibold">{error}</p>
+            <button onClick={loadResponses} className="px-4 py-2 rounded-xl bg-rose-950 border border-rose-500/40 text-rose-200 font-bold">
+              Coba Ulang
+            </button>
+          </div>
+        ) : paginatedResponses.length === 0 ? (
+          <div className="text-center py-20 text-slate-500 space-y-2 rounded-3xl bg-slate-900 border border-slate-800">
+            <Icon name="fileText" className="w-12 h-12 mx-auto text-slate-700" />
+            <p className="text-sm font-bold text-slate-300">Belum Ada Tanggapan Terverifikasi</p>
+            <p className="text-xs text-slate-500">Kuesioner terkirim yang telah selesai dinilai akan muncul di sini secara otomatis.</p>
+          </div>
+        ) : viewLayout === 'cards' ? (
+          /* CARD LAYOUT WITH CIRCULAR SCORE METRIC DONUT GAUGE */
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {paginatedResponses.map((r) => {
+              const res = r.result
+              const rawScoreVal =
+                res?.percentage ??
+                res?.rawScore ??
+                (r as any).score ??
+                (r as any).totalScore ??
+                (r as any).percentage ??
+                (r as any).finalScore ??
+                0
+
+              const score = Math.min(100, Math.max(0, Math.round(Number(rawScoreVal) || 0)))
+              const grade = res?.grade || (score >= 80 ? 'Grade A' : score >= 60 ? 'Grade B' : 'Grade C')
+              const thresholdTitle = res?.thresholdTitle || (score >= 80 ? 'Memenuhi Syarat (MS)' : score >= 60 ? 'Binaan Lanjutan' : 'Perlu Perbaikan')
+
+              const formTitle = ((r as any).formTitle || 'Formulir Evaluasi Keamanan Pangan').replace(/^form_[\w\-]+/g, 'Formulir Evaluasi Pangan')
+              const distCode = r.distributionCode || 'V1-DIST'
+              const ownerName = (r as any).ownerName || 'Penerbit Kode'
+
+              return (
+                <div
+                  key={r.responseId}
+                  className={`rounded-3xl bg-slate-900 border overflow-hidden shadow-xl transition-all flex flex-col justify-between ${
+                    selectedResponseIds.includes(r.responseId)
+                      ? 'border-cyan-500/80 bg-cyan-950/20'
+                      : 'border-slate-800 hover:border-slate-700'
+                  }`}
+                >
+                  <div className="p-6 space-y-5">
+                    {/* Top Row: Circular Score Gauge (Left) + Details (Right) */}
+                    <div className="flex items-start gap-4">
+                      <input
+                        type="checkbox"
+                        checked={selectedResponseIds.includes(r.responseId)}
+                        onChange={() => handleSelectResponseToggle(r.responseId)}
+                        className="mt-2 w-4 h-4 rounded border-slate-700 bg-slate-950 text-cyan-500 focus:ring-cyan-500 focus:ring-offset-slate-950 cursor-pointer shrink-0"
+                      />
+                      {/* Left Side: Circular Score Donut Gauge */}
+                      <CircularScoreGauge score={score} grade={grade} />
+
+                      {/* Right Side: Respondent & Form Metadata */}
+                      <div className="space-y-2 min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-bold text-slate-100 truncate" title={formTitle}>
+                            {formTitle}
+                          </span>
+
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md uppercase font-mono bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
+                            TERVERIFIKASI ✓
+                          </span>
+                        </div>
+
+                        {/* Respondent Name & Contact Info */}
+                        <div className="space-y-0.5">
+                          <h3 className="text-sm font-extrabold text-cyan-300 truncate">
+                            {r.respondent?.name || 'Responden Publik (Anonim)'}
+                          </h3>
+                          {r.respondent?.email && (
+                            <p className="text-xs text-slate-400 font-mono truncate">{r.respondent.email}</p>
+                          )}
+                        </div>
+
+                        {/* Author Kode & Threshold Badge */}
+                        <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800/80 space-y-1">
+                          <div className="text-[11px] font-bold text-slate-200 line-clamp-1">
+                            {thresholdTitle}
+                          </div>
+                          <div className="text-[10px] font-mono text-slate-400 flex items-center justify-between gap-2">
+                            <span>Author: <strong className="text-purple-300 font-sans">{ownerName}</strong> ({distCode})</span>
+                            <span>{new Date(r.submittedAt || r.updatedAt || Date.now()).toLocaleDateString('id-ID')}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bottom Action Toolbar */}
+                  <div className="p-4 bg-slate-950/80 border-t border-slate-800 flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center justify-between gap-2 border-t border-slate-800/80 pt-3 mt-1">
+                      <button
+                        type="button"
+                        onClick={() => openAnswerModal(r, 'answers')}
+                        className="px-4 py-2.5 rounded-xl bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 text-xs font-extrabold border border-cyan-500/40 flex items-center gap-1.5 transition-all shadow-md flex-1 justify-center"
+                      >
+                        <Icon name="eye" className="w-3.5 h-3.5 text-cyan-400" />
+                        <span>Lihat Jawaban</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedResponse(r)
+                          setIsDeleteModalOpen(true)
+                        }}
+                        className="px-3.5 py-2.5 rounded-xl bg-rose-950/60 hover:bg-rose-900/60 text-rose-300 text-xs font-bold border border-rose-500/30 flex items-center gap-1.5 transition-all"
+                        title="Hapus tanggapan ini"
+                      >
+                        <Icon name="trash" className="w-4 h-4 text-rose-400" />
+                        <span>Hapus</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        ) : (
+          /* TABLE LAYOUT FALLBACK */
+          <div className="rounded-3xl bg-slate-900 border border-slate-800 overflow-hidden shadow-xl">
             <div className="divide-y divide-slate-800/80">
-              {filteredResponses.map((r) => {
-                const isSubmitted = r.status === 'submitted'
-                const answerCount = Object.keys(r.answers || {}).length
+              {paginatedResponses.map((r) => {
+                const res = r.result
+                const rawScoreVal =
+                  res?.percentage ??
+                  res?.rawScore ??
+                  (r as any).score ??
+                  (r as any).totalScore ??
+                  (r as any).percentage ??
+                  (r as any).finalScore ??
+                  0
+
+                const score = Math.min(100, Math.max(0, Math.round(Number(rawScoreVal) || 0)))
+                const grade = res?.grade || (score >= 80 ? 'A' : score >= 60 ? 'B' : 'C')
+                const thresholdTitle = res?.thresholdTitle || (score >= 80 ? 'Memenuhi Syarat (MS)' : score >= 60 ? 'Binaan Lanjutan' : 'Perlu Perbaikan')
+                const formTitle = ((r as any).formTitle || 'Formulir Evaluasi Keamanan Pangan').replace(/^form_[\w\-]+/g, 'Formulir Evaluasi Pangan')
+                const ownerName = (r as any).ownerName || 'Penerbit Kode'
 
                 return (
                   <div
                     key={r.responseId}
-                    className="p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-slate-800/30 transition-colors"
+                    className={`p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-colors ${
+                      selectedResponseIds.includes(r.responseId)
+                        ? 'bg-cyan-950/30'
+                        : 'hover:bg-slate-800/40'
+                    }`}
                   >
-                    <div className="space-y-1.5 max-w-xl">
-                      <div className="flex items-center gap-2.5 flex-wrap">
-                        <span className="font-mono text-slate-300 font-extrabold text-xs px-2.5 py-0.5 rounded-lg bg-slate-950 border border-slate-800">
-                          {r.responseId}
+                    <div className="flex items-start gap-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedResponseIds.includes(r.responseId)}
+                        onChange={() => handleSelectResponseToggle(r.responseId)}
+                        className="mt-1 w-4 h-4 rounded border-slate-700 bg-slate-950 text-cyan-500 focus:ring-cyan-500 focus:ring-offset-slate-950 cursor-pointer shrink-0"
+                      />
+                      <div className="space-y-1.5">
+                      <div className="flex items-center gap-2 flex-wrap font-mono text-xs">
+                        <span className="font-bold text-slate-100 font-sans">
+                          {formTitle}
                         </span>
-
-                        <span
-                          className={`text-[10px] font-bold px-2.5 py-0.5 rounded-md uppercase border ${
-                            isSubmitted
-                              ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
-                              : 'bg-amber-500/10 text-amber-300 border-amber-500/30'
-                          }`}
-                        >
-                          {r.status}
+                        <span className="px-2 py-0.5 rounded bg-purple-950 text-purple-300 font-bold border border-purple-500/30">
+                          Author: {ownerName}
                         </span>
-
-                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-500/30">
-                          Kode: {r.distributionCode}
-                        </span>
-
-                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-950 text-purple-300 border border-purple-500/30">
-                          Versi: v{r.versionNumber} ({r.versionId})
+                        <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 font-bold border border-emerald-500/40">
+                          TERVERIFIKASI ✓
                         </span>
                       </div>
 
-                      <div className="flex items-center gap-2 text-xs font-semibold text-slate-200">
-                        <Icon name="user" className="w-3.5 h-3.5 text-cyan-400" />
-                        <span>{r.respondent?.name || 'Responden Publik (Anonim)'}</span>
-                        {r.respondent?.email && <span className="text-slate-400 font-mono">({r.respondent.email})</span>}
+                      <div className="text-sm font-bold text-cyan-300">
+                        {r.respondent?.name || 'Responden Publik (Anonim)'}
                       </div>
 
-                      <div className="flex items-center gap-3 text-[11px] text-slate-500 font-mono pt-1">
-                        <span>Form ID: {r.formId}</span>
-                        <span>•</span>
-                        <span>Jawaban Terisi: {answerCount} butir</span>
-                        <span>•</span>
-                        <span>
-                          {isSubmitted
-                            ? `Terkirim: ${new Date(r.submittedAt || r.updatedAt).toLocaleString('id-ID')}`
-                            : `Dimulai: ${new Date(r.startedAt).toLocaleString('id-ID')}`}
-                        </span>
+                      <div className="text-xs font-mono text-slate-300 font-bold">
+                        Skor: {score}% — Predikat {grade} ({thresholdTitle})
                       </div>
                     </div>
+                  </div>
 
-                    <div className="flex items-center gap-2 self-start md:self-center">
-                      <Link
-                        href={`/dashboard/responses/${r.responseId}`}
-                        className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-400 hover:text-cyan-300 border border-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                  <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => openAnswerModal(r, 'answers')}
+                        className="px-4 py-2 rounded-xl bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 text-xs font-extrabold border border-cyan-500/40 flex items-center gap-1.5 transition-all shadow-md"
                       >
-                        <span>Inspeksi Jawaban</span>
-                        <Icon name="arrowRight" className="w-4 h-4" />
-                      </Link>
+                        <Icon name="eye" className="w-3.5 h-3.5 text-cyan-400" />
+                        <span>Lihat Jawaban</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedResponse(r)
+                          setIsDeleteModalOpen(true)
+                        }}
+                        className="px-3 py-2 rounded-xl bg-rose-950/60 hover:bg-rose-900/60 text-rose-300 text-xs font-bold border border-rose-500/30 flex items-center gap-1 transition-all"
+                        title="Hapus tanggapan ini"
+                      >
+                        <Icon name="trash" className="w-3.5 h-3.5 text-rose-400" />
+                        <span>Hapus</span>
+                      </button>
                     </div>
                   </div>
                 )
               })}
             </div>
-          )}
-        </div>
+          </div>
+        )}
+
+        {/* PAGINATION CONTROLS BAR */}
+        {totalPages > 1 && (
+          <div className="p-4 rounded-3xl bg-slate-900 border border-slate-800 flex items-center justify-between gap-4 flex-wrap shadow-md font-mono text-xs">
+            <span className="text-slate-400">
+              Menampilkan Halaman <strong className="text-cyan-400">{currentPage}</strong> dari <strong>{totalPages}</strong> ({filteredResponses.length} Tanggapan Terverifikasi)
+            </span>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                disabled={currentPage <= 1}
+                className="px-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 hover:bg-slate-800 disabled:opacity-40 font-bold transition-colors"
+              >
+                ← Sebelumnya
+              </button>
+
+              <div className="flex items-center gap-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((pg) => (
+                  <button
+                    key={pg}
+                    type="button"
+                    onClick={() => setCurrentPage(pg)}
+                    className={`w-8 h-8 rounded-xl font-bold transition-all ${
+                      currentPage === pg
+                        ? 'bg-cyan-500 text-slate-950 font-black shadow-md shadow-cyan-500/20'
+                        : 'bg-slate-950 text-slate-400 hover:bg-slate-800'
+                    }`}
+                  >
+                    {pg}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                disabled={currentPage >= totalPages}
+                className="px-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 hover:bg-slate-800 disabled:opacity-40 font-bold transition-colors"
+              >
+                Selanjutnya →
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Toast */}
-      {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 p-4 rounded-xl bg-slate-900 border border-slate-700 text-slate-100 text-xs font-semibold shadow-2xl animate-in slide-in-from-bottom-3">
-          {toastMessage}
+      {/* ========== INTEGRATED ANSWER & CODE ANALYSIS MODAL ========== */}
+      {isPreviewModalOpen && selectedRespondent && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ backgroundColor: 'rgba(0,0,0,0.8)' }}
+          onClick={() => setIsPreviewModalOpen(false)}
+        >
+          <div
+            className="relative w-full max-w-3xl bg-slate-950 border border-slate-800 rounded-3xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between p-5 border-b border-slate-800 bg-slate-900">
+              <div>
+                <span className="text-[10px] font-mono font-bold text-cyan-400 uppercase tracking-wider">
+                  Inspeksi & Analisis Hasil Evaluasi Responden
+                </span>
+                <h3 className="text-base font-extrabold text-slate-100">
+                  {selectedRespondent.respondent?.name || 'Responden Publik'}
+                </h3>
+                <p className="text-xs text-slate-400 font-sans font-semibold">
+                  Formulir: {(selectedRespondent as any).formTitle || selectedRespondent.formId}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsPreviewModalOpen(false)}
+                className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-slate-100"
+              >
+                <Icon name="x" className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto p-5 space-y-5 font-sans">
+              {/* TOP HERO SUMMARY: CODE ANALYSIS & SCORE SUMMARY */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Card 1: Score & Threshold */}
+                <div className="p-4 rounded-2xl bg-gradient-to-br from-cyan-950/40 via-slate-900 to-slate-950 border border-cyan-500/30 space-y-2 shadow-lg">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-mono font-bold text-cyan-400 uppercase tracking-wider">
+                      Nilai & Predikat Evaluasi
+                    </span>
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                      TERVERIFIKASI ✓
+                    </span>
+                  </div>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-3xl font-black font-mono text-cyan-300">
+                      {selectedRespondent.result?.percentage ?? 0}%
+                    </span>
+                    <span className="text-sm font-extrabold text-emerald-400 font-mono">
+                      Grade {selectedRespondent.result?.grade || 'N/A'}
+                    </span>
+                  </div>
+                  <p className="text-xs font-bold text-slate-100">
+                    {selectedRespondent.result?.thresholdTitle || 'Memenuhi Syarat (MS)'}
+                  </p>
+                  <p className="text-[11px] text-slate-400 font-mono">
+                    Waktu Selesai: {new Date(selectedRespondent.submittedAt || selectedRespondent.updatedAt || Date.now()).toLocaleString('id-ID')}
+                  </p>
+                </div>
+
+                {/* Card 2: Code & Author Analysis */}
+                <div className="p-4 rounded-2xl bg-gradient-to-br from-purple-950/40 via-slate-900 to-slate-950 border border-purple-500/30 space-y-2 shadow-lg">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-mono font-bold text-purple-300 uppercase tracking-wider">
+                      Analisis Kode & Author
+                    </span>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-purple-500/10 text-purple-300 border border-purple-500/30 font-bold uppercase">
+                      {(selectedRespondent as any).ownerType || 'cadre'}
+                    </span>
+                  </div>
+                  <p className="text-2xl font-black font-mono text-purple-200 tracking-wider">
+                    {selectedRespondent.distributionCode || 'V1-LEGACY-DIST'}
+                  </p>
+                  <div className="text-xs space-y-0.5">
+                    <p className="text-slate-300 font-bold">
+                      Author: <span className="text-purple-300">{(selectedRespondent as any).ownerName || 'Administrator BPOM'}</span>
+                    </p>
+                    <p className="text-slate-400 font-mono text-[11px]">
+                      Form: {(selectedRespondent as any).formTitle || 'Formulir Evaluasi Pangan'} (v{selectedRespondent.versionNumber || 1.5})
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* MAIN SECTION: RESPONDENT ANSWERS */}
+              <div className="space-y-3 pt-2">
+                <h4 className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <Icon name="fileText" className="w-3.5 h-3.5 text-cyan-400" />
+                  Rincian Pertanyaan & Jawaban Responden:
+                </h4>
+                  {Object.entries(selectedRespondent.answers || {}).map(([key, value], idx) => {
+                    if (
+                      [
+                        'respondentName',
+                        'respondentEmail',
+                        'name',
+                        'nama',
+                        'email',
+                        'createdAt',
+                        'formCode',
+                        'formId',
+                        'formTitle',
+                        'submittedAt',
+                      ].includes(key)
+                    )
+                      return null
+
+                    const { type, content } = formatAnswerValue(value)
+
+                    return (
+                      <div key={key || idx} className="p-4 rounded-2xl bg-slate-900 border border-slate-800/80 space-y-2">
+                        <div className="flex justify-between items-center text-[10px] font-mono font-bold text-cyan-400">
+                          <span>Pertanyaan #{String(idx + 1).padStart(2, '0')}</span>
+                        </div>
+
+                        <p className="text-xs font-bold text-slate-200 leading-snug">{key}</p>
+
+                        {type === 'signature' && (
+                          <div className="rounded-xl overflow-hidden border border-slate-800 bg-white p-2 max-w-xs">
+                            <img src={content} alt="Tanda Tangan Digital" className="max-h-32 mx-auto" />
+                            <p className="text-[10px] text-cyan-600 text-center font-mono mt-1">📝 Tanda tangan digital</p>
+                          </div>
+                        )}
+
+                        {type === 'table' && (
+                          <div className="overflow-x-auto rounded-xl border border-slate-800/80">
+                            <table className="w-full text-xs font-mono">
+                              <thead className="bg-slate-950 text-slate-400 text-[10px] uppercase">
+                                <tr>
+                                  <th className="text-left p-2.5 px-3.5 border-r border-slate-800 font-sans">Sub Pertanyaan / Indikator</th>
+                                  <th className="text-right p-2.5 px-3.5 font-sans">Jawaban</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-800/80 bg-slate-900">
+                                {Object.entries(content).map(([subKey, subVal], i) => (
+                                  <tr key={i}>
+                                    <td className="p-2.5 px-3.5 font-sans text-slate-300 border-r border-slate-800">{subKey}</td>
+                                    <td className="p-2.5 px-3.5 text-right font-bold text-cyan-300">
+                                      {typeof subVal === 'object' ? JSON.stringify(subVal) : String(subVal)}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+
+                        {type === 'array' && (
+                          <div className="flex flex-wrap gap-1.5 pt-1">
+                            {content.map((item: any, i: number) => (
+                              <span
+                                key={i}
+                                className="px-3 py-1 rounded-xl bg-cyan-950 border border-cyan-500/40 text-xs font-mono text-cyan-300 font-bold"
+                              >
+                                {typeof item === 'object' ? JSON.stringify(item) : String(item)}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        {type === 'text' && (
+                          <div className="p-3 rounded-xl bg-slate-950 border border-slate-800/80 text-xs font-mono text-slate-200">
+                            {content}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-between p-4 border-t border-slate-800 bg-slate-900">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsPreviewModalOpen(false)
+                  setSelectedResponse(selectedRespondent)
+                  setIsDeleteModalOpen(true)
+                }}
+                className="px-4 py-2 rounded-xl bg-rose-950/60 hover:bg-rose-900/60 border border-rose-500/40 text-xs font-bold text-rose-300 transition-all flex items-center gap-1.5"
+              >
+                <Icon name="trash" className="w-3.5 h-3.5 text-rose-400" />
+                <span>Hapus Tanggapan Ini</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsPreviewModalOpen(false)}
+                className="px-5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-xs font-bold text-white shadow-lg shadow-cyan-600/20"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE CONFIRMATION MODAL */}
+      {isDeleteModalOpen && selectedResponse && (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="w-full max-w-md bg-slate-950 border border-rose-500/40 rounded-3xl p-6 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3 text-rose-400">
+              <div className="w-10 h-10 rounded-2xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center">
+                <Icon name="trash" className="w-5 h-5 text-rose-400" />
+              </div>
+              <div>
+                <h3 className="text-base font-extrabold text-white">Konfirmasi Hapus Tanggapan</h3>
+                <p className="text-xs text-rose-300 font-mono">ID: {selectedResponse.responseId}</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Apakah Anda yakin ingin menghapus data tanggapan kuesioner dari <strong>{(selectedResponse as any).respondentName || (selectedResponse as any).answers?.name || 'Responden'}</strong>? Tindakan ini permanen dan tidak dapat dibatalkan.
+            </p>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsDeleteModalOpen(false)
+                  setSelectedResponse(null)
+                }}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-300"
+              >
+                Batal
+              </button>
+
+              <button
+                type="button"
+                onClick={handleDeleteResponse}
+                disabled={isDeleting}
+                className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-xs font-extrabold text-white shadow-lg shadow-rose-600/30 flex items-center gap-1.5"
+              >
+                <Icon name="trash" className="w-3.5 h-3.5" />
+                <span>{isDeleting ? 'Menghapus...' : 'Ya, Hapus Permanent'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* BULK DELETE CONFIRMATION MODAL */}
+      {isBulkDeleteModalOpen && selectedResponseIds.length > 0 && (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+          <div className="w-full max-w-md bg-slate-950 border border-rose-500/50 rounded-3xl p-6 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3 text-rose-400">
+              <div className="w-10 h-10 rounded-2xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center">
+                <Icon name="trash" className="w-5 h-5 text-rose-400" />
+              </div>
+              <div>
+                <h3 className="text-base font-extrabold text-white">Konfirmasi Hapus Terpilih (Bulk Delete)</h3>
+                <p className="text-xs text-rose-300 font-mono">{selectedResponseIds.length} Tanggapan Terpilih</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Apakah Anda yakin ingin menghapus sekaligus <strong>{selectedResponseIds.length} data tanggapan</strong> kuesioner yang telah Anda pilih? Tindakan ini bersifat permanen dari database.
+            </p>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsBulkDeleteModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-300"
+              >
+                Batal
+              </button>
+
+              <button
+                type="button"
+                onClick={handleBulkDeleteResponses}
+                disabled={isBulkDeleting}
+                className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-xs font-extrabold text-white shadow-lg shadow-rose-600/30 flex items-center gap-1.5"
+              >
+                <Icon name="trash" className="w-3.5 h-3.5" />
+                <span>{isBulkDeleting ? 'Menghapus...' : `Ya, Hapus ${selectedResponseIds.length} Tanggapan`}</span>
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

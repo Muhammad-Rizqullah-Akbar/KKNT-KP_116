@@ -27,7 +27,14 @@ export interface ResponseDoc {
   updatedAt: string
   submittedAt?: string
   submissionToken: string
-  result?: ResponseResultDoc
+  result?: ResponseResultDoc | any
+  createdBy?: string
+  cadreId?: string
+  userId?: string
+  formTitle?: string
+  groupName?: string
+  distributionTitle?: string
+  ownerName?: string
   metadata?: {
     userAgent?: string
     locale?: string
@@ -58,6 +65,7 @@ export interface PublicResponseSubmitDTO {
     grade: string
     thresholdTitle: string
     thresholdDescription?: string
+    aspects?: any[]
     recommendations: any[]
   }
 }

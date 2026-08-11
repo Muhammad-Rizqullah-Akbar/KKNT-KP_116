@@ -21,6 +21,9 @@ export interface ArticleData {
   title: string
   slug: string
   author: string
+  authorUid?: string
+  authorRole?: string
+  authorOrganization?: string
   authorBio: string
   category: string
   status: 'Draft' | 'Published'
@@ -32,6 +35,7 @@ export interface ArticleData {
   featuredImage: string
   tags: string[]
   gallery: { id: string; url?: string; caption: string; gradient: string }[]
+  embeddedDistributionCode?: string
   createdAt?: any
   updatedAt?: any
 }
@@ -61,13 +65,26 @@ export const getArticles = async (): Promise<ArticleData[]> => {
   }
 }
 
+const sanitizeArticleData = (data: Record<string, any>): Record<string, any> => {
+  const sanitized: Record<string, any> = {}
+  Object.keys(data).forEach((key) => {
+    if (data[key] !== undefined) {
+      sanitized[key] = data[key]
+    } else {
+      sanitized[key] = ''
+    }
+  })
+  return sanitized
+}
+
 /**
  * Menyimpan artikel baru ke Firestore
  */
 export const createArticle = async (data: Omit<ArticleData, 'id'>): Promise<string> => {
   try {
+    const sanitizedPayload = sanitizeArticleData(data)
     const docRef = await addDoc(collection(db, COLLECTION_NAME), {
-      ...data,
+      ...sanitizedPayload,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     })
@@ -85,8 +102,9 @@ export const createArticle = async (data: Omit<ArticleData, 'id'>): Promise<stri
 export const updateArticle = async (id: string, data: Partial<ArticleData>): Promise<void> => {
   try {
     const docRef = doc(db, COLLECTION_NAME, id)
+    const sanitizedPayload = sanitizeArticleData(data)
     await updateDoc(docRef, {
-      ...data,
+      ...sanitizedPayload,
       updatedAt: serverTimestamp()
     })
   } catch (error) {

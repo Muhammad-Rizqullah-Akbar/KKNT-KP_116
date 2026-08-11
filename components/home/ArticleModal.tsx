@@ -117,13 +117,43 @@ export function ArticleModal({ article, isOpen, onClose, categoryBadgeColors }: 
             </div>
           )}
 
+          {/* Call-to-Action Embedded Questionnaire Widget for Cadre Credits */}
+          <div className="rounded-2xl bg-gradient-to-r from-purple-950/60 via-slate-900 to-cyan-950/60 border border-purple-500/40 p-5 space-y-3 shadow-xl">
+            <div className="flex items-center gap-2">
+              <span className="px-2.5 py-0.5 rounded-md bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-extrabold flex items-center gap-1">
+                <Icon name="checkCircle" className="w-3.5 h-3.5 text-purple-400" />
+                <span>Kuesioner Keamanan Pangan Interaktif</span>
+              </span>
+              <span className="text-white/40 text-xs">• Kredit Penulis: {article.author || 'Kader Lapangan'}</span>
+            </div>
+
+            <div>
+              <h4 className="text-base font-extrabold text-white">Dukung Edukasi Keamanan Pangan & Isi Kuesioner Resmi</h4>
+              <p className="text-xs text-white/60 leading-relaxed mt-1">
+                Setelah membaca materi edukasi di atas, mari bantu kader penyuluhan <strong className="text-purple-300">{article.author}</strong> dengan mengisi kuesioner evaluasi hygiene & sanitasi pangan berikut.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3 pt-1">
+              <a
+                href={`/form/${article.embeddedDistributionCode || 'KKPD-MASTER'}`}
+                target="_blank"
+                rel="noreferrer"
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-cyan-600 hover:from-purple-500 hover:to-cyan-500 text-white font-extrabold text-xs shadow-lg shadow-purple-600/30 flex items-center gap-2 transition-all"
+              >
+                <Icon name="clipboardList" className="w-4 h-4" />
+                <span>Isi Kuesioner Sekarang (Kode: {article.embeddedDistributionCode || 'KKPD-MASTER'})</span>
+              </a>
+            </div>
+          </div>
+
           <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.05] flex items-start gap-4">
             <div className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-500 to-cyan-500 flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
               {(article.author || 'A').split(' ').map((n: string) => n[0]).join('')}
             </div>
             <div>
               <p className="text-sm font-semibold text-white">{article.author || 'Penulis Edukasi'}</p>
-              <p className="text-xs text-white/40">{article.authorBio || 'Kontributor Keamanan Pangan'}</p>
+              <p className="text-xs text-white/40">{article.authorBio || 'Kontributor Keamanan Pangan BPOM'}</p>
             </div>
           </div>
 
@@ -135,7 +165,7 @@ export function ArticleModal({ article, isOpen, onClose, categoryBadgeColors }: 
             </Link>
             <button
               onClick={onClose}
-              className="px-6 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white/70 hover:text-white transition-all"
+              className="px-6 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white/70 hover:text-white transition-all text-sm font-medium"
             >
               Tutup
             </button>

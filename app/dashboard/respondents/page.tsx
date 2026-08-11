@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
+import Link from 'next/link'
 import { Topbar } from '@/components/dashboard/Topbar'
 import { Icon } from '@/components/ui/Icons'
 import {
@@ -924,7 +925,17 @@ export default function RespondentsPage() {
             </div>
 
             {/* Footer */}
-            <div className="flex items-center justify-end px-6 py-4 border-t border-white/6 shrink-0">
+            <div className="flex items-center justify-between px-6 py-4 border-t border-white/6 shrink-0 gap-3">
+              {selectedRespondent && (
+                <Link
+                  href={`/dashboard/responses/${selectedRespondent.id}`}
+                  className="px-4 py-2 rounded-xl bg-purple-600/30 hover:bg-purple-600/50 border border-purple-500/40 text-xs font-semibold text-purple-200 transition-all flex items-center gap-1.5"
+                >
+                  <Icon name="externalLink" className="w-3.5 h-3.5" />
+                  <span>Inspeksi Laporan Hasil Penilaian Lengkap</span>
+                </Link>
+              )}
+
               <button
                 onClick={() => setIsPreviewOpen(false)}
                 className="px-5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-sm font-medium text-white transition-all shadow-lg shadow-cyan-600/25"

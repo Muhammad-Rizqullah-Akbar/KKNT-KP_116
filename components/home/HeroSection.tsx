@@ -32,6 +32,7 @@ export function HeroSection({ onOpenCodeModal, heroData }: HeroSectionProps) {
           fill
           priority
           sizes="100vw"
+          unoptimized={bgImageSrc.startsWith('http')}
           className="object-cover object-center opacity-85 scale-100 transition-all duration-700"
         />
 

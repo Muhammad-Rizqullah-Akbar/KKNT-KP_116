@@ -1,9 +1,11 @@
 import type { FormMetadata, Question, ScoringConfig, ValidationConfig } from './types'
+export type { ScoringConfig, ValidationConfig }
 
 export type FormAspect = {
   aspectId: string
   title: string
   description?: string
+  isScored?: boolean // default true. If false, aspect is non-scored / biodata / survey only
 }
 
 export type GradeThreshold = {
@@ -18,6 +20,7 @@ export type GradeThreshold = {
 export type RecommendationConfig = {
   mode: 'disabled' | 'manual' | 'automatic' | 'hybrid'
   manualArticleIds?: string[]
+  gradeArticleMap?: Record<string, string[]>
 }
 
 export type FormDistributionConfig = {
@@ -25,7 +28,7 @@ export type FormDistributionConfig = {
   distributionCodePrefix?: string
 }
 
-export type BuilderQuestion = Question & { aspectId?: string }
+export type BuilderQuestion = Question & { aspectId?: string; answerType?: string; config?: any }
 
 export type BuilderState = {
   metadata: FormMetadata
@@ -151,9 +154,17 @@ export function addAspect(state: BuilderState, aspect: FormAspect): BuilderState
 }
 
 export function updateAspect(state: BuilderState, aspectId: string, update: Partial<FormAspect>): BuilderState {
+  const updatedAspects = state.aspects.map((a) => (a.aspectId === aspectId ? { ...a, ...structuredClone(update), aspectId } : a))
+  const stageDist = { ...(state.scoring?.stagePointDistribution || {}) }
+
+  if (update.isScored === false) {
+    delete stageDist[aspectId]
+  }
+
   return {
     ...state,
-    aspects: state.aspects.map((a) => (a.aspectId === aspectId ? { ...a, ...structuredClone(update), aspectId } : a)),
+    aspects: updatedAspects,
+    scoring: { ...state.scoring, stagePointDistribution: stageDist },
   }
 }
 
