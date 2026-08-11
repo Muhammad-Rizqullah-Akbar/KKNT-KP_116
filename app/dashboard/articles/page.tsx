@@ -583,7 +583,7 @@ export default function ArticlesAdminPage() {
     setIsEditing(false)
     setSelectedArticle(null)
     setFormData({
-      title: 'Judul Artikel Edukasi Baru', category: 'Teknologi', author: userData?.displayName || user?.email || 'Kader Edukator', authorBio: userData?.organization || 'Kader Edukator BPOM', status: 'Draft',
+      title: 'Judul Artikel Edukasi Baru', category: 'Teknologi', author: userData?.displayName || user?.email || 'Kader Edukator', authorBio: (userData as any)?.organization || 'Kader Edukator BPOM', status: 'Draft',
       readTime: 5, featuredImage: '', excerpt: 'Tuliskan ringkasan singkat artikel edukasi di sini...', tags: '#Pangan, #Edukasi', embeddedDistributionCode: '', gallery: [],
       blocks: [
         { id: 'b1', type: 'h2', value: '1. Pendahuluan Keamanan Pangan' },
@@ -626,10 +626,10 @@ export default function ArticlesAdminPage() {
         slug: formData.title.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
         category: formData.category,
         author: formData.author || userData?.displayName || user?.email || 'Penulis KKPD-KP',
-        authorBio: formData.authorBio || userData?.organization || 'BPOM / Cadre Edukator',
+        authorBio: formData.authorBio || (userData as any)?.organization || 'BPOM / Cadre Edukator',
         authorUid: user?.uid || '',
         authorRole: userData?.role || 'public',
-        authorOrganization: userData?.organization || userData?.partnershipName || '',
+        authorOrganization: (userData as any)?.organization || (userData as any)?.partnershipName || '',
         status: finalStatus,
         readTime: formData.readTime,
         featuredImage: formData.featuredImage,
@@ -901,7 +901,7 @@ export default function ArticlesAdminPage() {
                         <button onClick={() => handleEdit(article)} className="p-2 rounded-lg hover:bg-white/[0.05]" title="Edit Form">
                           <Icon name="pencil" className="w-4 h-4 text-white/50 hover:text-cyan-400" />
                         </button>
-                        <button onClick={() => { setSelectedArticle(article); setFormData({ title: article.title, category: article.category, author: article.author, authorBio: article.authorBio, status: article.status, readTime: article.readTime, featuredImage: article.featuredImage, excerpt: article.excerpt, tags: article.tags ? article.tags.join(', ') : '', gallery: article.gallery || [], blocks: htmlToBlocks(article.content) }); setIsPreviewOpen(true); document.body.style.overflow = 'hidden'; }} className="p-2 rounded-lg hover:bg-white/[0.05]" title="Live Editor Preview">
+                        <button onClick={() => { setSelectedArticle(article); setFormData({ title: article.title, category: article.category, author: article.author, authorBio: article.authorBio, status: article.status, readTime: article.readTime, featuredImage: article.featuredImage, excerpt: article.excerpt, tags: article.tags ? article.tags.join(', ') : '', embeddedDistributionCode: (article as any).embeddedDistributionCode || '', gallery: article.gallery || [], blocks: htmlToBlocks(article.content) }); setIsPreviewOpen(true); document.body.style.overflow = 'hidden'; }} className="p-2 rounded-lg hover:bg-white/[0.05]" title="Live Editor Preview">
                           <Icon name="eye" className="w-4 h-4 text-white/50 hover:text-sky-400" />
                         </button>
                         <button onClick={() => handleDelete(article.id!)} className="p-2 rounded-lg hover:bg-red-500/10" title="Hapus">
@@ -965,7 +965,7 @@ export default function ArticlesAdminPage() {
                     : 'border-transparent text-white/50 hover:text-white hover:bg-white/[0.03]'
                 }`}
               >
-                <Icon name="layers" className="w-4 h-4" />
+                <Icon name="layout" className="w-4 h-4" />
                 <span>2. Blok Konten ({formData.blocks.length})</span>
               </button>
 
