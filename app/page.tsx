@@ -289,7 +289,7 @@ export default function HomePage() {
       <Navbar transparent={true} onOpenCodeModal={() => setIsCodeModalOpen(true)} />
 
       {/* Hero Section */}
-      <HeroSection onOpenCodeModal={() => setIsCodeModalOpen(true)} heroData={heroData} />
+      <HeroSection heroData={heroData} onOpenCodeModal={() => setIsCodeModalOpen(true)} />
 
       {/* Program Section (Sudah aman & menggunakan state partnershipData) */}
       <ProgramSection data={partnershipData} />
