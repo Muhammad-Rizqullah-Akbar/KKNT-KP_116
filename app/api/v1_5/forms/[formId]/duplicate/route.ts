@@ -11,10 +11,9 @@ export async function POST(
   { params }: { params: Promise<{ formId: string }> }
 ) {
   try {
-    const authContext = (await getAuthorizationContext()) || {
-      uid: 'dev-user',
-      role: 'admin' as const,
-      token: {} as any,
+    const authContext = await getAuthorizationContext()
+    if (!authContext) {
+      return NextResponse.json({ success: false, message: 'Otentikasi diperlukan.' }, { status: 401 })
     }
     const { formId } = await params
 

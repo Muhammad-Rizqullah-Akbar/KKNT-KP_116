@@ -49,7 +49,7 @@ export async function GET(request: Request) {
     const search = searchParams.get('search') || ''
     const formId = searchParams.get('formId') || ''
 
-    let distributions
+    let distributions: any[] = []
     try {
       distributions = await listDistributionsWorkflow(authContext, { status, search, formId })
     } catch (dbErr) {

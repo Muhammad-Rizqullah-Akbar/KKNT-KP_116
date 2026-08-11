@@ -13,10 +13,9 @@ interface RouteParams {
 export async function POST(_request: Request, { params }: RouteParams) {
   try {
     const { formId } = await params
-    const authContext = (await getAuthorizationContext()) || {
-      uid: 'dev-user',
-      role: 'admin' as const,
-      token: {} as any,
+    const authContext = await getAuthorizationContext()
+    if (!authContext) {
+      return NextResponse.json({ success: false, message: 'Otentikasi diperlukan.' }, { status: 401 })
     }
 
     const archived = await archiveFormWorkflow(formId, authContext.uid)
