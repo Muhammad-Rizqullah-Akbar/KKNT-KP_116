@@ -33,7 +33,7 @@ export function calculateQuestionScore(
   if (type === 'single-choice' || type === 'binary' || type === 'dropdown') {
     const defaultWeight = 5
     const maxScore = question.scoring?.weight ?? defaultWeight
-    const answerKey = question.answerKey || {}
+    const answerKey = (question.answerKey as any) || {}
     const correctOptionIds = answerKey.correctOptionIds || (answerKey.optionId ? [answerKey.optionId] : [])
 
     const selectedOptId = typeof answerValue === 'string' ? answerValue : ''
@@ -59,7 +59,7 @@ export function calculateQuestionScore(
 
   // 2. MULTIPLE CHOICE
   if (type === 'multiple-choice') {
-    const answerKey = question.answerKey || {}
+    const answerKey = (question.answerKey as any) || {}
     const correctOptionIds = answerKey.correctOptionIds || []
     const selectedOptionIds: string[] = Array.isArray(answerValue) ? answerValue : []
 

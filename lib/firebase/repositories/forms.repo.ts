@@ -609,7 +609,7 @@ export const submitFormResponse = async (
         
         if (type === 'indicator-table' || type === 'likert') {
           const indicators = q.config?.indicators || []
-          const statements = q.config?.statements || q.options || []
+          const statements = q.config?.statements || (q as any).options || []
           
           const tableAnswers: Record<string, string> = {}
           let hasValue = false

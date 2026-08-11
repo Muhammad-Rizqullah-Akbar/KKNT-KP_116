@@ -26,11 +26,13 @@ import type {
 } from '@/lib/forms/v1_5/responseTypes'
 import type { ResponseResultDoc, RecommendationItem } from '@/lib/forms/v1_5/scoring/scoringTypes'
 
+import { randomBytes, randomUUID } from 'crypto'
+
 /**
  * Generates an opaque random token for session locking.
  */
 function generateSubmissionToken(): string {
-  return `tok_${Math.random().toString(36).substring(2, 10)}${Date.now().toString(36)}`
+  return `tok_${randomBytes(16).toString('hex')}`
 }
 
 /**
@@ -167,7 +169,7 @@ export async function startResponseWorkflow(
     }
   }
 
-  const responseId = `resp_${Math.random().toString(36).substring(2, 9)}_${Date.now()}`
+  const responseId = `resp_${randomUUID()}`
   const submissionToken = generateSubmissionToken()
   const now = new Date().toISOString()
 

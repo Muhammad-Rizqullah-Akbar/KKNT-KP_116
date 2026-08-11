@@ -25,6 +25,8 @@ import type {
   UpdateDistributionParams,
 } from '@/lib/forms/v1_5/distributionTypes'
 
+import { randomInt, randomBytes } from 'crypto'
+
 /**
  * Generates an opaque, human-friendly, collision-resistant code (e.g. KKPD7X9).
  */
@@ -32,10 +34,10 @@ async function generateUniqueDistributionCode(): Promise<string> {
   const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ' // Avoid ambiguous O, 0, I, 1
   let attempts = 0
 
-  while (attempts < 10) {
+  while (attempts < 20) {
     let code = 'KKPD'
     for (let i = 0; i < 3; i++) {
-      code += chars.charAt(Math.floor(Math.random() * chars.length))
+      code += chars.charAt(randomInt(0, chars.length))
     }
 
     const existing = await getDistributionByCodeDoc(code)
@@ -43,8 +45,9 @@ async function generateUniqueDistributionCode(): Promise<string> {
     attempts++
   }
 
-  // Fallback random code
-  return `KPD${Math.random().toString(36).substring(2, 6).toUpperCase()}`
+  // Cryptographically secure fallback
+  const hex = randomBytes(2).toString('hex').toUpperCase()
+  return `KPD${hex}`
 }
 
 /**
@@ -63,73 +66,29 @@ export async function resolveDistributionWorkflow(
 
   if (!dist) {
     // Direct Form ID / Legacy Form Code fallback
-    const rawCode = distributionCode.trim()
-    const formAgg = await getFormAggregateFromDb(rawCode)
-    if (formAgg) {
-      dist = {
-        distributionId: `dist_direct_${formAgg.formId}`,
-        formId: formAgg.formId,
-        code: normalized,
-        normalizedCode: normalized,
-        title: formAgg.metadata?.title || (formAgg as any).title || 'Formulir Penilaian Kebersihan & Keamanan Pangan',
-        description: formAgg.metadata?.description || (formAgg as any).description || '',
-        ownerType: 'admin',
-        ownerId: formAgg.createdBy || 'bpom_admin',
-        ownerName: 'Administrator BPOM',
-        versionMode: 'active',
-        status: 'active',
-        createdAt: formAgg.createdAt || new Date().toISOString(),
-        createdBy: formAgg.createdBy || 'system',
-        updatedAt: formAgg.updatedAt || new Date().toISOString(),
-        updatedBy: 'system',
-      }
-    }
-  }
-
-  if (!dist) {
     try {
-      const allDists = await listDistributionsDoc()
-      const activeDist = allDists.find((d) => d.status === 'active') || allDists[0]
-      if (activeDist) {
+      const formAgg = await getFormAggregateFromDb(distributionCode)
+      if (formAgg) {
         dist = {
-          ...activeDist,
+          distributionId: `dist_direct_${formAgg.formId}`,
+          formId: formAgg.formId,
           code: normalized,
           normalizedCode: normalized,
-        }
-      }
-    } catch (e) {
-      console.warn('Fallback listDistributionsDoc failed:', e)
-    }
-  }
-
-  if (!dist) {
-    try {
-      const rawV15Forms = await safeGetCollectionDocs('v1_5_forms')
-      const rawForms = await safeGetCollectionDocs('forms')
-      const firstFormDoc = rawV15Forms[0] || rawForms[0]
-      if (firstFormDoc) {
-        const formData = firstFormDoc.data
-        const formId = firstFormDoc.id
-        dist = {
-          distributionId: `dist_fallback_${formId}`,
-          formId,
-          code: normalized,
-          normalizedCode: normalized,
-          title: formData.metadata?.title || formData.title || 'Formulir Penilaian Kebersihan & Keamanan Pangan',
-          description: formData.metadata?.description || formData.description || '',
+          title: formAgg.metadata?.title || (formAgg as any).title || 'Formulir Penilaian Kebersihan & Keamanan Pangan',
+          description: formAgg.metadata?.description || (formAgg as any).description || '',
           ownerType: 'admin',
-          ownerId: formData.createdBy || 'bpom_admin',
+          ownerId: formAgg.createdBy || 'bpom_admin',
           ownerName: 'Administrator BPOM',
           versionMode: 'active',
           status: 'active',
-          createdAt: formData.createdAt || new Date().toISOString(),
-          createdBy: formData.createdBy || 'system',
-          updatedAt: formData.updatedAt || new Date().toISOString(),
+          createdAt: formAgg.createdAt || new Date().toISOString(),
+          createdBy: formAgg.createdBy || 'system',
+          updatedAt: formAgg.updatedAt || new Date().toISOString(),
           updatedBy: 'system',
         }
       }
     } catch (e) {
-      console.warn('Fallback form lookup failed:', e)
+      console.warn('Fallback direct form lookup failed:', e)
     }
   }
 
@@ -294,7 +253,10 @@ export async function createDistributionWorkflow(
   let ownerName = creatorProfile?.displayName || creatorProfile?.name || authContext.token.name || authContext.token.email?.split('@')[0] || 'Kader Lapangan'
 
   // If Admin is target-assigning distribution to a specific user (Cadre or Mitra)
-  if (params.targetUserId) {
+  if (params.targetUserId && params.targetUserId !== authContext.uid) {
+    if (!isAdmin) {
+      throw new Error('Anda tidak memiliki hak otorisasi untuk melakukan target assignment ke pengguna lain.')
+    }
     ownerId = params.targetUserId
     try {
       const targetDoc = await safeGetDoc('users', ownerId)
@@ -425,12 +387,20 @@ export async function archiveDistributionWorkflow(
  */
 export async function deleteDistributionWorkflow(
   distributionId: string,
-  _authContext: AuthorizationContext
+  authContext: AuthorizationContext
 ): Promise<{ success: boolean; message: string }> {
-  try {
-    await deleteDistributionDoc(distributionId)
-  } catch (err) {
-    console.warn('Delete distribution warning:', err)
+  const existing = await getDistributionDoc(distributionId)
+  if (!existing) {
+    throw new Error(`Distribusi dengan ID "${distributionId}" tidak ditemukan.`)
   }
+
+  const isAdmin = authContext.role === 'admin' || authContext.role === 'super_admin' || authContext.role === 'internal_bpom'
+  const isOwner = existing.ownerId === authContext.uid || existing.createdBy === authContext.uid
+
+  if (!isAdmin && !isOwner) {
+    throw new Error('Anda tidak memiliki hak otorisasi untuk menghapus distribusi ini.')
+  }
+
+  await deleteDistributionDoc(distributionId)
   return { success: true, message: `Kode distribusi "${distributionId}" berhasil dihapus.` }
 }
