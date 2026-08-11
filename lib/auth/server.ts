@@ -36,64 +36,47 @@ export async function getAuthorizationContext(): Promise<AuthorizationContext | 
 
   let uid = ''
   let email = ''
-  let token: any = null
+  let token: DecodedIdToken
 
   try {
     token = await adminAuth.verifySessionCookie(session, true)
     uid = token.uid
     email = token.email || ''
-  } catch (adminErr) {
-    try {
-      const parts = session.split('.')
-      if (parts.length >= 2) {
-        const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf-8'))
-        uid = payload.user_id || payload.sub || payload.uid || ''
-        email = payload.email || ''
-        token = payload
-      }
-    } catch {
-      // Decode failed
-    }
+  } catch {
+    // Fail-closed: invalid, expired, or tampered session cookie MUST NOT yield an authenticated user.
+    return null
   }
 
   if (!uid) return null
 
   let role: StoredRole | undefined
 
-  // 1. Try reading role from Firestore profile
+  // 1. Try reading role from trusted Firestore profile
   try {
     const { safeGetDoc } = await import('@/lib/firebase/repositories/v1_5/safeFirestore')
     const userDoc = await safeGetDoc('users', uid)
-    if (userDoc?.data?.role) {
+    if (userDoc?.data?.role && isStoredRole(userDoc.data.role)) {
       role = userDoc.data.role
     }
-  } catch (fsErr) {
-    // Ignore Firestore read error
+  } catch {
+    // Ignore Firestore read failure
   }
 
-  // 2. Fallback: Fetch user record from Firebase Auth if role is not resolved from Firestore
+  // 2. Fallback: Check verified Firebase Auth custom claims
   if (!isStoredRole(role)) {
     try {
       const userRecord = await adminAuth.getUser(uid)
-      const uEmail = userRecord.email || email || ''
       const customRole = userRecord.customClaims?.role as StoredRole
-
       if (isStoredRole(customRole)) {
         role = customRole
-      } else if (uEmail.startsWith('admin@') || uEmail.includes('admin')) {
-        role = 'admin'
       }
-    } catch (authErr) {
-      if (email.startsWith('admin@') || email.includes('admin')) {
-        role = 'admin'
-      } else {
-        role = 'cadre'
-      }
+    } catch {
+      // Auth lookup failed
     }
   }
 
   if (!isStoredRole(role)) return null
-  return { uid, role, token: token || ({ uid } as any) }
+  return { uid, role, token }
 }
 
 export async function requireRole(
