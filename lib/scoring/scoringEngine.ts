@@ -58,7 +58,12 @@ export class ScoringEngine {
    * Dapatkan stage yang masuk penilaian
    */
   private getScoredStages(): FormStage[] {
-    return this.stages.filter(s => s.includeInScoring !== false)
+    const distributionMap = this.scoring?.distribution || (this.scoring as any)?.stagePointDistribution || {}
+    return this.stages.filter((s) => {
+      if (s.includeInScoring === false || (s as any).isScored === false) return false
+      const allocated = Number(distributionMap[s.id]) || 0
+      return allocated > 0
+    })
   }
 
   /**
@@ -138,15 +143,19 @@ export class ScoringEngine {
     let totalPossiblePoints = 0
     const scoredStages = this.getScoredStages()
 
+    const distributionMap = this.scoring?.distribution || (this.scoring as any)?.stagePointDistribution || {}
+
     scoredStages.forEach(stage => {
-      const stageData = perStage[stage.id]
-      const allocatedPoints = this.scoring.distribution[stage.id] || 0
+      const stageData = perStage[stage.id] || { rawEarned: 0, rawPossible: 0, percentage: 0, name: stage.name || 'Aspect', earned: 0, possible: 0 }
+      const allocatedPoints = Number(distributionMap[stage.id]) || 0
       
       // Normalisasi: (percentage / 100) * allocatedPoints
-      const normalizedEarned = (stageData.percentage / 100) * allocatedPoints
+      const stagePct = Number(stageData.percentage) || 0
+      const normalizedEarned = (stagePct / 100) * allocatedPoints
       
       stageData.earned = Math.round(normalizedEarned * 100) / 100
       stageData.possible = allocatedPoints
+      perStage[stage.id] = stageData
       
       totalEarnedPoints += stageData.earned
       totalPossiblePoints += allocatedPoints
@@ -361,8 +370,8 @@ export class ScoringEngine {
     if (indicators.length === 0) return 0
 
     // Ambil min dan max dari skala yang SEBENARNYA
-    const maxVal = scales.length > 0 ? Math.max(...scales.map(s => s.value)) : 5
-    const minVal = scales.length > 0 ? Math.min(...scales.map(s => s.value)) : 1
+    const maxVal = scales.length > 0 ? Math.max(...scales.map((s: any) => s.value)) : 5
+    const minVal = scales.length > 0 ? Math.min(...scales.map((s: any) => s.value)) : 1
 
     let totalEarned = 0
 

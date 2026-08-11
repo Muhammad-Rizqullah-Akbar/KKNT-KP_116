@@ -586,6 +586,33 @@ export default function ArticleDetailPage({ params }: { params: Promise<{ slug: 
               dangerouslySetInnerHTML={{ __html: editedArticle.content }} 
             />
 
+            {/* EMBEDDED KUESIONER / FORM CTA BANNER */}
+            {editedArticle.embeddedDistributionCode && (
+              <div className="my-8 p-6 rounded-3xl bg-gradient-to-br from-cyan-950/80 via-slate-900 to-purple-950/80 border-2 border-cyan-500/40 shadow-2xl space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center text-cyan-400 flex-shrink-0">
+                    <Icon name="fileText" className="w-5 h-5 text-cyan-400" />
+                  </div>
+                  <div>
+                    <h4 className="text-base font-extrabold text-white">Formulir & Kuesioner Evaluasi Resmi</h4>
+                    <p className="text-xs text-cyan-300 font-mono">Kode Akses Distribusi: <strong>{editedArticle.embeddedDistributionCode}</strong></p>
+                  </div>
+                </div>
+                <p className="text-xs text-white/70 leading-relaxed">
+                  Bantu kami mengumpulkan data evaluasi pangan secara langsung dengan mengklik tombol di bawah ini untuk mengisi kuesioner resmi.
+                </p>
+                <a
+                  href={`/form/${editedArticle.embeddedDistributionCode}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-gradient-to-r from-cyan-500 to-emerald-500 hover:from-cyan-400 hover:to-emerald-400 text-slate-950 text-xs font-black uppercase tracking-wider shadow-lg shadow-cyan-500/25 transition-all"
+                >
+                  <span>Isi Kuesioner Sekarang</span>
+                  <Icon name="arrowRight" className="w-4 h-4 text-slate-950" />
+                </a>
+              </div>
+            )}
+
             {/* TAGS */}
             {uniqueTags.length > 0 && (
               <div className="flex flex-wrap gap-2 pt-8 border-t border-white/[0.06]">

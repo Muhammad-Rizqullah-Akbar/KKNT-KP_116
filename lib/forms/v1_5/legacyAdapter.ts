@@ -22,9 +22,85 @@ export function adaptLegacyForm(legacy: LegacyForm): LegacyAdaptationResult {
   const formId = legacy.id || legacy.code || 'legacy-form'; const warnings: string[] = []; const rawScoring = legacy.scoring || {}; const rawValidation = legacy.validation || {}; const versionId = `legacy-${formId}-v1`
   return { canonical: { form: { formId, metadata: { title: legacy.title || '', description: legacy.description, target: legacy.target, category: legacy.category, kind: 'official', status: normalizeStatus(legacy.status) }, activeVersionId: versionId, createdBy: legacy.createdBy, createdAt: legacy.createdAt, updatedAt: legacy.updatedAt }, version: { versionId, formId, versionNumber: 1, status: normalizeStatus(legacy.status), questions: (legacy.questions || []).map((question) => adaptQuestion(formId, question, warnings)), scoring: { totalPoints: typeof rawScoring.totalPoints === 'number' ? rawScoring.totalPoints : 100, mode: rawScoring.mode === 'hybrid' || rawScoring.mode === 'manual' ? rawScoring.mode : 'auto', stagePointDistribution: typeof rawScoring.distribution === 'object' && rawScoring.distribution ? rawScoring.distribution as Record<string, number> : {}, allowOverride: typeof rawScoring.allowOverride === 'boolean' ? rawScoring.allowOverride : true, autoBalance: typeof rawScoring.autoBalance === 'boolean' ? rawScoring.autoBalance : true }, validation: { mode: rawValidation.mode === 'free' || rawValidation.mode === 'all_required_except' ? rawValidation.mode : 'all_required', exceptionQuestionIds: Array.isArray(rawValidation.exceptions) ? rawValidation.exceptions.filter((id): id is string => typeof id === 'string') : [], allowOverride: typeof rawValidation.allowOverride === 'boolean' ? rawValidation.allowOverride : true }, createdAt: legacy.createdAt, createdBy: legacy.createdBy } }, warnings }
 }
-function toPublicQuestion(question: Question): PublicQuestion {
-  return { questionId: question.questionId, type: question.type, prompt: question.prompt, required: question.required, options: question.options, presentation: question.presentation }
+function toPublicQuestion(question: any): PublicQuestion {
+  const questionId = question.questionId || question.id || `q_${Math.random().toString(36).substring(2, 7)}`
+  const aspectId = question.aspectId || question.stageId || question.stage_id || question.aspect || question.category || 'default'
+  const prompt = question.prompt || question.title || question.question || question.label || 'Pertanyaan'
+  const rawType = question.type || question.answerType || 'short-text'
+  const normalizedType = (rawType === 'indicator' || rawType === 'table') ? 'indicator-table' : rawType
+  const required = question.required !== false
+
+  const rawOpts = Array.isArray(question.options) ? question.options : question.config?.options || []
+  const options = rawOpts.map((o: any, idx: number) => {
+    if (typeof o === 'string') {
+      return { optionId: `opt_${questionId}_${idx}`, label: o }
+    }
+    if (o && typeof o === 'object') {
+      return {
+        optionId: o.optionId || o.id || `opt_${questionId}_${idx}`,
+        label: o.label || o.text || o.title || String(o)
+      }
+    }
+    return { optionId: `opt_${questionId}_${idx}`, label: String(o) }
+  })
+
+  // Normalize indicators for indicator-table / indicator types
+  const rawIndicators = question.presentation?.indicators || question.indicators || question.config?.indicators || []
+  let indicators = rawIndicators.map((ind: any, idx: number) => {
+    if (typeof ind === 'string') return { indicatorId: `ind_${questionId}_${idx}`, label: ind }
+    if (ind && typeof ind === 'object') return { indicatorId: ind.indicatorId || ind.id || `ind_${questionId}_${idx}`, label: ind.label || ind.title || ind.text || String(ind) }
+    return { indicatorId: `ind_${questionId}_${idx}`, label: String(ind) }
+  })
+
+  if (indicators.length === 0 && (normalizedType === 'indicator-table' || rawType === 'indicator')) {
+    // If options exist, use options as indicators for indicator-table
+    indicators = options.map((o: any) => ({ indicatorId: o.optionId, label: o.label }))
+  }
+
+  // Normalize indicatorScales for indicator-table / likert
+  const rawScales = question.presentation?.indicatorScales || question.indicatorScales || question.config?.indicatorScales || question.scales || []
+  const indicatorScales = rawScales.map((sc: any, idx: number) => {
+    if (typeof sc === 'number' || typeof sc === 'string') return { value: Number(sc) || (idx + 1), label: String(sc) }
+    if (sc && typeof sc === 'object') return { value: Number(sc.value) || (idx + 1), label: String(sc.label || sc.value || idx + 1) }
+    return { value: idx + 1, label: String(idx + 1) }
+  })
+
+  const mediaUrl = question.presentation?.media?.url || question.mediaUrl || question.imageUrl || question.photoURL || question.image || question.config?.imageUrl || question.config?.mediaUrl || null
+  const mediaCaption = question.presentation?.media?.caption || question.imageCaption || question.config?.imageCaption || ''
+
+  return {
+    questionId,
+    aspectId,
+    type: normalizedType as any,
+    prompt,
+    required,
+    options,
+    presentation: {
+      description: question.presentation?.description || question.description || question.config?.description || '',
+      placeholder: question.presentation?.placeholder || question.placeholder || question.config?.placeholder || undefined,
+      media: mediaUrl ? { type: 'image', url: mediaUrl, caption: mediaCaption } : question.presentation?.media || { type: 'none' },
+      ratingMin: question.presentation?.ratingMin || question.ratingMin || question.config?.ratingMin || 1,
+      ratingMax: question.presentation?.ratingMax || question.ratingMax || question.config?.ratingMax || 5,
+      indicators: indicators.length > 0 ? indicators : undefined,
+      indicatorScales: indicatorScales.length > 0 ? indicatorScales : [
+        { value: 1, label: '1 - Sangat Buruk' },
+        { value: 2, label: '2 - Buruk' },
+        { value: 3, label: '3 - Cukup' },
+        { value: 4, label: '4 - Baik' },
+        { value: 5, label: '5 - Sangat Baik' },
+      ],
+    }
+  }
 }
-export function toPublicFormProjection(canonical: CanonicalForm): PublicCanonicalForm { return { form: canonical.form, version: { ...canonical.version, questions: canonical.version.questions.map(toPublicQuestion) } } }
+export function toPublicFormProjection(canonical: CanonicalForm): PublicCanonicalForm {
+  const rawQuestions = Array.isArray(canonical.version?.questions) ? canonical.version.questions : []
+  return {
+    form: canonical.form,
+    version: {
+      ...canonical.version,
+      questions: rawQuestions.map(toPublicQuestion)
+    }
+  }
+}
 /** Boundary only: later infrastructure can map this input to the legacy engine without changing formulas. */
 export function toLegacyScoringAdapterInput(canonical: CanonicalForm): LegacyScoringAdapterInput { return { questions: canonical.version.questions, scoring: canonical.version.scoring, validation: canonical.version.validation } }

@@ -1,6 +1,4 @@
-import 'server-only'
-
-import { adminFirestore } from '@/lib/firebaseAdmin'
+import { safeGetDoc, safeGetCollectionDocs, safeSetDoc } from './safeFirestore'
 import type { FormAccessDoc } from '@/lib/forms/v1_5/distributionTypes'
 
 const FORM_ACCESS_COLLECTION = 'formAccess'
@@ -16,7 +14,6 @@ export async function grantFormAccessDoc(
   sessionUid: string
 ): Promise<FormAccessDoc> {
   const accessId = `access_${formId}_${subjectType}_${subjectId}`
-  const docRef = adminFirestore.collection(FORM_ACCESS_COLLECTION).doc(accessId)
 
   const now = new Date().toISOString()
   const accessData: FormAccessDoc = {
@@ -32,7 +29,7 @@ export async function grantFormAccessDoc(
     updatedAt: now,
   }
 
-  await docRef.set(accessData)
+  await safeSetDoc(FORM_ACCESS_COLLECTION, accessId, accessData)
   return accessData
 }
 
@@ -40,11 +37,15 @@ export async function grantFormAccessDoc(
  * Revokes form access.
  */
 export async function revokeFormAccessDoc(accessId: string): Promise<void> {
-  const docRef = adminFirestore.collection(FORM_ACCESS_COLLECTION).doc(accessId)
-  await docRef.update({
-    status: 'revoked',
-    updatedAt: new Date().toISOString(),
-  })
+  const existing = await safeGetDoc(FORM_ACCESS_COLLECTION, accessId)
+  if (existing) {
+    const updated = {
+      ...existing.data,
+      status: 'revoked',
+      updatedAt: new Date().toISOString(),
+    }
+    await safeSetDoc(FORM_ACCESS_COLLECTION, accessId, updated)
+  }
 }
 
 /**
@@ -56,11 +57,11 @@ export async function checkFormAccessDoc(
   subjectId: string
 ): Promise<boolean> {
   const accessId = `access_${formId}_${subjectType}_${subjectId}`
-  const docSnap = await adminFirestore.collection(FORM_ACCESS_COLLECTION).doc(accessId).get()
+  const docObj = await safeGetDoc(FORM_ACCESS_COLLECTION, accessId)
 
-  if (!docSnap.exists) return false
-  const data = docSnap.data() as FormAccessDoc
-  return data.status === 'active' && data.permissions.includes('distribute')
+  if (!docObj) return false
+  const data = docObj.data as FormAccessDoc
+  return data.status === 'active' && data.permissions?.includes('distribute')
 }
 
 /**
@@ -70,17 +71,15 @@ export async function listFormAccessDoc(options?: {
   formId?: string
   subjectId?: string
 }): Promise<FormAccessDoc[]> {
-  let query: FirebaseAdmin.Firestore.Query = adminFirestore.collection(FORM_ACCESS_COLLECTION)
+  const rawDocs = await safeGetCollectionDocs(FORM_ACCESS_COLLECTION)
+  let docs = rawDocs.map((d) => d.data as FormAccessDoc).filter((d) => d.status === 'active')
 
   if (options?.formId) {
-    query = query.where('formId', '==', options.formId)
+    docs = docs.filter((d) => d.formId === options.formId)
   }
   if (options?.subjectId) {
-    query = query.where('subjectId', '==', options.subjectId)
+    docs = docs.filter((d) => d.subjectId === options.subjectId)
   }
 
-  const snapshot = await query.get()
-  return snapshot.docs
-    .map((d) => d.data() as FormAccessDoc)
-    .filter((d) => d.status === 'active')
+  return docs
 }

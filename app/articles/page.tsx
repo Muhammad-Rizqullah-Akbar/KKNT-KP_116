@@ -42,6 +42,12 @@ export default function ArticlesPage() {
   const [articles, setArticles] = useState<ArticleData[]>([])
   const [loading, setLoading] = useState(true)
 
+  // Dynamic Categories Memo
+  const categories = useMemo(() => {
+    const set = new Set(articles.map((a) => a.category).filter(Boolean))
+    return ['Semua', ...Array.from(set)]
+  }, [articles])
+
   // State Filter, Search & Pagination
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('Semua')

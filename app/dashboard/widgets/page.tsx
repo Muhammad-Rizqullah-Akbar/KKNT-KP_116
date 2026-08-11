@@ -6,6 +6,7 @@ import { Icon, type IconName } from '@/components/ui/Icons'
 import { Button } from '@/components/shared/Button'
 import { getAllResponses, getForms, type FormResponse, type FormData as LegacyFormData } from '@/lib/firebase/repositories/forms.repo'
 import { useAuth } from '@/context/AuthContext'
+import { safeFetchJson } from '@/lib/shared/safeFetch'
 
 // ============================================================================
 // CONSTANTS & COLOR PALETTES
@@ -97,14 +98,9 @@ export default function WidgetsPage() {
 
       // 2. Fetch V1.5 Forms safely
       let v15Data: any[] = []
-      try {
-        const v15Res = await fetch('/api/v1_5/forms')
-        const v15Json = await v15Res.json()
-        if (v15Json.success && Array.isArray(v15Json.forms)) {
-          v15Data = v15Json.forms
-        }
-      } catch (e) {
-        console.warn('V1.5 forms API not available or empty:', e)
+      const { ok, data: v15Json } = await safeFetchJson('/api/v1_5/forms')
+      if (ok && v15Json && Array.isArray(v15Json.forms)) {
+        v15Data = v15Json.forms
       }
       setV15Forms(v15Data)
 

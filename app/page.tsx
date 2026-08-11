@@ -11,6 +11,7 @@ import { GallerySection } from '@/components/home/GallerySection'
 import { ArticleModal } from '@/components/home/ArticleModal'
 import { CodeModal } from '@/components/home/CodeModal'
 import { Icon } from '@/components/ui/Icons'
+import { safeFetchJson } from '@/lib/shared/safeFetch'
 
 // Import Repositori Firestore
 import {
@@ -130,7 +131,8 @@ const categoryGradients: Record<string, string> = {
 }
 
 export default function HomePage() {
-  // ✅ PENTING: Inisialisasi state partnershipData dari defaultPartnershipData
+  // ✅ PENTING: Inisialisasi state partnershipData dan heroData dari CMS Firestore
+  const [heroData, setHeroData] = useState<any>(null)
   const [partnershipData, setPartnershipData] = useState<any>(defaultPartnershipData)
   const [galleryData, setGalleryData] = useState<any[]>(defaultGalleryData)
 
@@ -161,6 +163,7 @@ export default function HomePage() {
       try {
         const settings = await getLandingPageSettings()
         if (settings) {
+          if (settings.hero) setHeroData(settings.hero)
           if (settings.partnership) setPartnershipData(settings.partnership)
           if (settings.gallery && settings.gallery.length > 0) setGalleryData(settings.gallery)
         }
@@ -225,11 +228,10 @@ export default function HomePage() {
     setCodeError(null)
 
     try {
-      const response = await fetch(`/api/public/check-code?code=${encodeURIComponent(code)}`)
-      const data = await response.json()
+      const { ok, data, error } = await safeFetchJson(`/api/public/check-code?code=${encodeURIComponent(code)}`)
 
-      if (!response.ok) {
-        throw new Error(data.message || 'Kode tidak valid')
+      if (!ok || !data) {
+        throw new Error(error || 'Kode akses tidak valid.')
       }
 
       localStorage.setItem('aether_access_code', code)
@@ -287,7 +289,7 @@ export default function HomePage() {
       <Navbar transparent={true} onOpenCodeModal={() => setIsCodeModalOpen(true)} />
 
       {/* Hero Section */}
-      <HeroSection onOpenCodeModal={() => setIsCodeModalOpen(true)} />
+      <HeroSection onOpenCodeModal={() => setIsCodeModalOpen(true)} heroData={heroData} />
 
       {/* Program Section (Sudah aman & menggunakan state partnershipData) */}
       <ProgramSection data={partnershipData} />

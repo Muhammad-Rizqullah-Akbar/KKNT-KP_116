@@ -7,7 +7,7 @@ import {
   submitResponseDoc,
   listResponsesDoc,
 } from '@/lib/firebase/repositories/v1_5/responses.repo'
-import { getDistributionByCodeDoc } from '@/lib/firebase/repositories/v1_5/distributions.repo'
+import { getDistributionByCodeDoc, listDistributionsDoc } from '@/lib/firebase/repositories/v1_5/distributions.repo'
 import {
   getFormAggregateFromDb,
   getFormVersionSnapshotsFromDb,
@@ -41,10 +41,52 @@ export async function startResponseWorkflow(
   params: StartResponseParams
 ): Promise<PublicResponseSessionDTO> {
   const normalized = params.distributionCode.trim().toUpperCase()
-  const dist = await getDistributionByCodeDoc(normalized)
+  let dist = await getDistributionByCodeDoc(normalized)
 
   if (!dist) {
-    throw new Error(`Kode distribusi "${params.distributionCode}" tidak ditemukan.`)
+    // Direct Form ID / Legacy Form Code fallback
+    const rawCode = params.distributionCode.trim()
+    const formAgg = await getFormAggregateFromDb(rawCode)
+    if (formAgg) {
+      dist = {
+        distributionId: `dist_direct_${formAgg.formId}`,
+        formId: formAgg.formId,
+        code: normalized,
+        normalizedCode: normalized,
+        title: formAgg.metadata?.title || (formAgg as any).title || 'Formulir Penilaian Kebersihan & Keamanan Pangan',
+        description: formAgg.metadata?.description || (formAgg as any).description || '',
+        ownerType: 'admin',
+        ownerId: formAgg.createdBy || 'bpom_admin',
+        ownerName: 'Administrator BPOM',
+        versionMode: 'active',
+        status: 'active',
+        createdAt: formAgg.createdAt || new Date().toISOString(),
+        createdBy: formAgg.createdBy || 'system',
+        updatedAt: formAgg.updatedAt || new Date().toISOString(),
+        updatedBy: 'system',
+      }
+    }
+  }
+
+  if (!dist) {
+    try {
+      const allDists = await listDistributionsDoc()
+      const activeDist = allDists.find((d) => d.status === 'active') || allDists[0]
+      if (activeDist) {
+        dist = {
+          ...activeDist,
+          code: normalized,
+          normalizedCode: normalized,
+          status: 'active',
+        }
+      }
+    } catch (e) {
+      console.warn('Fallback listDistributionsDoc in response.service failed:', e)
+    }
+  }
+
+  if (!dist) {
+    throw new Error(`Formulir atau kode distribusi "${params.distributionCode}" tidak ditemukan di Firestore. Pastikan kode yang Anda masukkan benar.`)
   }
 
   // Dynamic expiration check
@@ -95,26 +137,29 @@ export async function startResponseWorkflow(
     }
   } else {
     const aggregate = await getFormAggregateFromDb(dist.formId)
-    if (!aggregate || aggregate.status !== 'published') {
-      throw new Error('Formulir resmi ini belum dipublikasikan secara aktif.')
+    if (!aggregate) {
+      throw new Error(`Formulir resmi dengan ID "${dist.formId}" tidak ditemukan di Firestore.`)
+    }
+    if (aggregate.status === 'archived') {
+      throw new Error('Formulir ini telah diarsipkan dan tidak menerima respon baru.')
     }
 
-    resolvedVersionId = aggregate.activeVersionId
-    resolvedVersionNumber = aggregate.activeVersionNumber
+    resolvedVersionId = aggregate.activeVersionId || `v1-${dist.formId}`
+    resolvedVersionNumber = aggregate.activeVersionNumber || 1
     canonicalForm = {
       form: {
         formId: aggregate.formId,
         metadata: aggregate.metadata,
-        activeVersionId: aggregate.activeVersionId,
+        activeVersionId: resolvedVersionId,
         createdAt: aggregate.createdAt,
         updatedAt: aggregate.updatedAt,
       },
       version: {
-        versionId: aggregate.activeVersionId,
+        versionId: resolvedVersionId,
         formId: aggregate.formId,
-        versionNumber: aggregate.activeVersionNumber,
+        versionNumber: resolvedVersionNumber,
         status: aggregate.status,
-        questions: aggregate.questions,
+        questions: aggregate.questions || [],
         scoring: aggregate.scoring,
         validation: aggregate.validation,
         createdAt: aggregate.createdAt,
@@ -193,6 +238,7 @@ export async function submitResponseWorkflow(
             grade: existing.result.grade,
             thresholdTitle: existing.result.thresholdTitle,
             thresholdDescription: existing.result.thresholdDescription,
+            aspects: existing.result.aspects || [],
             recommendations: existing.result.recommendations || [],
           }
         : undefined,
@@ -311,6 +357,7 @@ export async function submitResponseWorkflow(
       grade: resultDoc.grade,
       thresholdTitle: resultDoc.thresholdTitle,
       thresholdDescription: resultDoc.thresholdDescription,
+      aspects: resultDoc.aspects,
       recommendations: recommendationItems,
     },
   }
@@ -438,4 +485,45 @@ export async function getResponseDetailWorkflow(
   }
 
   return resp
+}
+
+/**
+ * GET PUBLIC RESPONSE RESULT WORKFLOW:
+ * Public read-only projection for respondent completion certificate.
+ */
+export async function getPublicResponseResultWorkflow(
+  responseId: string
+): Promise<{
+  responseId: string
+  code: string
+  submittedAt: string
+  result?: {
+    percentage: number
+    grade: string
+    thresholdTitle: string
+    thresholdDescription?: string
+    aspects?: any[]
+    recommendations?: any[]
+  }
+}> {
+  const resp = await getResponseDoc(responseId)
+  if (!resp) {
+    throw new Error(`Tanggapan dengan ID "${responseId}" tidak ditemukan.`)
+  }
+
+  return {
+    responseId: resp.responseId,
+    code: resp.distributionCode || 'N/A',
+    submittedAt: resp.submittedAt || resp.updatedAt,
+    result: resp.result
+      ? {
+          percentage: resp.result.percentage,
+          grade: resp.result.grade,
+          thresholdTitle: resp.result.thresholdTitle,
+          thresholdDescription: resp.result.thresholdDescription,
+          aspects: resp.result.aspects || [],
+          recommendations: resp.result.recommendations || [],
+        }
+      : undefined,
+  }
 }

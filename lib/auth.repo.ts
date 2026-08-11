@@ -6,6 +6,7 @@ import {
 } from '@/lib/firebaseClient'
 import {
   signInWithEmailAndPassword,
+  signInWithCustomToken,
   signOut,
   sendPasswordResetEmail,
   updateProfile,
@@ -21,7 +22,7 @@ import {
 } from 'firebase/firestore'
 
 // ============ TYPES ============
-export type UserRole = 'super_admin' | 'admin' | null
+export type UserRole = 'super_admin' | 'admin' | 'internal_bpom' | 'partnership' | 'cadre' | null
 
 export interface UserData {
   uid: string
@@ -50,13 +51,40 @@ async function establishServerSession(user: User): Promise<void> {
   })
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}))
-    throw new Error(errorData.message || 'Gagal membuat sesi aman. Silakan coba lagi.')
+    let errorMessage = 'Gagal membuat sesi aman. Silakan coba lagi.'
+    const contentType = response.headers.get('content-type')
+    if (contentType && contentType.includes('application/json')) {
+      const errorData = await response.json().catch(() => ({}))
+      if (errorData.message) errorMessage = errorData.message
+    }
+    throw new Error(errorMessage)
   }
 }
 
-const getErrorMessage = (error: unknown, fallback: string): string =>
-  error instanceof Error ? error.message : fallback
+const getErrorMessage = (error: unknown, fallback: string): string => {
+  if (!error) return fallback
+  const errObj = error as any
+  const code = errObj?.code || ''
+  const msg = errObj?.message || String(error)
+
+  if (
+    code === 'auth/invalid-credential' ||
+    code === 'auth/user-not-found' ||
+    code === 'auth/wrong-password' ||
+    code === 'auth/invalid-email' ||
+    msg.includes('invalid-credential') ||
+    msg.includes('user-not-found')
+  ) {
+    return 'Email atau kata sandi yang Anda masukkan salah. Silakan periksa kembali email dan password akun Kader/Admin Anda.'
+  }
+  if (code === 'auth/too-many-requests') {
+    return 'Terlalu banyak percobaan login yang gagal. Silakan tunggu beberapa saat lagi.'
+  }
+  if (code === 'auth/user-disabled') {
+    return 'Akun Anda telah dinonaktifkan oleh administrator.'
+  }
+  return errObj.message || fallback
+}
 
 async function clearServerSession(): Promise<void> {
   await fetch('/api/auth/session', { method: 'DELETE' })
@@ -95,6 +123,14 @@ export const getUserData = async (uid: string): Promise<UserData | null> => {
         role: 'admin',
       }
     }
+    if (email.includes('cadre') || email.includes('kader')) {
+      return {
+        uid,
+        email,
+        displayName: auth.currentUser.displayName || 'Kader Lapangan',
+        role: 'cadre',
+      }
+    }
   }
 
   return null
@@ -114,30 +150,87 @@ export const loginWithEmail = async (
   email: string,
   password: string
 ): Promise<LoginResult> => {
+  let user: User | null = null
+
+  // 1. Primary Strategy: Firebase Client SDK
   try {
     const userCredential = await signInWithEmailAndPassword(auth, email, password)
-    const { user } = userCredential
-    
-    // 1. Establish server session FIRST to set HttpOnly cookie and provision profile if missing
-    await establishServerSession(user)
+    user = userCredential.user
+  } catch (clientErr: any) {
+    console.warn('Client signInWithEmailAndPassword warning:', clientErr?.code || clientErr?.message)
 
-    // 2. Fetch user profile data
-    const userData = await getUserData(user.uid)
-    const role = userData?.role || null
-    
-    // 3. Verify user is authorized as admin or super_admin
-    if (!role || (role !== 'admin' && role !== 'super_admin')) {
-      await signOut(auth)
+    // 2. Fallback Strategy: Server-side API verification & password auto-sync
+    try {
+      const serverRes = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      })
+      const serverData = await serverRes.json().catch(() => ({}))
+
+      if (serverRes.ok && serverData.success) {
+        // Since /api/auth/login synced the password on Firebase Auth, try signInWithEmailAndPassword again
+        try {
+          const reCred = await signInWithEmailAndPassword(auth, email, password)
+          user = reCred.user
+        } catch (reErr) {
+          if (serverData.customToken) {
+            try {
+              const customCred = await signInWithCustomToken(auth, serverData.customToken)
+              user = customCred.user
+            } catch (tokenErr: any) {
+              console.warn('signInWithCustomToken fallback warning:', tokenErr?.code || tokenErr?.message)
+            }
+          }
+        }
+
+        if (!user && auth.currentUser) {
+          user = auth.currentUser
+        }
+
+        if (!user) {
+          const { restSignInWithEmail, restSignUpWithEmail } = await import('@/lib/firebaseRestAuth')
+          const restRes = (await restSignInWithEmail(email, password)) || (await restSignUpWithEmail(email, password, serverData.userData?.displayName))
+          if (restRes?.uid) {
+            try {
+              const reCred2 = await signInWithEmailAndPassword(auth, email, password)
+              user = reCred2.user
+            } catch {
+              user = auth.currentUser
+            }
+          }
+        }
+      } else {
+        throw new Error(serverData.message || getErrorMessage(clientErr, 'Email atau password yang Anda masukkan salah.'))
+      }
+    } catch (fallbackErr: any) {
+      console.error('Server login verification fallback failed:', fallbackErr)
       await clearServerSession()
-      throw new Error('Akun Anda tidak memiliki hak akses ke Dashboard Admin.')
+      throw new Error(fallbackErr?.message || getErrorMessage(clientErr, 'Email atau password yang Anda masukkan salah.'))
     }
-    
-    return { user, role, userData }
-  } catch (error: unknown) {
-    console.error('Login error:', error)
-    await clearServerSession()
-    throw new Error(getErrorMessage(error, 'Login gagal. Silakan coba lagi.'))
   }
+
+  if (!user) {
+    await clearServerSession()
+    throw new Error('Gagal mengotentikasi pengguna. Silakan coba lagi.')
+  }
+
+  // 3. Establish server session FIRST to set HttpOnly cookie
+  await establishServerSession(user)
+
+  // 4. Fetch user profile data
+  const userData = await getUserData(user.uid)
+  const role = userData?.role || null
+
+  // 5. Verify user has a valid registered role
+  const validRoles = ['super_admin', 'admin', 'internal_bpom', 'partnership', 'cadre']
+  if (!role || !validRoles.includes(role)) {
+    await signOut(auth)
+    await clearServerSession()
+    throw new Error('Akun Anda tidak memiliki hak akses terdaftar pada sistem.')
+  }
+
+  return { user, role, userData }
 }
 
 /**

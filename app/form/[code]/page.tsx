@@ -9,6 +9,7 @@ import { PublicReviewScreen } from '@/components/forms/v1_5/PublicReviewScreen'
 import { PublicCompletionReceipt } from '@/components/forms/v1_5/PublicCompletionReceipt'
 import type { PublicDistributionDTO, PublicResponseSessionDTO } from '@/lib/forms/v1_5/distributionTypes'
 import { Icon } from '@/components/ui/Icons'
+import { safeFetchJson } from '@/lib/shared/safeFetch'
 
 interface PageProps {
   params: Promise<{ code: string }>
@@ -38,6 +39,7 @@ export default function PublicDistributionPage({ params }: PageProps) {
   // Submission lock guard to prevent double-clicks
   const [isSubmitting, setIsSubmitting] = useState(false)
   const isSubmittingRef = useRef(false)
+  const [viewMode, setViewMode] = useState<'single' | 'aspect_all'>('aspect_all')
 
   // 1. Load Distribution Baseline Landing Info
   const loadPublicDistribution = async () => {
@@ -149,8 +151,64 @@ export default function PublicDistributionPage({ params }: PageProps) {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [flowStep, sessionData])
 
-  // Proceed to Review Step
+  // Check unanswered mandatory questions
+  const checkUnansweredQuestions = () => {
+    if (!sessionData) return []
+    const questions = sessionData.form?.version?.questions || sessionData.form?.questions || []
+    const unanswered: { index: number; questionId: string; prompt: string }[] = []
+
+    questions.forEach((q: any, idx: number) => {
+      if (q.required === false) return
+
+      const val = answers[q.questionId]
+      let isAnswered = false
+
+      if (val !== undefined && val !== null && val !== '') {
+        const type = q.type || q.answerType
+        if (type === 'indicator-table' || type === 'likert') {
+          const indicators = q.presentation?.indicators || q.indicators || q.config?.indicators || []
+          if (indicators.length === 0) {
+            isAnswered = true
+          } else {
+            isAnswered = typeof val === 'object' && indicators.every((ind: any) => {
+              const indId = ind.indicatorId || ind.id || ind
+              return val[indId] !== undefined && val[indId] !== null && val[indId] !== ''
+            })
+          }
+        } else if (type === 'multiple-choice') {
+          isAnswered = Array.isArray(val) && val.length > 0
+        } else if (typeof val === 'object') {
+          isAnswered = Object.keys(val).length > 0
+        } else {
+          isAnswered = true
+        }
+      }
+
+      if (!isAnswered) {
+        unanswered.push({
+          index: idx,
+          questionId: q.questionId,
+          prompt: q.prompt,
+        })
+      }
+    })
+
+    return unanswered
+  }
+
+  // Proceed to Review Step with Strict Completion Check
   const handleGoToReview = () => {
+    const unanswered = checkUnansweredQuestions()
+    if (unanswered.length > 0) {
+      const numList = unanswered.map((u) => `Soal ${String(u.index + 1).padStart(2, '0')}`).slice(0, 5).join(', ')
+      const moreStr = unanswered.length > 5 ? ` dan ${unanswered.length - 5} soal lainnya` : ''
+      setValidationError(`Silakan lengkapi seluruh pertanyaan terlebih dahulu. Masih ada ${unanswered.length} pertanyaan yang belum diisi (${numList}${moreStr}).`)
+      setCurrentQuestionIndex(unanswered[0].index)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+      return
+    }
+
+    setValidationError(null)
     setFlowStep('review')
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -159,6 +217,17 @@ export default function PublicDistributionPage({ params }: PageProps) {
   const handleSubmitResponse = async () => {
     if (!sessionData) return
     if (isSubmittingRef.current) return
+
+    const unanswered = checkUnansweredQuestions()
+    if (unanswered.length > 0) {
+      const numList = unanswered.map((u) => `Soal ${String(u.index + 1).padStart(2, '0')}`).slice(0, 5).join(', ')
+      const moreStr = unanswered.length > 5 ? ` dan ${unanswered.length - 5} soal lainnya` : ''
+      setValidationError(`Gagal mengirim: Masih ada ${unanswered.length} pertanyaan yang belum diisi (${numList}${moreStr}). Harap lengkapi semua jawaban terlebih dahulu.`)
+      setFlowStep('filling')
+      setCurrentQuestionIndex(unanswered[0].index)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+      return
+    }
 
     isSubmittingRef.current = true
     setIsSubmitting(true)
@@ -245,21 +314,69 @@ export default function PublicDistributionPage({ params }: PageProps) {
     )
   }
 
+  // Derive resolved aspects array from form version (aspects or stages) or extract dynamically from questions
+  const resolveFormAspects = (rawAspects: any[], rawQuestions: any[], rawStages?: any[]) => {
+    if (Array.isArray(rawAspects) && rawAspects.length > 0) {
+      return rawAspects.map((asp: any, idx: number) => {
+        const rawTitle = asp.title || asp.name || asp.label || `Aspek ${idx + 1}`
+        const isRandom = typeof rawTitle === 'string' && (rawTitle.startsWith('asp_') || rawTitle.startsWith('stg_'))
+        return {
+          ...asp,
+          aspectId: asp.aspectId || asp.id || `asp_${idx + 1}`,
+          title: isRandom ? `Aspek Penilaian ${idx + 1}` : rawTitle,
+        }
+      })
+    }
+    if (Array.isArray(rawStages) && rawStages.length > 0) {
+      return rawStages.map((stg: any, idx: number) => {
+        const rawTitle = stg.name || stg.title || stg.label || `Aspek ${idx + 1}`
+        const isRandom = typeof rawTitle === 'string' && (rawTitle.startsWith('stg_') || rawTitle.startsWith('asp_'))
+        return {
+          aspectId: stg.id || stg.stageId || `stg_${idx + 1}`,
+          title: isRandom ? `Aspek Penilaian ${idx + 1}` : rawTitle,
+          description: stg.description || '',
+        }
+      })
+    }
+
+    const aspectMap = new Map<string, string>()
+    rawQuestions.forEach((q: any) => {
+      const aId = q.aspectId || q.stageId || q.stage_id || q.aspect || q.category || 'default'
+      let aTitle = q.aspectTitle || q.stageName || (typeof q.aspect === 'string' && !q.aspect.startsWith('asp_') ? q.aspect : null) || (typeof q.category === 'string' && q.category !== 'default' ? q.category : null)
+      if (!aTitle || aTitle.startsWith('asp_') || aTitle.startsWith('stg_')) {
+        aTitle = aId === 'default' ? 'Evaluasi Kebersihan & Keamanan Pangan' : `Aspek Penilaian ${aspectMap.size + 1}`
+      }
+      if (!aspectMap.has(aId)) {
+        aspectMap.set(aId, aTitle)
+      }
+    })
+    return Array.from(aspectMap.entries()).map(([aspectId, title], idx) => ({
+      aspectId,
+      title: (title.startsWith('asp_') || title.startsWith('stg_')) ? `Aspek Penilaian ${idx + 1}` : title,
+      description: '',
+    }))
+  }
+
   // STEP 3: REVIEW ANSWERS STEP
   if (flowStep === 'review' && sessionData) {
+    const questions = sessionData.form?.version?.questions || sessionData.form?.questions || []
+    const rawAspects = sessionData.form?.version?.aspects || sessionData.form?.aspects || []
+    const aspects = resolveFormAspects(rawAspects, questions)
+
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 font-sans p-4 sm:p-6">
         <PublicReviewScreen
           code={code}
           title={title}
-          aspects={sessionData.form.aspects || []}
-          questions={sessionData.form.questions || []}
+          aspects={aspects}
+          questions={questions}
           answers={answers}
           onBackToFilling={() => {
             setFlowStep('filling')
             window.scrollTo({ top: 0, behavior: 'smooth' })
           }}
           onSubmit={handleSubmitResponse}
+          onAnswerChange={(qId, val) => handleAnswersChange(qId, val)}
           isSubmitting={isSubmitting}
           errorMessage={validationError}
         />
@@ -269,11 +386,28 @@ export default function PublicDistributionPage({ params }: PageProps) {
 
   // STEP 2: ACTIVE QUESTION FILLING MODE (Desktop & Mobile Responsive Assessment Shell)
   if (flowStep === 'filling' && sessionData) {
-    const questions = sessionData.form.questions || []
-    const aspects = sessionData.form.aspects || []
+    const questions = sessionData.form?.version?.questions || sessionData.form?.questions || []
+    const rawAspects = sessionData.form?.version?.aspects || sessionData.form?.aspects || []
+    const aspects = resolveFormAspects(rawAspects, questions)
+
     const activeQuestion = questions[currentQuestionIndex]
-    const activeAspectId = (activeQuestion as any)?.aspectId || aspects[0]?.aspectId
-    const activeAspect = aspects.find((a) => a.aspectId === activeAspectId)
+    const activeAspectId = (activeQuestion as any)?.aspectId || (activeQuestion as any)?.stageId || aspects[0]?.aspectId
+    const activeAspect = aspects.find((a) => a.aspectId === activeAspectId) || aspects[0]
+
+    // Questions belonging to active aspect for 'aspect_all' mode, sorted by global question index
+    const activeAspectQuestions = questions.filter((q) => {
+      const aId = (q as any).aspectId || (q as any).stageId || (q as any).stage_id || 'default'
+      return aId === activeAspectId || aId === activeAspect?.aspectId
+    })
+    activeAspectQuestions.sort((a, b) => {
+      const idxA = questions.findIndex((q) => q.questionId === a.questionId)
+      const idxB = questions.findIndex((q) => q.questionId === b.questionId)
+      return idxA - idxB
+    })
+
+    const currentAspectIndex = aspects.findIndex((a) => a.aspectId === activeAspectId)
+    const isFirstAspect = currentAspectIndex <= 0
+    const isLastAspect = currentAspectIndex >= aspects.length - 1
 
     const isFirstQuestion = currentQuestionIndex === 0
     const isLastQuestion = currentQuestionIndex === questions.length - 1
@@ -288,6 +422,8 @@ export default function PublicDistributionPage({ params }: PageProps) {
           currentQuestionIndex={currentQuestionIndex}
           totalQuestions={questions.length}
           versionNumber={resolvedVersionNumber}
+          viewMode={viewMode}
+          onToggleViewMode={(mode) => setViewMode(mode)}
           onToggleNavigator={() => setIsMobileNavigatorOpen((prev) => !prev)}
           isNavigatorOpen={isMobileNavigatorOpen}
         />
@@ -300,6 +436,7 @@ export default function PublicDistributionPage({ params }: PageProps) {
             questions={questions}
             currentQuestionIndex={currentQuestionIndex}
             answers={answers}
+            hasAttemptedSubmit={!!validationError}
             onSelectQuestionIndex={(idx) => {
               setCurrentQuestionIndex(idx)
               window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -313,6 +450,7 @@ export default function PublicDistributionPage({ params }: PageProps) {
               questions={questions}
               currentQuestionIndex={currentQuestionIndex}
               answers={answers}
+              hasAttemptedSubmit={!!validationError}
               onSelectQuestionIndex={(idx) => {
                 setCurrentQuestionIndex(idx)
                 window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -324,11 +462,30 @@ export default function PublicDistributionPage({ params }: PageProps) {
 
           {/* Focused Question Workspace Canvas */}
           <main className="flex-1 min-w-0 space-y-6">
+            {validationError && (
+              <div className="p-4 rounded-2xl bg-amber-950/60 border border-amber-500/50 text-amber-200 text-xs font-semibold flex items-center justify-between gap-3 shadow-lg animate-in fade-in duration-200">
+                <div className="flex items-center gap-2.5">
+                  <Icon name="alertCircle" className="w-5 h-5 text-amber-400 flex-shrink-0" />
+                  <span>{validationError}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setValidationError(null)}
+                  className="text-amber-400 hover:text-white p-1"
+                >
+                  <Icon name="x" className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+
             {activeAspect && (
-              <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 flex items-center justify-between">
-                <span className="text-xs font-bold text-cyan-300 font-mono uppercase tracking-wider">
-                  {activeAspect.title}
-                </span>
+              <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 flex items-center justify-between shadow-sm">
+                <div className="space-y-0.5">
+                  <span className="text-[10px] text-cyan-400 font-mono font-bold uppercase tracking-wider">
+                    Aspek {currentAspectIndex >= 0 ? currentAspectIndex + 1 : 1} dari {aspects.length}
+                  </span>
+                  <h2 className="text-sm font-bold text-slate-100">{activeAspect.title}</h2>
+                </div>
                 {activeAspect.description && (
                   <span className="text-xs text-slate-400 hidden sm:inline line-clamp-1">
                     {activeAspect.description}
@@ -337,62 +494,123 @@ export default function PublicDistributionPage({ params }: PageProps) {
               </div>
             )}
 
-            {/* Single Focused Question View */}
-            {activeQuestion ? (
-              <FormPublicRenderer
-                questions={[activeQuestion]}
-                answers={answers}
-                onAnswerChange={(qId, val) => handleAnswersChange(qId, val)}
-              />
+            {/* View Mode Canvas Rendering */}
+            {viewMode === 'aspect_all' ? (
+              /* Mode All Questions in Aspect */
+              <div className="space-y-6">
+                <FormPublicRenderer
+                  questions={activeAspectQuestions.length > 0 ? activeAspectQuestions : [activeQuestion]}
+                  answers={answers}
+                  onAnswerChange={(qId, val) => handleAnswersChange(qId, val)}
+                  allQuestions={questions}
+                />
+
+                <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-between gap-3 flex-wrap shadow-lg">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!isFirstAspect) {
+                        const prevAspect = aspects[currentAspectIndex - 1]
+                        const firstQ = questions.findIndex(
+                          (q) => ((q as any).aspectId || (q as any).stageId || 'default') === prevAspect.aspectId
+                        )
+                        if (firstQ >= 0) setCurrentQuestionIndex(firstQ)
+                      }
+                      window.scrollTo({ top: 0, behavior: 'smooth' })
+                    }}
+                    disabled={isFirstAspect}
+                    className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-200 text-xs font-bold transition-all flex items-center gap-1.5"
+                  >
+                    <Icon name="arrowLeft" className="w-4 h-4" />
+                    <span>Aspek Sebelumnya</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (isLastAspect) {
+                        handleGoToReview()
+                      } else {
+                        const nextAspect = aspects[currentAspectIndex + 1]
+                        const firstQ = questions.findIndex(
+                          (q) => ((q as any).aspectId || (q as any).stageId || 'default') === nextAspect.aspectId
+                        )
+                        if (firstQ >= 0) setCurrentQuestionIndex(firstQ)
+                      }
+                      window.scrollTo({ top: 0, behavior: 'smooth' })
+                    }}
+                    className="px-5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-extrabold shadow-lg shadow-cyan-600/25 flex items-center gap-2 transition-all"
+                  >
+                    <span>{isLastAspect ? 'Tinjau Jawaban 📋' : 'Lanjut ke Aspek Berikutnya'}</span>
+                    <Icon name="arrowRight" className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
             ) : (
-              <div className="p-8 text-center text-xs text-slate-400 bg-slate-900 rounded-2xl border border-slate-800">
-                Tidak ada pertanyaan pada indeks ini.
+              /* Mode Single Question */
+              <div className="space-y-6">
+                {activeQuestion ? (
+                  <FormPublicRenderer
+                    questions={[activeQuestion]}
+                    answers={answers}
+                    onAnswerChange={(qId, val) => handleAnswersChange(qId, val)}
+                    allQuestions={questions}
+                  />
+                ) : (
+                  <div className="p-8 text-center text-xs text-slate-400 bg-slate-900 rounded-2xl border border-slate-800">
+                    Tidak ada pertanyaan pada indeks ini.
+                  </div>
+                )}
+
+                {/* Previous / Next Controls Bar */}
+                <div className="flex items-center justify-between pt-4 border-t border-slate-800/80">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCurrentQuestionIndex((prev) => Math.max(0, prev - 1))
+                      window.scrollTo({ top: 0, behavior: 'smooth' })
+                    }}
+                    disabled={isFirstQuestion}
+                    className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:opacity-40 text-slate-300 text-xs font-semibold border border-slate-800 flex items-center gap-1.5 transition-colors"
+                  >
+                    <Icon name="arrowLeft" className="w-4 h-4" />
+                    <span>Sebelumnya</span>
+                  </button>
+
+                  {isLastQuestion ? (
+                    <button
+                      type="button"
+                      onClick={handleGoToReview}
+                      className="px-6 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-extrabold shadow-lg shadow-cyan-600/25 flex items-center gap-2 transition-all"
+                    >
+                      <span>Tinjau Jawaban</span>
+                      <Icon name="arrowRight" className="w-4 h-4" />
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCurrentQuestionIndex((prev) => Math.min(questions.length - 1, prev + 1))
+                        window.scrollTo({ top: 0, behavior: 'smooth' })
+                      }}
+                      className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-cyan-300 text-xs font-semibold border border-slate-800 flex items-center gap-1.5 transition-colors"
+                    >
+                      <span>Selanjutnya</span>
+                      <Icon name="arrowRight" className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
               </div>
             )}
-
-            {/* Previous / Next Controls Bar */}
-            <div className="flex items-center justify-between pt-4 border-t border-slate-800/80">
-              <button
-                type="button"
-                onClick={() => {
-                  setCurrentQuestionIndex((prev) => Math.max(0, prev - 1))
-                  window.scrollTo({ top: 0, behavior: 'smooth' })
-                }}
-                disabled={isFirstQuestion}
-                className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:opacity-40 text-slate-300 text-xs font-semibold border border-slate-800 flex items-center gap-1.5 transition-colors"
-              >
-                <Icon name="arrowLeft" className="w-4 h-4" />
-                <span>Sebelumnya</span>
-              </button>
-
-              {isLastQuestion ? (
-                <button
-                  type="button"
-                  onClick={handleGoToReview}
-                  className="px-6 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-extrabold shadow-lg shadow-cyan-600/25 flex items-center gap-2 transition-all"
-                >
-                  <span>Tinjau Jawaban</span>
-                  <Icon name="arrowRight" className="w-4 h-4" />
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCurrentQuestionIndex((prev) => Math.min(questions.length - 1, prev + 1))
-                    window.scrollTo({ top: 0, behavior: 'smooth' })
-                  }}
-                  className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-cyan-300 text-xs font-semibold border border-slate-800 flex items-center gap-1.5 transition-colors"
-                >
-                  <span>Selanjutnya</span>
-                  <Icon name="arrowRight" className="w-4 h-4" />
-                </button>
-              )}
-            </div>
           </main>
         </div>
       </div>
     )
   }
+
+  const landingQuestions = form?.version?.questions || form?.questions || []
+  const rawLandingAspects = form?.version?.aspects || form?.aspects || []
+  const landingAspects = resolveFormAspects(rawLandingAspects, landingQuestions)
 
   // STEP 1: RESPONDENT ENTRY LANDING
   return (
@@ -429,7 +647,7 @@ export default function PublicDistributionPage({ params }: PageProps) {
             <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-0.5">
               <span className="text-[10px] text-slate-500 uppercase font-mono">Struktur Soal</span>
               <p className="font-semibold text-cyan-300 font-mono">
-                {form.aspects?.length || 0} Aspek • {form.questions?.length || 0} Pertanyaan
+                {landingAspects.length} Aspek • {landingQuestions.length} Pertanyaan
               </p>
             </div>
           </div>
