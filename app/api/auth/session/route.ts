@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
 
     let uid = ''
     let email = ''
-    let sessionCookie = idToken
+    let sessionCookie = ''
 
     try {
       const decodedToken = await adminAuth.verifyIdToken(idToken)
@@ -23,20 +23,11 @@ export async function POST(request: NextRequest) {
         expiresIn: SESSION_MAX_AGE_SECONDS * 1000,
       })
     } catch (adminErr: any) {
-      console.warn('adminAuth session creation warning, using JWT payload fallback:', adminErr?.message || adminErr)
-      try {
-        const parts = idToken.split('.')
-        if (parts.length >= 2) {
-          const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf-8'))
-          uid = payload.user_id || payload.sub || payload.uid || ''
-          email = payload.email || ''
-        }
-      } catch (e) {
-        console.warn('JWT payload decode warning:', e)
-      }
+      console.warn('verifyIdToken failed:', adminErr?.message || adminErr)
+      return NextResponse.json({ message: 'Tokens provided could not be verified.' }, { status: 401 })
     }
 
-    if (!uid) {
+    if (!uid || !sessionCookie) {
       return NextResponse.json({ message: 'Tokens provided could not be verified.' }, { status: 401 })
     }
 
@@ -49,13 +40,13 @@ export async function POST(request: NextRequest) {
       role = userSnap.exists ? userSnap.data()?.role : null
 
       if (!userSnap.exists) {
-        role = 'admin'
+        role = 'cadre'
         await userRef.set(
           {
             uid,
             email,
-            displayName: email.split('@')[0] || 'KKPD ADMIN',
-            role: 'admin',
+            displayName: email.split('@')[0] || 'Pengguna Baru',
+            role: 'cadre',
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           },
