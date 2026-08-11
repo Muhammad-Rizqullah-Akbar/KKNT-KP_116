@@ -7,11 +7,11 @@ const VALID_ROLES = ['super_admin', 'admin', 'internal_bpom', 'cadre', 'partners
 
 export async function POST(request: NextRequest) {
   try {
-    const authContext = (await getAuthorizationContext()) || {
-      uid: 'super_admin_dev',
-      role: 'super_admin' as const,
-      token: {} as any,
+    const authContext = await getAuthorizationContext()
+    if (!authContext) {
+      return NextResponse.json({ success: false, message: 'Otentikasi diperlukan untuk mendaftarkan akun.' }, { status: 401 })
     }
+
     const {
       email,
       password,
@@ -36,10 +36,27 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Authorization rule: Partnership users can only create 'cadre' role users
+    // Authorization Matrix:
+    // 1. Cadre / Public roles cannot create any accounts
+    if (authContext.role === 'cadre' || authContext.role === 'public') {
+      return NextResponse.json(
+        { success: false, message: 'Anda tidak memiliki hak untuk mendaftarkan akun pengguna baru.' },
+        { status: 403 }
+      )
+    }
+
+    // 2. Partnership users can ONLY create 'cadre' role users
     if (authContext.role === 'partnership' && role !== 'cadre') {
       return NextResponse.json(
         { success: false, message: 'Akun Mitra / Partnership hanya dapat mendaftarkan Kader (cadre).' },
+        { status: 403 }
+      )
+    }
+
+    // 3. Non-super_admin users cannot create privileged admin or super_admin roles
+    if ((role === 'super_admin' || role === 'admin' || role === 'internal_bpom') && authContext.role !== 'super_admin') {
+      return NextResponse.json(
+        { success: false, message: 'Hanya Super Admin yang diizinkan untuk membuat akun administratif.' },
         { status: 403 }
       )
     }
