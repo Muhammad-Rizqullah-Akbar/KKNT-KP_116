@@ -22,10 +22,6 @@ export function Topbar({ title, subtitle }: TopbarProps) {
           {subtitle && <p className="text-sm text-white/40">{subtitle}</p>}
         </div>
         <div className="flex items-center gap-3">
-          <button className="relative p-2 rounded-lg hover:bg-white/[0.05] transition-colors" title="Notifikasi">
-            <Icon name="bell" className="w-5 h-5 text-white/50" />
-            <span className="absolute top-1 right-1 w-2 h-2 bg-rose-500 rounded-full" />
-          </button>
           <button
             onClick={() => setIsProfileModalOpen(true)}
             className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.06] transition-all cursor-pointer"
