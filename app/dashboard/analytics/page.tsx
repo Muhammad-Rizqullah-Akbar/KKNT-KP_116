@@ -1,497 +1,858 @@
 'use client'
 
-import { useState, useMemo, useEffect, useRef } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Topbar } from '@/components/dashboard/Topbar'
 import { Icon } from '@/components/ui/Icons'
-import { Button } from '@/components/shared/Button'
-import { getAllResponses, getForms, getFormGroups, type FormResponse, type FormData, type FormGroup } from '@/lib/firebase/repositories/forms.repo'
+import { useAuth } from '@/context/AuthContext'
+import { safeFetchJson } from '@/lib/shared/safeFetch'
 
-type Visualization = {
-  id: string
-  name: string
-  type: 'Bar Chart' | 'Pie Chart' | 'Number (Skor)' | 'Matrix'
-  data: any
+type VersionFilter = 'v1_5' | 'v1_0' | 'all'
+
+interface ResponseItem {
+  responseId: string
+  formId: string
   formTitle: string
-  groupName: string
+  versionNumber?: number
+  distributionCode: string
+  ownerName: string
+  ownerType: string
+  submittedAt: string | number
+  respondentName: string
+  respondentEmail: string
+  score: number
+  grade: string
+  thresholdTitle: string
+  createdBy?: string
+  cadreId?: string
 }
 
-const cleanKey = (str: string) => (str || '').toLowerCase().replace(/[^\w\s]/g, '').trim()
+export default function AnalyticsDashboardPage() {
+  const { user, userData, userRole } = useAuth()
+  const isCadre = userData?.role === 'cadre' || userRole === 'cadre'
 
-export default function AnalyticsPage() {
-  const [responses, setResponses] = useState<FormResponse[]>([])
-  const [forms, setForms] = useState<FormData[]>([])
-  const [groups, setGroups] = useState<FormGroup[]>([])
-  const [loading, setLoading] = useState(true)
+  const [activeVersion, setActiveVersion] = useState<VersionFilter>('v1_5')
+  const [responses, setResponses] = useState<ResponseItem[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const [selectedForms, setSelectedForms] = useState<string[]>([])
-  const [selectedGroups, setSelectedGroups] = useState<string[]>([])
+  // Filters
+  const [searchTerm, setSearchTerm] = useState('')
+  const [selectedFormId, setSelectedFormId] = useState<string>('all')
+  const [selectedAuthor, setSelectedAuthor] = useState<string>('all')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
-  const [selectedVisuals, setSelectedVisuals] = useState<string[]>([])
+
+  // Export State
   const [isExporting, setIsExporting] = useState(false)
-  const [exportError, setExportError] = useState<string | null>(null)
-  const [viewMode, setViewMode] = useState<'group' | 'form'>('group')
-  const printRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true)
-      try {
-        const [resData, formsData, groupsData] = await Promise.all([
-          getAllResponses(),
-          getForms(),
-          getFormGroups(),
-        ])
-        setResponses(resData)
-        setForms(formsData)
-        setGroups(groupsData)
-      } catch (error) {
-        console.error('Gagal memuat data analisis database:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchData()
-  }, [])
+  // Fetch Data from Server API
+  const fetchAnalyticsData = async () => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/v1_5/responses?status=submitted')
+      if (!res.ok) throw new Error('Gagal terhubung ke layanan data analitik.')
+      const data = await res.json()
 
-  const uniqueGroups = useMemo(() => {
-    const groupSet = new Set<string>()
-    forms.forEach(f => {
-      const g = groups.find(item => item.id === f.groupId)
-      groupSet.add(g ? g.title : 'Mandiri / Tanpa Group')
-    })
-    return Array.from(groupSet)
-  }, [forms, groups])
+      if (data.success && Array.isArray(data.responses)) {
+        let parsed: ResponseItem[] = data.responses.map((r: any) => {
+          const res = r.result
+          const rawScoreVal =
+            res?.percentage ??
+            res?.rawScore ??
+            r.score ??
+            r.totalScore ??
+            r.percentage ??
+            r.finalScore ??
+            0
+          const score = Math.min(100, Math.max(0, Math.round(Number(rawScoreVal) || 0)))
+          const grade = res?.grade || (score >= 80 ? 'Grade A' : score >= 60 ? 'Grade B' : 'Grade C')
+          const thresholdTitle =
+            res?.thresholdTitle || (score >= 80 ? 'Memenuhi Syarat' : score >= 60 ? 'Pendampingan Lanjutan' : 'Perlu Perbaikan')
 
-  const formDataFromDb = useMemo(() => {
-    const mapping: Record<string, { group: string; total: number; visualizations: Visualization[] }> = {}
+          return {
+            responseId: r.responseId || r.id,
+            formId: r.formId || 'form_default',
+            formTitle: (r.formTitle || 'Formulir Evaluasi Pangan').replace(/^form_[\w\-]+/g, 'Formulir Evaluasi Pangan'),
+            versionNumber: r.versionNumber || (r.responseId?.startsWith('resp_') ? 1.5 : 1.0),
+            distributionCode: r.distributionCode || r.groupName || 'V1-DIST',
+            ownerName: r.ownerName || 'Kader Lapangan',
+            ownerType: r.ownerType || 'cadre',
+            submittedAt: r.submittedAt || r.updatedAt || Date.now(),
+            respondentName: r.respondent?.name || r.answers?.name || r.answers?.nama || 'Responden Publik',
+            respondentEmail: r.respondent?.email || r.answers?.email || '',
+            score,
+            grade,
+            thresholdTitle,
+            createdBy: r.createdBy,
+            cadreId: r.cadreId || r.userId,
+          }
+        })
 
-    forms.forEach(form => {
-      const g = groups.find(item => item.id === form.groupId)
-      const groupName = g ? g.title : 'Mandiri / Tanpa Group'
-      const formResponses = responses.filter(r => r.formId === form.id)
+        // If logged in user is a Cadre, filter responses strictly to personal distribution codes & UID
+        if (isCadre) {
+          const myDistRes = await safeFetchJson('/api/v1_5/distributions')
+          const myCodesSet = new Set<string>()
+          if (myDistRes.ok && myDistRes.data && Array.isArray(myDistRes.data.distributions)) {
+            myDistRes.data.distributions.forEach((d: any) => {
+              if (d.createdBy === user?.uid || d.cadreId === user?.uid || d.ownerId === user?.uid) {
+                if (d.code) myCodesSet.add(String(d.code).toLowerCase().trim())
+                if (d.distributionId) myCodesSet.add(String(d.distributionId).toLowerCase().trim())
+              }
+            })
+          }
+          if (userData?.cadreCode) myCodesSet.add(String(userData.cadreCode).toLowerCase().trim())
 
-      const visualizations: Visualization[] = []
-
-      form.questions?.forEach((q: any) => {
-        const type = q.answerType || q.type || 'short-text'
-        if (['single-choice', 'multiple-choice', 'dropdown', 'indicator-table', 'likert', 'rating', 'binary'].includes(type)) {
-          const qTitle = q.question || q.label || 'Pertanyaan'
-          
-          const counts: Record<string, number> = {}
-          const targetCleanQ = cleanKey(qTitle)
-
-          formResponses.forEach(r => {
-            if (r.answers) {
-              Object.entries(r.answers).forEach(([ansKey, val]) => {
-                const cleanAnsKey = cleanKey(ansKey)
-                const isMatch = ansKey === q.id || cleanAnsKey === targetCleanQ || cleanAnsKey.includes(targetCleanQ) || targetCleanQ.includes(cleanAnsKey)
-
-                if (isMatch) {
-                  if (typeof val === 'string' && val.trim() !== '') {
-                    counts[val] = (counts[val] || 0) + 1
-                  } else if (Array.isArray(val)) {
-                    val.forEach(item => {
-                      if (typeof item === 'string') counts[item] = (counts[item] || 0) + 1
-                    })
-                  } else if (typeof val === 'object' && val !== null) {
-                    Object.values(val).forEach((subVal: any) => {
-                      if (typeof subVal === 'string' && subVal.trim() !== '') {
-                        counts[subVal] = (counts[subVal] || 0) + 1
-                      }
-                    })
-                  }
-                }
-              })
-            }
-          })
-
-          const labels = Object.keys(counts)
-          const values = labels.map(l => counts[l])
-
-          let chartType: 'Bar Chart' | 'Pie Chart' | 'Matrix' = 'Bar Chart'
-          if (type === 'indicator-table' || type === 'likert') chartType = 'Matrix'
-          else if (labels.length === 3) chartType = 'Pie Chart'
-
-          visualizations.push({
-            id: `vis-${form.id}-${q.id}`,
-            name: qTitle,
-            type: chartType,
-            data: labels.length > 0 ? { labels, values } : { labels: ['Belum Ada Respon'], values: [0] },
-            formTitle: form.title,
-            groupName: groupName,
+          parsed = parsed.filter((r) => {
+            const distCode = String(r.distributionCode || '').toLowerCase().trim()
+            const isMyCode = distCode !== '' && myCodesSet.has(distCode)
+            const isMyUid = r.createdBy === user?.uid || r.cadreId === user?.uid
+            return isMyCode || isMyUid
           })
         }
-      })
 
-      visualizations.push({
-        id: `vis-score-${form.id}`,
-        name: `Rata-rata Skor: ${form.title}`,
-        type: 'Number (Skor)',
-        data: { value: formResponses.length > 0 ? 78.5 : 0, max: 100 },
-        formTitle: form.title,
-        groupName: groupName,
-      })
+        setResponses(parsed)
+      } else {
+        setResponses([])
+      }
+    } catch (err: any) {
+      setError(err.message || 'Terjadi kesalahan saat memuat data analitik.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
-      mapping[form.title] = {
-        group: groupName,
-        total: formResponses.length,
-        visualizations,
+  useEffect(() => {
+    fetchAnalyticsData()
+  }, [user])
+
+  // Filter Responses by Version Tabs (V1.5 vs V1.0)
+  const versionFilteredResponses = useMemo(() => {
+    return responses.filter((r) => {
+      if (activeVersion === 'v1_5') return (r.versionNumber || 1.5) >= 1.5
+      if (activeVersion === 'v1_0') return (r.versionNumber || 1.0) < 1.5
+      return true
+    })
+  }, [responses, activeVersion])
+
+  // Available Form Options for Filter
+  const formOptions = useMemo(() => {
+    const map = new Map<string, string>()
+    versionFilteredResponses.forEach((r) => {
+      if (!map.has(r.formId)) map.set(r.formId, r.formTitle)
+    })
+    return Array.from(map.entries()).map(([id, title]) => ({ id, title }))
+  }, [versionFilteredResponses])
+
+  // Available Author Options for Filter
+  const authorOptions = useMemo(() => {
+    const set = new Set<string>()
+    versionFilteredResponses.forEach((r) => {
+      if (r.ownerName) set.add(r.ownerName)
+    })
+    return Array.from(set)
+  }, [versionFilteredResponses])
+
+  // Applied Multi-level Filter
+  const filteredData = useMemo(() => {
+    return versionFilteredResponses.filter((r) => {
+      const term = searchTerm.toLowerCase()
+      const matchesSearch =
+        r.responseId.toLowerCase().includes(term) ||
+        r.formTitle.toLowerCase().includes(term) ||
+        r.distributionCode.toLowerCase().includes(term) ||
+        r.ownerName.toLowerCase().includes(term) ||
+        r.respondentName.toLowerCase().includes(term)
+
+      const matchesForm = selectedFormId === 'all' || r.formId === selectedFormId
+      const matchesAuthor = selectedAuthor === 'all' || r.ownerName === selectedAuthor
+
+      let matchesDate = true
+      if (startDate) {
+        matchesDate = new Date(r.submittedAt).getTime() >= new Date(startDate).getTime()
+      }
+      if (endDate && matchesDate) {
+        matchesDate = new Date(r.submittedAt).getTime() <= new Date(endDate + 'T23:59:59').getTime()
+      }
+
+      return matchesSearch && matchesForm && matchesAuthor && matchesDate
+    })
+  }, [versionFilteredResponses, searchTerm, selectedFormId, selectedAuthor, startDate, endDate])
+
+  // Executive KPI Calculations
+  const kpi = useMemo(() => {
+    const total = filteredData.length
+    if (total === 0) return { total: 0, msCount: 0, msPercentage: 0, avgScore: 0, activeCadres: 0, activeDistributions: 0 }
+
+    const msCount = filteredData.filter((r) => r.score >= 80).length
+    const msPercentage = Math.round((msCount / total) * 100)
+    const sumScore = filteredData.reduce((acc, curr) => acc + curr.score, 0)
+    const avgScore = Math.round(sumScore / total)
+
+    const cadres = new Set(filteredData.map((r) => r.ownerName)).size
+    const dists = new Set(filteredData.map((r) => r.distributionCode)).size
+
+    return { total, msCount, msPercentage, avgScore, activeCadres: cadres, activeDistributions: dists }
+  }, [filteredData])
+
+  // Score Breakdown Aggregation
+  const scoreBreakdown = useMemo(() => {
+    const total = filteredData.length
+    if (total === 0) return { ms: { count: 0, pct: 0 }, binaan: { count: 0, pct: 0 }, kritis: { count: 0, pct: 0 } }
+
+    const ms = filteredData.filter((r) => r.score >= 80).length
+    const binaan = filteredData.filter((r) => r.score >= 60 && r.score < 80).length
+    const kritis = filteredData.filter((r) => r.score < 60).length
+
+    return {
+      ms: { count: ms, pct: Math.round((ms / total) * 100) },
+      binaan: { count: binaan, pct: Math.round((binaan / total) * 100) },
+      kritis: { count: kritis, pct: Math.round((kritis / total) * 100) },
+    }
+  }, [filteredData])
+
+  // Form Performance Aggregation Table
+  const formPerformance = useMemo(() => {
+    const map = new Map<string, { title: string; count: number; totalScore: number; msCount: number }>()
+
+    filteredData.forEach((r) => {
+      const key = r.formId
+      if (!map.has(key)) {
+        map.set(key, { title: r.formTitle, count: 1, totalScore: r.score, msCount: r.score >= 80 ? 1 : 0 })
+      } else {
+        const item = map.get(key)!
+        item.count += 1
+        item.totalScore += r.score
+        if (r.score >= 80) item.msCount += 1
       }
     })
 
-    return mapping
-  }, [forms, responses, groups])
-
-  const formOptions = Object.keys(formDataFromDb)
-
-  const availableVisuals = useMemo(() => {
-    if (selectedForms.length === 0 && selectedGroups.length === 0) return []
-    
-    let filteredForms: string[] = []
-    if (selectedGroups.length > 0) {
-      filteredForms = formOptions.filter(form => {
-        const group = formDataFromDb[form]?.group
-        return selectedGroups.includes(group)
-      })
-    }
-    
-    const allForms = [...new Set([...selectedForms, ...filteredForms])]
-    if (allForms.length === 0) return []
-    
-    const allVisuals: Visualization[] = []
-    allForms.forEach(form => {
-      const formVis = formDataFromDb[form]?.visualizations || []
-      allVisuals.push(...formVis)
+    return Array.from(map.entries()).map(([formId, data]) => {
+      const avg = Math.round(data.totalScore / data.count)
+      const msRate = Math.round((data.msCount / data.count) * 100)
+      return { formId, title: data.title, count: data.count, avgScore: avg, msRate }
     })
-    return allVisuals
-  }, [selectedForms, selectedGroups, formDataFromDb])
+  }, [filteredData])
 
-  const selectedVisualData = useMemo(() => {
-    return availableVisuals.filter(v => selectedVisuals.includes(v.id))
-  }, [availableVisuals, selectedVisuals])
+  // Cadre Leaderboard Aggregation
+  const cadreLeaderboard = useMemo(() => {
+    const map = new Map<string, { ownerName: string; ownerType: string; count: number; totalScore: number; codes: Set<string> }>()
 
-  const handleGroupToggle = (group: string) => {
-    setSelectedGroups(prev => {
-      const newSelected = prev.includes(group) ? prev.filter(g => g !== group) : [...prev, group]
-      if (newSelected.length === 0) setSelectedVisuals([])
-      return newSelected
+    filteredData.forEach((r) => {
+      const key = r.ownerName
+      if (!map.has(key)) {
+        map.set(key, { ownerName: r.ownerName, ownerType: r.ownerType, count: 1, totalScore: r.score, codes: new Set([r.distributionCode]) })
+      } else {
+        const item = map.get(key)!
+        item.count += 1
+        item.totalScore += r.score
+        item.codes.add(r.distributionCode)
+      }
     })
+
+    return Array.from(map.values())
+      .map((item) => ({
+        ownerName: item.ownerName,
+        ownerType: item.ownerType,
+        count: item.count,
+        avgScore: Math.round(item.totalScore / item.count),
+        codeCount: item.codes.size,
+      }))
+      .sort((a, b) => b.count - a.count)
+  }, [filteredData])
+
+  // Print Report Handler
+  const handlePrintReport = () => {
+    setIsExporting(true)
+    setTimeout(() => {
+      window.print()
+      setIsExporting(false)
+    }, 400)
   }
 
-  const handleFormToggle = (form: string) => {
-    setSelectedForms(prev => {
-      const newSelected = prev.includes(form) ? prev.filter(f => f !== form) : [...prev, form]
-      if (newSelected.length === 0 && selectedGroups.length === 0) setSelectedVisuals([])
-      return newSelected
-    })
+  // Export CSV Handler
+  const handleExportCSV = () => {
+    if (filteredData.length === 0) return alert('Tidak ada data untuk diekspor.')
+
+    const headers = ['ID Respon', 'Formulir', 'Versi', 'Kode Distribusi', 'Author/Kader', 'Nama Responden', 'Skor %', 'Kategori', 'Tanggal Submisi']
+    const rows = filteredData.map((r) => [
+      `"${r.responseId}"`,
+      `"${r.formTitle}"`,
+      `"V${r.versionNumber || 1.5}"`,
+      `"${r.distributionCode}"`,
+      `"${r.ownerName}"`,
+      `"${r.respondentName}"`,
+      r.score,
+      `"${r.thresholdTitle}"`,
+      `"${new Date(r.submittedAt).toLocaleDateString('id-ID')}"`,
+    ])
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n')
+    const encodedUri = encodeURI(csvContent)
+    const link = document.createElement('a')
+    link.setAttribute('href', encodedUri)
+    link.setAttribute('download', `laporan_analisis_kkpd_${activeVersion}_${Date.now()}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
   }
 
-  const handleSelectAllForms = () => {
-    if (selectedForms.length === formOptions.length) {
-      setSelectedForms([])
-      setSelectedVisuals([])
-    } else {
-      setSelectedForms(formOptions)
-    }
-  }
-
-  const handleVisualToggle = (id: string) => {
-    setSelectedVisuals(prev => prev.includes(id) ? prev.filter(v => v !== id) : [...prev, id])
-  }
-
-  const handleSelectAllVisuals = () => {
-    if (selectedVisuals.length === availableVisuals.length) {
-      setSelectedVisuals([])
-    } else {
-      setSelectedVisuals(availableVisuals.map(v => v.id))
-    }
-  }
-
-  const handleReset = () => {
-    setSelectedForms([])
-    setSelectedGroups([])
-    setSelectedVisuals([])
+  const handleResetFilters = () => {
+    setSearchTerm('')
+    setSelectedFormId('all')
+    setSelectedAuthor('all')
     setStartDate('')
     setEndDate('')
-    setExportError(null)
-    setViewMode('group')
-  }
-
-  const handleExportPDF = async () => {
-    if (selectedVisualData.length === 0) return
-    setIsExporting(true)
-    setExportError(null)
-    try {
-      await new Promise(resolve => setTimeout(resolve, 1500))
-      window.print()
-    } catch (error) {
-      setExportError('Gagal mencetak laporan PDF.')
-    } finally {
-      setIsExporting(false)
-    }
-  }
-
-  // 🔥 Render Grafik dengan Pengaman Teks Overflow & Lebar Responsif
-  const renderVisualization = (vis: Visualization) => {
-    const { type, data, name } = vis
-    
-    switch (type) {
-      case 'Bar Chart':
-        return (
-          <div className="p-5 bg-white/[0.02] rounded-2xl border border-white/[0.05] flex flex-col justify-between h-full">
-            <h4 className="text-sm font-semibold text-white mb-4 line-clamp-2" title={name}>{name}</h4>
-            <div className="flex items-end gap-3 h-52 pt-2 overflow-x-auto custom-scrollbar pb-2">
-              {data.labels.map((label: string, i: number) => {
-                const maxVal = Math.max(...data.values, 1)
-                const height = (data.values[i] / maxVal) * 100
-                return (
-                  <div key={i} className="flex-1 min-w-[45px] flex flex-col items-center gap-2 h-full justify-end">
-                    <span className="text-[10px] font-semibold text-white/70">{data.values[i]}</span>
-                    <div 
-                      className="w-full max-w-[36px] bg-gradient-to-t from-cyan-500 to-violet-500 rounded-t-lg transition-all shadow"
-                      style={{ height: `${Math.max(height, 8)}%` }}
-                    />
-                    <span className="text-[10px] text-white/40 truncate w-full text-center" title={label}>{label}</span>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )
-
-      case 'Pie Chart': {
-        const total = data.values.reduce((a: number, b: number) => a + b, 0) || 1
-        let currentAngle = 0
-        const colors = ['#06b6d4', '#8b5cf6', '#f59e0b', '#10b981', '#f43f5e', '#3b82f6']
-        
-        return (
-          <div className="p-5 bg-white/[0.02] rounded-2xl border border-white/[0.05] flex flex-col justify-between h-full">
-            <h4 className="text-sm font-semibold text-white mb-4 line-clamp-2" title={name}>{name}</h4>
-            <div className="flex items-center gap-4 flex-wrap justify-center py-2">
-              <div className="relative w-36 h-36 shrink-0">
-                <svg viewBox="0 0 100 100" className="transform -rotate-90 w-full h-full">
-                  {data.labels.map((label: string, i: number) => {
-                    const percentage = (data.values[i] / total) * 100
-                    const angle = (percentage / 100) * 360
-                    const startAngle = currentAngle
-                    const endAngle = currentAngle + angle
-                    currentAngle = endAngle
-                    
-                    const x1 = 50 + 40 * Math.cos((startAngle * Math.PI) / 180)
-                    const y1 = 50 + 40 * Math.sin((startAngle * Math.PI) / 180)
-                    const x2 = 50 + 40 * Math.cos((endAngle * Math.PI) / 180)
-                    const y2 = 50 + 40 * Math.sin((endAngle * Math.PI) / 180)
-                    const largeArc = angle > 180 ? 1 : 0
-                    
-                    return (
-                      <path
-                        key={i}
-                        d={`M 50 50 L ${x1} ${y1} A 40 40 0 ${largeArc} 1 ${x2} ${y2} Z`}
-                        fill={colors[i % colors.length]}
-                        opacity={0.85}
-                      />
-                    )
-                  })}
-                </svg>
-              </div>
-              <div className="space-y-1.5 flex-1 min-w-[140px] max-h-36 overflow-y-auto custom-scrollbar">
-                {data.labels.map((label: string, i: number) => {
-                  const percentage = Math.round((data.values[i] / total) * 100)
-                  return (
-                    <div key={i} className="flex items-center justify-between text-xs gap-2">
-                      <div className="flex items-center gap-1.5 truncate">
-                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: colors[i % colors.length] }} />
-                        <span className="text-white/70 truncate" title={label}>{label}</span>
-                      </div>
-                      <span className="text-white/40 font-mono shrink-0">{data.values[i]} ({percentage}%)</span>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          </div>
-        )
-      }
-
-      case 'Number (Skor)':
-        return (
-          <div className="p-5 bg-white/[0.02] rounded-2xl border border-white/[0.05] flex flex-col justify-between h-full">
-            <h4 className="text-sm font-semibold text-white mb-2 line-clamp-2" title={name}>{name}</h4>
-            <div className="text-center py-6">
-              <span className="text-5xl font-bold font-display text-cyan-400">{data.value}</span>
-              <span className="text-sm text-white/30 ml-1">/ {data.max}</span>
-              <div className="w-full h-2.5 bg-white/[0.05] rounded-full mt-4 overflow-hidden">
-                <div 
-                  className="h-full bg-gradient-to-r from-cyan-500 to-violet-500 rounded-full transition-all"
-                  style={{ width: `${(data.value / data.max) * 100}%` }}
-                />
-              </div>
-            </div>
-          </div>
-        )
-
-      case 'Matrix':
-        return (
-          <div className="p-5 bg-white/[0.02] rounded-2xl border border-white/[0.05] flex flex-col justify-between h-full">
-            <h4 className="text-sm font-semibold text-white mb-4 line-clamp-2" title={name}>{name}</h4>
-            <div className="space-y-3 max-h-48 overflow-y-auto custom-scrollbar">
-              {data.labels.map((label: string, i: number) => {
-                const total = data.values.reduce((a: number, b: number) => a + b, 0) || 1
-                const percentage = Math.round((data.values[i] / total) * 100)
-                return (
-                  <div key={i} className="space-y-1">
-                    <div className="flex justify-between text-xs gap-2">
-                      <span className="text-white/80 font-medium truncate" title={label}>{label}</span>
-                      <span className="text-white/40 font-mono shrink-0">{data.values[i]} ({percentage}%)</span>
-                    </div>
-                    <div className="w-full h-2.5 bg-white/[0.06] rounded-full overflow-hidden">
-                      <div className="h-full bg-gradient-to-r from-cyan-500 to-violet-500 rounded-full" style={{ width: `${percentage}%` }} />
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )
-
-      default:
-        return null
-    }
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#06060E]">
-      <Topbar title="Laporan & Analisis" subtitle="Analisis data mandiri langsung terhubung ke database Firestore" />
+    <div className="flex flex-col min-h-screen bg-slate-950 text-slate-100 font-sans print:bg-white print:text-slate-900">
+      {/* Dynamic CSS Print Page Layout */}
+      <style>{`
+        @media print {
+          @page {
+            size: A4 portrait;
+            margin: 12mm 10mm 12mm 10mm;
+          }
+          body {
+            background-color: #ffffff !important;
+            color: #0f172a !important;
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          .print\\:hidden {
+            display: none !important;
+          }
+          .print-card,
+          .print-no-break,
+          tr,
+          .p-5,
+          .p-6,
+          .rounded-3xl,
+          .rounded-2xl {
+            break-inside: avoid !important;
+            page-break-inside: avoid !important;
+          }
+          thead {
+            display: table-header-group !important;
+          }
+          .max-w-7xl {
+            max-width: 100% !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+          .bg-slate-900,
+          .bg-slate-950,
+          .bg-slate-900\\/90 {
+            background-color: #ffffff !important;
+            border-color: #cbd5e1 !important;
+            box-shadow: none !important;
+          }
+          .text-slate-100,
+          .text-slate-200,
+          .text-white {
+            color: #0f172a !important;
+          }
+          .text-slate-400,
+          .text-slate-500 {
+            color: #475569 !important;
+          }
+          .border-slate-800,
+          .border-slate-700 {
+            border-color: #cbd5e1 !important;
+          }
+          .bg-slate-800,
+          .bg-slate-950 {
+            background-color: #f8fafc !important;
+          }
+        }
+      `}</style>
 
-      <div className="flex-1 p-6 space-y-6">
-        {/* Filter Section */}
-        <div className="rounded-2xl bg-[#080812] border border-white/[0.05] p-6 space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-white/40 uppercase tracking-wider">Tampilkan:</span>
-              <button
-                onClick={() => setViewMode('group')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${viewMode === 'group' ? 'bg-violet-500/20 text-violet-400 border border-violet-500/20' : 'bg-white/[0.03] text-white/50 border border-white/[0.05]'}`}
-              >
-                <Icon name="grid" className="w-3 h-3 inline mr-1" /> Group
-              </button>
-              <button
-                onClick={() => setViewMode('form')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${viewMode === 'form' ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/20' : 'bg-white/[0.03] text-white/50 border border-white/[0.05]'}`}
-              >
-                <Icon name="fileText" className="w-3 h-3 inline mr-1" /> Form
-              </button>
-            </div>
+      {/* Dashboard Topbar (Hidden in Print) */}
+      <div className="print:hidden">
+        <Topbar
+          title="Laporan & Analisis Data"
+          subtitle="Rekapitulasi dan analisis data evaluasi kuesioner, performa kelompok, serta perbandingan data per versi"
+        />
+      </div>
 
-            <button onClick={handleReset} className="px-3 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.06] text-xs text-white/50 hover:text-white flex items-center gap-1">
-              <Icon name="refreshCw" className="w-3 h-3" /> Reset Filter
+      {/* Printable PDF Formal Academic Header (Visible ONLY when printing) */}
+      <div className="hidden print:block mb-6 pb-4 border-b-2 border-slate-900 space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-black text-slate-900 uppercase tracking-tight">
+              LAPORAN & ANALISIS DATA EVALUASI KUESIONER
+            </h1>
+            <p className="text-xs text-slate-600 font-medium">
+              Platform Desa Sehat — Rekapitulasi & Segmentasi Data Submisi
+            </p>
+          </div>
+          <div className="text-right text-[11px] font-mono text-slate-600">
+            <p><strong>Tanggal Cetak:</strong> {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+            <p><strong>Versi Data:</strong> {activeVersion === 'v1_5' ? 'Version 1.5 (Desa Pangan Aman)' : activeVersion === 'v1_0' ? 'Version 1.0 (Arsip Legacy)' : 'Keseluruhan Versi'}</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-4 gap-2 pt-2 border-t border-slate-300 text-[11px] font-mono">
+          <div className="p-2 bg-slate-100 rounded border border-slate-300">
+            <span className="text-slate-500 block text-[9px] uppercase font-sans">Total Submisi</span>
+            <strong className="text-slate-900 text-sm">{kpi.total} Respon</strong>
+          </div>
+          <div className="p-2 bg-slate-100 rounded border border-slate-300">
+            <span className="text-slate-500 block text-[9px] uppercase font-sans">Nilai Rata-Rata</span>
+            <strong className="text-slate-900 text-sm">{kpi.avgScore}%</strong>
+          </div>
+          <div className="p-2 bg-slate-100 rounded border border-slate-300">
+            <span className="text-slate-500 block text-[9px] uppercase font-sans">Persentase Capaian (≥ 80%)</span>
+            <strong className="text-emerald-700 text-sm">{kpi.msPercentage}% ({kpi.msCount})</strong>
+          </div>
+          <div className="p-2 bg-slate-100 rounded border border-slate-300">
+            <span className="text-slate-500 block text-[9px] uppercase font-sans">Kontributor Aktif</span>
+            <strong className="text-slate-900 text-sm">{kpi.activeCadres} Kader</strong>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Container */}
+      <div className="flex-1 p-4 sm:p-6 space-y-6 max-w-7xl mx-auto w-full">
+        {/* ============ VERSION TAB SELECTOR ============ */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 p-4 rounded-3xl bg-slate-900 border border-slate-800 shadow-xl print:hidden">
+          <div className="flex items-center gap-2 p-1.5 bg-slate-950 rounded-2xl border border-slate-800/80">
+            <button
+              type="button"
+              onClick={() => setActiveVersion('v1_5')}
+              className={`px-5 py-2.5 rounded-xl text-xs font-black transition-all flex items-center gap-2 ${
+                activeVersion === 'v1_5'
+                  ? 'bg-gradient-to-r from-cyan-500 to-teal-500 text-white shadow-lg shadow-cyan-500/25'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Icon name="sparkles" className="w-4 h-4 text-amber-300" />
+              <span>Version 1.5 — Desa Pangan Aman (Aktif)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveVersion('v1_0')}
+              className={`px-5 py-2.5 rounded-xl text-xs font-black transition-all flex items-center gap-2 ${
+                activeVersion === 'v1_0'
+                  ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/25'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Icon name="database" className="w-4 h-4 text-purple-300" />
+              <span>Version 1.0 — Arsip Legacy</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveVersion('all')}
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                activeVersion === 'all' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Semua Versi
             </button>
           </div>
 
-          {viewMode === 'group' ? (
-            <div>
-              <label className="text-xs text-white/40 uppercase tracking-wider block mb-2">Pilih Group Database</label>
-              <div className="flex flex-wrap gap-2">
-                {uniqueGroups.map(group => (
-                  <button
-                    key={group}
-                    onClick={() => handleGroupToggle(group)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${selectedGroups.includes(group) ? 'bg-violet-500/20 text-violet-400 border border-violet-500/20' : 'bg-white/[0.03] text-white/50 border border-white/[0.05]'}`}
-                  >
-                    {group}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-xs text-white/40 uppercase tracking-wider">Pilih Formulir Database</label>
-                <button onClick={handleSelectAllForms} className="text-xs text-cyan-400 hover:underline">
-                  {selectedForms.length === formOptions.length ? 'Deselect All' : 'Select All'}
-                </button>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {formOptions.map(form => (
-                  <button
-                    key={form}
-                    onClick={() => handleFormToggle(form)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${selectedForms.includes(form) ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/20' : 'bg-white/[0.03] text-white/50 border border-white/[0.05]'}`}
-                  >
-                    {form} ({formDataFromDb[form]?.total || 0} Respon)
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+          {/* Action Export Suite */}
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handleExportCSV}
+              className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 flex items-center gap-2 transition-all shadow-md"
+            >
+              <Icon name="download" className="w-4 h-4 text-cyan-400" />
+              <span>Ekspor CSV</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handlePrintReport}
+              disabled={isExporting}
+              className="px-5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-extrabold shadow-lg shadow-cyan-600/25 flex items-center gap-2 transition-all"
+            >
+              <Icon name="printer" className="w-4 h-4" />
+              <span>{isExporting ? 'Mencetak...' : 'Cetak Laporan PDF'}</span>
+            </button>
+          </div>
         </div>
 
-        {/* Visualization Selection */}
-        <div className="rounded-2xl bg-[#080812] border border-white/[0.05] p-6 space-y-4">
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <div>
-              <h3 className="font-display text-sm font-semibold text-white">Pilih Visual Grafik Analitik</h3>
-              <p className="text-xs text-white/30">{availableVisuals.length} visual pertanyaan tersedia dari database</p>
+        {/* ============ EXECUTIVE KPI SUMMARY BAR ============ */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 print-card">
+          {/* KPI 1: Total Submisi */}
+          <div className="p-5 rounded-3xl bg-slate-900 border border-slate-800 shadow-xl space-y-2 print:border-slate-300 print:bg-white">
+            <div className="flex items-center justify-between text-xs font-bold text-slate-400 print:text-slate-700">
+              <span>Total Submisi Data</span>
+              <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 print:hidden">
+                <Icon name="fileText" className="w-4 h-4" />
+              </div>
             </div>
-            {availableVisuals.length > 0 && (
-              <button onClick={handleSelectAllVisuals} className="text-xs text-cyan-400 hover:underline">
-                {selectedVisuals.length === availableVisuals.length ? 'Deselect All' : 'Select All'}
+            <div className="flex items-baseline gap-2">
+              <span className="text-3xl font-black font-mono text-slate-100 print:text-slate-900">{kpi.total}</span>
+              <span className="text-xs text-cyan-400 print:text-cyan-700 font-semibold font-mono">Respon Submisi</span>
+            </div>
+            <p className="text-[11px] text-slate-400 print:text-slate-600">
+              Filtered for {activeVersion === 'v1_5' ? 'Platform V1.5' : activeVersion === 'v1_0' ? 'Arsip V1.0' : 'Keseluruhan Versi'}
+            </p>
+          </div>
+
+          {/* KPI 2: Persentase Capaian (MS %) */}
+          <div className="p-5 rounded-3xl bg-slate-900 border border-slate-800 shadow-xl space-y-2 print:border-slate-300 print:bg-white">
+            <div className="flex items-center justify-between text-xs font-bold text-slate-400 print:text-slate-700">
+              <span>Persentase Capaian (≥ 80%)</span>
+              <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 print:hidden">
+                <Icon name="checkCircle" className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-3xl font-black font-mono text-emerald-400 print:text-emerald-700">{kpi.msPercentage}%</span>
+              <span className="text-xs text-slate-400 print:text-slate-600 font-mono">({kpi.msCount} / {kpi.total})</span>
+            </div>
+            <p className="text-[11px] text-emerald-400/80 print:text-emerald-700 font-medium">Kategori Cukup / Memenuhi Syarat</p>
+          </div>
+
+          {/* KPI 3: Nilai Rata-rata */}
+          <div className="p-5 rounded-3xl bg-slate-900 border border-slate-800 shadow-xl space-y-2 print:border-slate-300 print:bg-white">
+            <div className="flex items-center justify-between text-xs font-bold text-slate-400 print:text-slate-700">
+              <span>Nilai Rata-Rata</span>
+              <div className="p-2 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20 print:hidden">
+                <Icon name="trendingUp" className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-3xl font-black font-mono text-purple-300 print:text-purple-700">{kpi.avgScore}%</span>
+              <span className="text-xs text-slate-400 print:text-slate-600 font-mono">Skor Rata-Rata</span>
+            </div>
+            <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden print:bg-slate-200">
+              <div className="bg-gradient-to-r from-cyan-500 to-purple-500 h-full rounded-full" style={{ width: `${kpi.avgScore}%` }} />
+            </div>
+          </div>
+
+          {/* KPI 4: Jangkauan Kader & Instansi */}
+          <div className="p-5 rounded-3xl bg-slate-900 border border-slate-800 shadow-xl space-y-2 print:border-slate-300 print:bg-white">
+            <div className="flex items-center justify-between text-xs font-bold text-slate-400 print:text-slate-700">
+              <span>Jangkauan Kader & Instansi</span>
+              <div className="p-2 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20 print:hidden">
+                <Icon name="users" className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-3xl font-black font-mono text-blue-300 print:text-slate-900">{kpi.activeCadres}</span>
+              <span className="text-xs text-slate-400 print:text-slate-600 font-mono">Kader ({kpi.activeDistributions} Kode)</span>
+            </div>
+            <p className="text-[11px] text-slate-400 print:text-slate-600">Kontributor pengumpul data kuesioner</p>
+          </div>
+        </div>
+
+        {/* ============ FILTER & CONTROL BAR (Hidden in Print) ============ */}
+        <div className="p-5 rounded-3xl bg-slate-900 border border-slate-800 shadow-xl space-y-4 print:hidden">
+          <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
+            {/* Search Input */}
+            <div className="relative flex-1 min-w-[240px]">
+              <Icon name="search" className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Cari ID respon, nama responden, formulir, atau kader..."
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/80 transition-colors"
+              />
+            </div>
+
+            {/* Filter Form Dropdown */}
+            <div className="min-w-[180px]">
+              <select
+                value={selectedFormId}
+                onChange={(e) => setSelectedFormId(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/80 transition-colors"
+              >
+                <option value="all">Semua Formulir Evaluasi ({formOptions.length})</option>
+                {formOptions.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Filter Author Dropdown */}
+            <div className="min-w-[160px]">
+              <select
+                value={selectedAuthor}
+                onChange={(e) => setSelectedAuthor(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/80 transition-colors"
+              >
+                <option value="all">Semua Author / Kader ({authorOptions.length})</option>
+                {authorOptions.map((author) => (
+                  <option key={author} value={author}>
+                    {author}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Date Range Inputs */}
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-300 focus:outline-none focus:border-cyan-500/80"
+                title="Tanggal Mulai"
+              />
+              <span className="text-slate-500 text-xs">-</span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-300 focus:outline-none focus:border-cyan-500/80"
+                title="Tanggal Akhir"
+              />
+            </div>
+
+            {(searchTerm || selectedFormId !== 'all' || selectedAuthor !== 'all' || startDate || endDate) && (
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-colors"
+              >
+                Reset Filter
               </button>
             )}
           </div>
-
-          {loading ? (
-            <div className="py-12 text-center text-white/30">Memindai data analitik dari database...</div>
-          ) : availableVisuals.length === 0 ? (
-            <div className="text-center py-12 text-white/40">Silakan pilih Group atau Formulir di atas untuk menampilkan grafik analisis.</div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-              {availableVisuals.map(vis => (
-                <button
-                  key={vis.id}
-                  onClick={() => handleVisualToggle(vis.id)}
-                  className={`p-3 rounded-xl border transition-all text-left ${selectedVisuals.includes(vis.id) ? 'bg-cyan-500/10 border-cyan-500/30' : 'bg-white/[0.02] border-white/[0.05]'}`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="text-sm text-white/90 font-medium truncate" title={vis.name}>{vis.name}</p>
-                      <p className="text-xs text-white/40 truncate">{vis.type} • <span className="text-cyan-400">{vis.formTitle}</span></p>
-                    </div>
-                    {selectedVisuals.includes(vis.id) && <Icon name="checkCircle" className="w-4 h-4 text-cyan-400 shrink-0" />}
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
         </div>
 
-        {/* Visualization Display */}
-        <div className="rounded-2xl bg-[#080812] border border-white/[0.05] p-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="font-display text-sm font-semibold text-white">Tampilan Grafik Analisis</h3>
-            <Button
-              variant="primary"
-              size="sm"
-              icon={isExporting ? 'loader' : 'printer'}
-              onClick={handleExportPDF}
-              disabled={selectedVisualData.length === 0 || isExporting}
-            >
-              {isExporting ? 'Mencetak...' : 'Cetak PDF'}
-            </Button>
+        {/* ============ VISUAL ANALYTICS SECTION 1: SCORE BREAKDOWN ============ */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 print-card">
+          {/* Segmentasi Predikat Status */}
+          <div className="lg:col-span-2 p-6 rounded-3xl bg-slate-900 border border-slate-800 shadow-xl space-y-5 print:border-slate-300 print:bg-white">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-extrabold text-white print:text-slate-900">Distribusi Kelompok Nilai Submisi</h3>
+                <p className="text-xs text-slate-400 print:text-slate-600">Persentase dan sebaran hasil evaluasi berdasarkan rentang nilai</p>
+              </div>
+              <span className="px-3 py-1 rounded-xl bg-cyan-950 border border-cyan-500/30 text-cyan-300 font-mono text-xs font-bold print:hidden">
+                {filteredData.length} Laporan
+              </span>
+            </div>
+
+            {/* Visual Bar Breakdown */}
+            <div className="space-y-4">
+              {/* MS (Memenuhi Syarat / Kategori Tinggi) */}
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-xs font-bold">
+                  <span className="text-emerald-400 print:text-emerald-800 flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
+                    Kategori Tinggi / Memenuhi Syarat (Skor 80 - 100%)
+                  </span>
+                  <span className="font-mono text-slate-200 print:text-slate-900">
+                    {scoreBreakdown.ms.count} Respon ({scoreBreakdown.ms.pct}%)
+                  </span>
+                </div>
+                <div className="w-full bg-slate-950 rounded-xl h-3.5 overflow-hidden border border-slate-800 print:border-slate-300 print:bg-slate-100">
+                  <div
+                    className="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-xl transition-all duration-500"
+                    style={{ width: `${scoreBreakdown.ms.pct}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Binaan Lanjutan / Kategori Sedang */}
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-xs font-bold">
+                  <span className="text-amber-400 print:text-amber-800 flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
+                    Kategori Sedang / Pendampingan Lanjutan (Skor 60 - 79%)
+                  </span>
+                  <span className="font-mono text-slate-200 print:text-slate-900">
+                    {scoreBreakdown.binaan.count} Respon ({scoreBreakdown.binaan.pct}%)
+                  </span>
+                </div>
+                <div className="w-full bg-slate-950 rounded-xl h-3.5 overflow-hidden border border-slate-800 print:border-slate-300 print:bg-slate-100">
+                  <div
+                    className="bg-gradient-to-r from-amber-500 to-yellow-400 h-full rounded-xl transition-all duration-500"
+                    style={{ width: `${scoreBreakdown.binaan.pct}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Perlu Perbaikan / Kategori Rendah */}
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-xs font-bold">
+                  <span className="text-rose-400 print:text-rose-800 flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-rose-400" />
+                    Kategori Perlu Perbaikan (Skor &lt; 60%)
+                  </span>
+                  <span className="font-mono text-slate-200 print:text-slate-900">
+                    {scoreBreakdown.kritis.count} Respon ({scoreBreakdown.kritis.pct}%)
+                  </span>
+                </div>
+                <div className="w-full bg-slate-950 rounded-xl h-3.5 overflow-hidden border border-slate-800 print:border-slate-300 print:bg-slate-100">
+                  <div
+                    className="bg-gradient-to-r from-rose-600 to-pink-500 h-full rounded-xl transition-all duration-500"
+                    style={{ width: `${scoreBreakdown.kritis.pct}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Audit Note */}
+            <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 text-xs text-slate-300 flex items-start gap-2.5 print:border-slate-300 print:bg-slate-50 print:text-slate-800">
+              <Icon name="shieldCheck" className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5 print:hidden" />
+              <p>
+                <strong>Catatan Evaluasi Data:</strong> Responden dengan hasil evaluasi pada kategori Perlu Perbaikan disarankan untuk mendapatkan pendampingan lebih lanjut guna meningkatkan pemahaman dan capaian nilai pada tahap berikutnya.
+              </p>
+            </div>
           </div>
 
-          {selectedVisualData.length === 0 ? (
-            <div className="text-center py-12 text-white/30">Pilih salah satu grafik di atas untuk melihat visualisasi detail.</div>
-          ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {selectedVisualData.map(vis => (
-                <div key={vis.id} className="h-full">
-                  {renderVisualization(vis)}
-                </div>
-              ))}
+          {/* Donut Score Summary Box */}
+          <div className="p-6 rounded-3xl bg-slate-900 border border-slate-800 shadow-xl flex flex-col justify-between space-y-4 print:border-slate-300 print:bg-white">
+            <div>
+              <h3 className="text-base font-extrabold text-white print:text-slate-900">Ringkasan Nilai Rata-Rata</h3>
+              <p className="text-xs text-slate-400 print:text-slate-600">Gambaran umum rerata nilai seluruh responden</p>
             </div>
-          )}
+
+            {/* Circular Gauge Center */}
+            <div className="relative flex items-center justify-center my-4">
+              <div className="w-36 h-36 rounded-full border-8 border-slate-950 bg-slate-950/60 flex flex-col items-center justify-center p-4 text-center shadow-inner print:border-slate-300 print:bg-white">
+                <span className="text-3xl font-black font-mono text-cyan-400 print:text-slate-900">{kpi.avgScore}%</span>
+                <span className="text-[10px] text-slate-400 print:text-slate-600 font-bold uppercase tracking-wider">Nilai Rata-Rata</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 text-center font-mono text-xs pt-2 border-t border-slate-800 print:border-slate-300">
+              <div className="p-2 rounded-xl bg-slate-950 border border-slate-800/80 print:bg-slate-100 print:border-slate-300">
+                <p className="text-emerald-400 print:text-emerald-700 font-bold">{scoreBreakdown.ms.count}</p>
+                <p className="text-[10px] text-slate-400 print:text-slate-600 font-sans">MS</p>
+              </div>
+              <div className="p-2 rounded-xl bg-slate-950 border border-slate-800/80 print:bg-slate-100 print:border-slate-300">
+                <p className="text-amber-400 print:text-amber-700 font-bold">{scoreBreakdown.binaan.count}</p>
+                <p className="text-[10px] text-slate-400 print:text-slate-600 font-sans">Sedang</p>
+              </div>
+              <div className="p-2 rounded-xl bg-slate-950 border border-slate-800/80 print:bg-slate-100 print:border-slate-300">
+                <p className="text-rose-400 print:text-rose-700 font-bold">{scoreBreakdown.kritis.count}</p>
+                <p className="text-[10px] text-slate-400 print:text-slate-600 font-sans">Perbaikan</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ============ VISUAL ANALYTICS SECTION 2: FORM PERFORMANCE TABLE ============ */}
+        <div className="p-6 rounded-3xl bg-slate-900 border border-slate-800 shadow-xl space-y-5 print-card print:border-slate-300 print:bg-white">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-base font-extrabold text-white print:text-slate-900">Analisis Performa per Formulir Evaluasi</h3>
+              <p className="text-xs text-slate-400 print:text-slate-600">Rincian nilai rata-rata dan persentase capaian per jenis kuesioner</p>
+            </div>
+            <span className="text-xs font-mono text-slate-400 print:text-slate-600">{formPerformance.length} Jenis Formulir</span>
+          </div>
+
+          <div className="overflow-x-auto custom-scrollbar">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-slate-800 text-[11px] font-bold text-slate-400 uppercase tracking-wider print:border-slate-900 print:text-slate-900">
+                  <th className="py-3 px-4">Nama Formulir Evaluasi</th>
+                  <th className="py-3 px-4 text-center">Jumlah Submisi</th>
+                  <th className="py-3 px-4 text-center">Nilai Rata-Rata</th>
+                  <th className="py-3 px-4 text-center">Persentase Capaian (≥ 80%)</th>
+                  <th className="py-3 px-4 text-right">Kategori Evaluasi</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/60 text-xs font-medium print:divide-slate-200">
+                {formPerformance.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-8 text-center text-slate-500">
+                      Tidak ada data formulir yang memenuhi kriteria filter.
+                    </td>
+                  </tr>
+                ) : (
+                  formPerformance.map((item) => (
+                    <tr key={item.formId} className="hover:bg-slate-800/30 transition-colors">
+                      <td className="py-3.5 px-4 font-extrabold text-slate-200 print:text-slate-900">{item.title}</td>
+                      <td className="py-3.5 px-4 text-center font-mono font-bold text-cyan-300 print:text-slate-900">{item.count} Laporan</td>
+                      <td className="py-3.5 px-4 text-center font-mono font-bold text-slate-100 print:text-slate-900">{item.avgScore}%</td>
+                      <td className="py-3.5 px-4 text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          <div className="w-20 bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-800 print:border-slate-300 print:bg-slate-100">
+                            <div className="bg-emerald-400 h-full rounded-full" style={{ width: `${item.msRate}%` }} />
+                          </div>
+                          <span className="font-mono font-bold text-emerald-400 print:text-emerald-700">{item.msRate}%</span>
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-4 text-right">
+                        <span
+                          className={`px-3 py-1 rounded-xl text-[11px] font-extrabold inline-block ${
+                            item.avgScore >= 80
+                              ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 print:text-emerald-800 print:bg-emerald-50 print:border-emerald-300'
+                              : item.avgScore >= 60
+                              ? 'bg-amber-500/10 text-amber-300 border border-amber-500/30 print:text-amber-800 print:bg-amber-50 print:border-amber-300'
+                              : 'bg-rose-500/10 text-rose-300 border border-rose-500/30 print:text-rose-800 print:bg-rose-50 print:border-rose-300'
+                          }`}
+                        >
+                          {item.avgScore >= 80 ? 'Memenuhi Syarat (≥ 80%)' : item.avgScore >= 60 ? 'Pendampingan Lanjutan' : 'Perlu Perbaikan'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* ============ VISUAL ANALYTICS SECTION 3: CADRE LEADERBOARD & ACTIVITY ============ */}
+        <div className="p-6 rounded-3xl bg-slate-900 border border-slate-800 shadow-xl space-y-5 print-card print:border-slate-300 print:bg-white">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-base font-extrabold text-white print:text-slate-900">Rekapitulasi Kontribusi Kader & Instansi</h3>
+              <p className="text-xs text-slate-400 print:text-slate-600">Akumulasi jumlah pengumpulan data kuesioner dan nilai rata-rata</p>
+            </div>
+            <span className="text-xs font-mono text-slate-400 print:text-slate-600">{cadreLeaderboard.length} Kontributor</span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {cadreLeaderboard.slice(0, 6).map((cadre, index) => (
+              <div
+                key={cadre.ownerName}
+                className="p-4 rounded-2xl bg-slate-950 border border-slate-800/80 space-y-3 shadow-md hover:border-slate-700 transition-all print:border-slate-300 print:bg-white"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div
+                      className={`w-8 h-8 rounded-xl font-mono text-xs font-black flex items-center justify-center shadow-md ${
+                        index === 0
+                          ? 'bg-amber-500 text-slate-950'
+                          : index === 1
+                          ? 'bg-slate-300 text-slate-950'
+                          : index === 2
+                          ? 'bg-amber-700 text-white'
+                          : 'bg-slate-800 text-slate-300 print:bg-slate-200 print:text-slate-800'
+                      }`}
+                    >
+                      #{index + 1}
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-extrabold text-slate-100 truncate max-w-[150px] print:text-slate-900" title={cadre.ownerName}>
+                        {cadre.ownerName}
+                      </h4>
+                      <p className="text-[10px] text-purple-300 print:text-purple-700 font-mono capitalize">{cadre.ownerType}</p>
+                    </div>
+                  </div>
+
+                  <span className="px-2.5 py-1 rounded-xl bg-cyan-950 border border-cyan-500/30 text-cyan-300 font-mono text-xs font-extrabold print:bg-slate-100 print:border-slate-300 print:text-slate-900">
+                    {cadre.count} Submisi
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between text-xs font-mono pt-2 border-t border-slate-800/80 print:border-slate-200">
+                  <span className="text-slate-400 print:text-slate-600">Nilai Rata-Rata:</span>
+                  <span className="font-extrabold text-emerald-400 print:text-emerald-700">{cadre.avgScore}%</span>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>
