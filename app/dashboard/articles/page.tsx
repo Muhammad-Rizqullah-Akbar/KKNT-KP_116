@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { Topbar } from '@/components/dashboard/Topbar'
 import { Icon } from '@/components/ui/Icons'
+import { useAuth } from '@/context/AuthContext'
 import { 
   getArticles, 
   createArticle, 
@@ -75,6 +76,7 @@ const galleryGradients = [
 
 // ============ KOMPONEN UTAMA ============
 export default function ArticlesAdminPage() {
+  const { user, userData } = useAuth()
   const [articles, setArticles] = useState<Article[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -102,6 +104,26 @@ export default function ArticlesAdminPage() {
   const [loadingMedia, setLoadingMedia] = useState(false)
   const [onSelectMediaCallback, setOnSelectMediaCallback] = useState<((url: string) => void) | null>(null)
 
+  // Smart Image Marker Picker State
+  interface DetectedMarker {
+    key: string
+    label: string
+    targetType: 'featured' | 'block' | 'gallery'
+    blockId?: string
+    galleryId?: string
+    file?: File | null
+    uploadedUrl?: string
+  }
+
+  // JSON Import & Tutorial Modal States
+  const [isJsonImportOpen, setIsJsonImportOpen] = useState(false)
+  const [isJsonTutorialOpen, setIsJsonTutorialOpen] = useState(false)
+  const [isImageMatcherOpen, setIsImageMatcherOpen] = useState(false)
+  const [detectedMarkers, setDetectedMarkers] = useState<DetectedMarker[]>([])
+  const [rawJsonText, setRawJsonText] = useState('')
+  const [jsonError, setJsonError] = useState<string | null>(null)
+  const [attachedLocalFiles, setAttachedLocalFiles] = useState<File[]>([])
+
   // Device Switcher State
   const [previewDevice, setPreviewDevice] = useState<'desktop' | 'tablet' | 'mobile'>('desktop')
 
@@ -118,6 +140,7 @@ export default function ArticlesAdminPage() {
     featuredImage: '',
     excerpt: '',
     tags: '',
+    embeddedDistributionCode: '',
     gallery: [] as GalleryImage[],
     blocks: [] as ContentBlock[],
   })
@@ -127,8 +150,9 @@ export default function ArticlesAdminPage() {
     setLoading(true)
     try {
       const data = await getArticles()
-      const formattedData = data.map((doc: any) => ({
+      let formattedData = data.map((doc: any) => ({
         id: doc.id,
+        authorUid: doc.authorUid || doc.authorId || doc.createdBy || '',
         title: doc.title || '',
         slug: doc.slug || '',
         author: doc.author || '',
@@ -144,6 +168,22 @@ export default function ArticlesAdminPage() {
         tags: Array.isArray(doc.tags) ? doc.tags : [],
         gallery: Array.isArray(doc.gallery) ? doc.gallery : [],
       }))
+
+      // Strictly filter to author's own articles if user has cadre role
+      if (userData?.role === 'cadre') {
+        const userUid = user?.uid
+        const userEmail = (user?.email || '').toLowerCase().trim()
+        const userDisplayName = (userData?.displayName || '').toLowerCase().trim()
+
+        formattedData = formattedData.filter((a: any) => {
+          if (a.authorUid && userUid && a.authorUid === userUid) return true
+          const authLower = String(a.author || '').toLowerCase().trim()
+          if (userEmail && authLower === userEmail) return true
+          if (userDisplayName && userDisplayName.length > 2 && authLower === userDisplayName) return true
+          return false
+        })
+      }
+
       setArticles(formattedData)
     } catch (error) {
       console.error('Gagal mengambil data artikel:', error)
@@ -152,7 +192,7 @@ export default function ArticlesAdminPage() {
     }
   }
 
-  useEffect(() => { fetchArticlesData() }, [])
+  useEffect(() => { fetchArticlesData() }, [user, userData])
 
   // MEDIA STORAGE HELPERS
   const fetchMediaLibrary = async () => {
@@ -264,16 +304,287 @@ export default function ArticlesAdminPage() {
     return { total, published, draft, views, categories }
   }, [articles])
 
+  const sampleJsonTemplate = useMemo(() => ({
+    title: 'Edukasi Keamanan Pangan & Tata Cara Evaluasi Mandiri',
+    category: 'Teknologi',
+    author: 'Dr. Ahmad Hidayat',
+    authorBio: 'Kader Utama BPOM Pendamping Lapangan',
+    readTime: 5,
+    excerpt: 'Panduan praktis bagi masyarakat dan kader dalam menjaga kebersihan serta higiene sanitasi pangan.',
+    tags: '#KeamananPangan, #EdukasiBPOM, #KaderSehat',
+    embeddedDistributionCode: 'KKPDR48',
+    featuredImage: 'https://images.unsplash.com/photo-1576867757603-05b134ebc379?auto=format&fit=crop&w=1200&q=80',
+    blocks: [
+      {
+        id: 'b1',
+        type: 'h2',
+        value: '1. Pentingnya Keamanan Pangan di Lingkungan Masyarakat'
+      },
+      {
+        id: 'b2',
+        type: 'p',
+        value: 'Pangan yang aman merupakan fondasi utama dalam menjaga kesehatan masyarakat. Penanganan yang buruk dapat memicu terjadinya penyakit akibat kontaminasi bakteri.'
+      },
+      {
+        id: 'b3',
+        type: 'quote',
+        value: 'Mencegah kontaminasi pangan jauh lebih efisien daripada mengobati dampak penyakit yang ditimbulkannya.',
+        quoteAuthor: 'Panduan Keamanan Pangan BPOM'
+      },
+      {
+        id: 'b4',
+        type: 'h2',
+        value: '2. Lima Kunci Keamanan Pangan yang Wajib Diterapkan'
+      },
+      {
+        id: 'b5',
+        type: 'p',
+        value: '1) Jagalah kebersihan. 2) Pisahkan bahan mentah dan matang. 3) Masaklah dengan benar. 4) Jaga pangan pada suhu aman. 5) Gunakan air dan bahan baku yang aman.'
+      }
+    ],
+    gallery: [
+      {
+        id: 'g1',
+        caption: 'Kegiatan Pendampingan Kader di Lapangan',
+        url: 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=800&q=80'
+      }
+    ]
+  }), [])
+
+  const autoUploadBase64ToStorage = async (urlStr: string, namePrefix: string): Promise<string> => {
+    if (!urlStr || !urlStr.startsWith('data:image')) return urlStr
+    try {
+      const storageRef = ref(storage, `articles/${Date.now()}_${namePrefix}.png`)
+      const res = await fetch(urlStr)
+      const blob = await res.blob()
+      const snapshot = await uploadBytes(storageRef, blob)
+      return await getDownloadURL(snapshot.ref)
+    } catch (err) {
+      console.warn('Auto upload base64 failed:', err)
+      return urlStr
+    }
+  }
+
+  const handleImportJson = async (jsonString: string, attachedImages?: File[]) => {
+    setJsonError(null)
+    try {
+      const parsed = JSON.parse(jsonString)
+      if (!parsed.title || typeof parsed.title !== 'string') {
+        throw new Error('Properti "title" wajib ada dan berupa string.')
+      }
+
+      // Process batch local image files if uploaded alongside JSON
+      const uploadedAttachedUrls: string[] = []
+      const filesToProcess = attachedImages || attachedLocalFiles
+      if (filesToProcess && filesToProcess.length > 0) {
+        for (let i = 0; i < filesToProcess.length; i++) {
+          const file = filesToProcess[i]
+          try {
+            const storageRef = ref(storage, `articles/${Date.now()}_${file.name}`)
+            const snapshot = await uploadBytes(storageRef, file)
+            const downloadUrl = await getDownloadURL(snapshot.ref)
+            uploadedAttachedUrls.push(downloadUrl)
+          } catch (e) {
+            console.warn('Batch image upload failed:', e)
+          }
+        }
+      }
+
+      let featuredImage = parsed.featuredImage || ''
+      if (featuredImage.startsWith('data:image')) {
+        featuredImage = await autoUploadBase64ToStorage(featuredImage, 'featured')
+      } else if (!featuredImage && uploadedAttachedUrls.length > 0) {
+        featuredImage = uploadedAttachedUrls.shift() || ''
+      }
+
+      const blocks: ContentBlock[] = []
+      if (Array.isArray(parsed.blocks)) {
+        for (let idx = 0; idx < parsed.blocks.length; idx++) {
+          const b = parsed.blocks[idx]
+          let imageUrl = b.imageUrl || ''
+          if (imageUrl.startsWith('data:image')) {
+            imageUrl = await autoUploadBase64ToStorage(imageUrl, `block_${idx}`)
+          }
+          blocks.push({
+            id: b.id || `b_${Date.now()}_${idx}`,
+            type: ['p', 'h2', 'quote', 'list', 'image'].includes(b.type) ? b.type : 'p',
+            value: b.value || '',
+            quoteAuthor: b.quoteAuthor || '',
+            imageUrl,
+            imageCaption: b.imageCaption || '',
+          })
+        }
+      } else {
+        blocks.push(
+          { id: 'b1', type: 'h2', value: '1. Pendahuluan' },
+          { id: 'b2', type: 'p', value: parsed.content || 'Isi artikel...' }
+        )
+      }
+
+      const gallery: GalleryImage[] = []
+      if (Array.isArray(parsed.gallery)) {
+        for (let idx = 0; idx < parsed.gallery.length; idx++) {
+          const g = parsed.gallery[idx]
+          let url = g.url || ''
+          if (url.startsWith('data:image')) {
+            url = await autoUploadBase64ToStorage(url, `gallery_${idx}`)
+          }
+          gallery.push({
+            id: g.id || `g_${Date.now()}_${idx}`,
+            url,
+            caption: g.caption || 'Foto dokumentasi',
+            gradient: galleryGradients[idx % galleryGradients.length],
+          })
+        }
+      }
+
+      // Attach any remaining uploaded batch images to gallery slots
+      if (uploadedAttachedUrls.length > 0) {
+        uploadedAttachedUrls.forEach((imgUrl, idx) => {
+          if (!featuredImage) {
+            featuredImage = imgUrl
+          } else {
+            gallery.push({
+              id: `g_batch_${Date.now()}_${idx}`,
+              url: imgUrl,
+              caption: `Dokumentasi Foto ${gallery.length + 1}`,
+              gradient: galleryGradients[gallery.length % galleryGradients.length],
+            })
+          }
+        })
+      }
+
+      // Scan for MARK:xxx tags in JSON
+      const foundMarkers: DetectedMarker[] = []
+
+      if (featuredImage && (featuredImage.startsWith('MARK:') || featuredImage === 'MARK')) {
+        foundMarkers.push({
+          key: featuredImage,
+          label: `Foto Utama Banner (${featuredImage})`,
+          targetType: 'featured',
+        })
+      }
+
+      blocks.forEach((b, idx) => {
+        if (b.imageUrl && (b.imageUrl.startsWith('MARK:') || b.imageUrl === 'MARK')) {
+          foundMarkers.push({
+            key: b.imageUrl,
+            label: `Gambar/Infografis Blok #${idx + 1} (${b.imageCaption || b.imageUrl})`,
+            targetType: 'block',
+            blockId: b.id,
+          })
+        }
+      })
+
+      gallery.forEach((g, idx) => {
+        if (g.url && (g.url.startsWith('MARK:') || g.url === 'MARK')) {
+          foundMarkers.push({
+            key: g.url,
+            label: `Foto Galeri Dokumentasi #${idx + 1} (${g.caption || g.url})`,
+            targetType: 'gallery',
+            galleryId: g.id,
+          })
+        }
+      })
+
+      setFormData({
+        title: parsed.title,
+        category: parsed.category || 'Teknologi',
+        author: parsed.author || userData?.displayName || user?.email || 'Penulis KKPD-KP',
+        authorBio: parsed.authorBio || 'BPOM / Cadre Edukator',
+        status: parsed.status === 'Published' ? 'Published' : 'Draft',
+        readTime: Number(parsed.readTime) || 5,
+        featuredImage,
+        excerpt: parsed.excerpt || '',
+        tags: Array.isArray(parsed.tags) ? parsed.tags.join(', ') : parsed.tags || '',
+        embeddedDistributionCode: (parsed.embeddedDistributionCode || '').trim().toUpperCase(),
+        gallery,
+        blocks,
+      })
+
+      setIsEditing(false)
+      setSelectedArticle(null)
+      setAttachedLocalFiles([])
+      setIsJsonImportOpen(false)
+
+      if (foundMarkers.length > 0) {
+        setDetectedMarkers(foundMarkers)
+        setIsImageMatcherOpen(true)
+      } else {
+        setIsPreviewOpen(true)
+      }
+    } catch (err: any) {
+      setJsonError(err.message || 'Sintaks JSON tidak valid. Periksa format titik koma dan tanda kutip.')
+    }
+  }
+
+  const handleApplyMatchedImages = async () => {
+    setLoading(true)
+    try {
+      let updatedFeatured = formData.featuredImage
+      let updatedBlocks = [...formData.blocks]
+      let updatedGallery = [...formData.gallery]
+
+      for (const marker of detectedMarkers) {
+        let finalUrl = marker.uploadedUrl || ''
+
+        if (marker.file) {
+          try {
+            const storageRef = ref(storage, `articles/${Date.now()}_${marker.file.name}`)
+            const snapshot = await uploadBytes(storageRef, marker.file)
+            finalUrl = await getDownloadURL(snapshot.ref)
+          } catch (e) {
+            console.warn('Failed to upload marker file:', e)
+          }
+        }
+
+        if (finalUrl) {
+          if (marker.targetType === 'featured') {
+            updatedFeatured = finalUrl
+          } else if (marker.targetType === 'block' && marker.blockId) {
+            updatedBlocks = updatedBlocks.map((b) => (b.id === marker.blockId ? { ...b, imageUrl: finalUrl } : b))
+          } else if (marker.targetType === 'gallery' && marker.galleryId) {
+            updatedGallery = updatedGallery.map((g) => (g.id === marker.galleryId ? { ...g, url: finalUrl } : g))
+          }
+        }
+      }
+
+      setFormData((prev) => ({
+        ...prev,
+        featuredImage: updatedFeatured,
+        blocks: updatedBlocks,
+        gallery: updatedGallery,
+      }))
+
+      setIsImageMatcherOpen(false)
+      setIsPreviewOpen(true)
+    } catch (err) {
+      console.error('Error applying matched images:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const downloadJsonTemplate = () => {
+    const blob = new Blob([JSON.stringify(sampleJsonTemplate, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'template_artikel_edukasi.json'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   // CRUD HANDLERS
   const handleCreate = () => {
     setIsEditing(false)
     setSelectedArticle(null)
     setFormData({
-      title: 'Judul Artikel Baru', category: 'Teknologi', author: 'Dr. Aria Nugraha', authorBio: 'Chief Technology Officer di Aether Global Labs', status: 'Draft',
-      readTime: 5, featuredImage: '', excerpt: 'Tuliskan ringkasan singkat artikel di sini...', tags: '#AI, #Teknologi', gallery: [],
+      title: 'Judul Artikel Edukasi Baru', category: 'Teknologi', author: userData?.displayName || user?.email || 'Kader Edukator', authorBio: userData?.organization || 'Kader Edukator BPOM', status: 'Draft',
+      readTime: 5, featuredImage: '', excerpt: 'Tuliskan ringkasan singkat artikel edukasi di sini...', tags: '#Pangan, #Edukasi', embeddedDistributionCode: '', gallery: [],
       blocks: [
-        { id: 'b1', type: 'h2', value: '1. Pendahuluan' },
-        { id: 'b2', type: 'p', value: 'Tulis paragraf pertama artikel Anda secara langsung di sini...' }
+        { id: 'b1', type: 'h2', value: '1. Pendahuluan Keamanan Pangan' },
+        { id: 'b2', type: 'p', value: 'Tulis paragraf awal artikel edukasi Anda secara langsung di sini...' }
       ]
     })
     setIsModalOpen(true)
@@ -292,6 +603,7 @@ export default function ArticlesAdminPage() {
       featuredImage: article.featuredImage || '',
       excerpt: article.excerpt || '',
       tags: article.tags ? article.tags.join(', ') : '',
+      embeddedDistributionCode: (article as any).embeddedDistributionCode || '',
       gallery: article.gallery || [],
       blocks: htmlToBlocks(article.content),
     })
@@ -310,14 +622,18 @@ export default function ArticlesAdminPage() {
         title: formData.title,
         slug: formData.title.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
         category: formData.category,
-        author: formData.author,
-        authorBio: formData.authorBio,
+        author: formData.author || userData?.displayName || user?.email || 'Penulis KKPD-KP',
+        authorBio: formData.authorBio || userData?.organization || 'BPOM / Cadre Edukator',
+        authorUid: user?.uid || '',
+        authorRole: userData?.role || 'public',
+        authorOrganization: userData?.organization || userData?.partnershipName || '',
         status: finalStatus,
         readTime: formData.readTime,
         featuredImage: formData.featuredImage,
         excerpt: formData.excerpt,
         content: compiledContent,
         tags: formData.tags.split(',').map(t => t.trim()).filter(t => t),
+        embeddedDistributionCode: formData.embeddedDistributionCode?.trim() || '',
         gallery: formData.gallery,
         date: new Date().toISOString().split('T')[0],
       }
@@ -513,9 +829,29 @@ export default function ArticlesAdminPage() {
               {statusOptions.map(opt => <option key={opt} value={opt} className="bg-[#080812]">{opt}</option>)}
             </select>
           </div>
-          <button onClick={handleCreate} className="px-5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-sm font-medium text-white shadow-lg flex items-center gap-2">
-            <Icon name="plus" className="w-4 h-4" /> Buat Artikel Baru
-          </button>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => setIsJsonImportOpen(true)}
+              className="px-4 py-2.5 rounded-xl bg-purple-950/60 border border-purple-500/30 hover:bg-purple-900/60 text-purple-300 text-sm font-semibold flex items-center gap-2 transition-all shadow-md"
+              title="Import Artikel dari File / String JSON"
+            >
+              <Icon name="upload" className="w-4 h-4 text-purple-400" />
+              <span>Import JSON</span>
+            </button>
+
+            <button
+              onClick={() => setIsJsonTutorialOpen(true)}
+              className="px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 text-sm font-semibold flex items-center gap-2 transition-all"
+              title="Petunjuk & Format Struktur JSON Artikel"
+            >
+              <Icon name="info" className="w-4 h-4 text-cyan-400" />
+              <span>Tutorial JSON</span>
+            </button>
+
+            <button onClick={handleCreate} className="px-5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-sm font-semibold text-white shadow-lg flex items-center gap-2 transition-all">
+              <Icon name="plus" className="w-4 h-4" /> Buat Artikel Baru
+            </button>
+          </div>
         </div>
 
         {/* TABEL DATA */}
@@ -654,11 +990,38 @@ export default function ArticlesAdminPage() {
                 <label className="text-xs text-white/50 uppercase tracking-wider">Subtitle / Ringkasan Singkat</label>
                 <textarea value={formData.excerpt} onChange={e => setFormData({...formData, excerpt: e.target.value})} rows={2} placeholder="Tulis ringkasan..." className="w-full px-4 py-3 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white focus:outline-none resize-none" />
               </div>
+
+              <div className="space-y-2 p-4 rounded-2xl bg-cyan-950/20 border border-cyan-500/30">
+                <label className="text-xs text-cyan-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                  <Icon name="key" className="w-3.5 h-3.5 text-cyan-400" />
+                  Sematkan Kode Distribusi Kuesioner (Opsional)
+                </label>
+                <input
+                  type="text"
+                  value={formData.embeddedDistributionCode}
+                  onChange={(e) => setFormData({ ...formData, embeddedDistributionCode: e.target.value.toUpperCase() })}
+                  placeholder="Contoh: KKPDQ6M atau DIST-KADER-01"
+                  className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-cyan-500/30 text-cyan-300 font-mono focus:outline-none focus:border-cyan-400 text-sm"
+                />
+                <p className="text-[11px] text-white/40 font-sans">
+                  Pembaca artikel akan secara otomatis disajikan tombol khusus untuk mengisi kuesioner resmi melalui Kode Distribusi milik Anda.
+                </p>
+              </div>
             </div>
 
             <div className="flex items-center justify-between px-6 py-4 border-t border-white/[0.06]">
               <button onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 rounded-xl text-sm text-white/50 hover:bg-white/[0.03]">Batal</button>
-              <div className="flex gap-3">
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => { setIsModalOpen(false); setIsPreviewOpen(true); }}
+                  className="px-4 py-2.5 rounded-xl bg-purple-950/60 border border-purple-500/40 text-purple-300 text-xs font-bold flex items-center gap-2 hover:bg-purple-900/60 transition-all"
+                  title="Tampilkan Pratinjau Kanvas Editor Visual Layar Penuh"
+                >
+                  <Icon name="eye" className="w-4 h-4 text-purple-400" />
+                  <span>Pratinjau Kanvas Publik</span>
+                </button>
+
                 <button onClick={() => { handleSave('Draft') }} className="px-5 py-2.5 rounded-xl bg-white/[0.03] text-sm text-white/70 hover:text-white flex items-center gap-2"><Icon name="save" className="w-4 h-4" /> Simpan Draft</button>
                 <button onClick={() => { handleSave('Published') }} className="px-5 py-2.5 rounded-xl bg-cyan-600 text-sm font-medium text-white flex items-center gap-2"><Icon name="send" className="w-4 h-4" /> Publish</button>
               </div>
@@ -727,9 +1090,31 @@ export default function ArticlesAdminPage() {
                 <button onClick={() => addBlock('quote')} className="px-2 py-1 rounded bg-violet-500/10 text-[11px] text-violet-400 hover:bg-violet-500/20">+ Quote</button>
                 <button onClick={() => addBlock('image')} className="px-2 py-1 rounded bg-amber-500/10 text-[11px] text-amber-400 hover:bg-amber-500/20">+ Infografis</button>
               </div>
+
+              {/* Sematkan Kode Distribusi Input in Control Bar */}
+              <div className="hidden lg:flex items-center gap-2 border-l border-white/10 pl-3">
+                <span className="text-[10px] font-mono text-cyan-400 font-bold uppercase">Sematkan Kode:</span>
+                <input
+                  type="text"
+                  value={formData.embeddedDistributionCode}
+                  onChange={(e) => setFormData({ ...formData, embeddedDistributionCode: e.target.value.toUpperCase() })}
+                  placeholder="Kode (mis: KKPDQ6M)"
+                  className="px-2.5 py-1 rounded-lg bg-slate-950 border border-cyan-500/30 text-cyan-300 text-xs font-mono focus:outline-none focus:border-cyan-400 w-36"
+                />
+              </div>
             </div>
 
             <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => { setIsPreviewOpen(false); setIsModalOpen(true); }}
+                className="px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 hover:bg-slate-800 text-slate-300 text-xs font-semibold flex items-center gap-1.5 transition-all"
+                title="Buka Form Standard"
+              >
+                <Icon name="pencil" className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Form Edit</span>
+              </button>
+
               <button onClick={() => handleSave()} className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-xs font-medium text-white flex items-center gap-1.5 shadow-lg">
                 <Icon name="send" className="w-3.5 h-3.5" /> Simpan & Publish
               </button>
@@ -855,6 +1240,28 @@ export default function ArticlesAdminPage() {
                       </div>
                     ))}
 
+                    {/* EMBEDDED KUESIONER / FORM CTA BANNER LIVE PREVIEW */}
+                    {formData.embeddedDistributionCode && (
+                      <div className="my-8 p-6 rounded-3xl bg-gradient-to-br from-cyan-950/80 via-slate-900 to-purple-950/80 border-2 border-cyan-500/40 shadow-2xl space-y-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-2xl bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center text-cyan-400 flex-shrink-0">
+                            <Icon name="fileText" className="w-5 h-5 text-cyan-400" />
+                          </div>
+                          <div>
+                            <h4 className="text-base font-extrabold text-white">Formulir & Kuesioner Evaluasi Resmi</h4>
+                            <p className="text-xs text-cyan-300 font-mono">Kode Akses Distribusi: <strong>{formData.embeddedDistributionCode}</strong></p>
+                          </div>
+                        </div>
+                        <p className="text-xs text-white/70 leading-relaxed">
+                          Bantu kami mengumpulkan data evaluasi pangan secara langsung dengan mengklik tombol di bawah ini untuk mengisi kuesioner resmi.
+                        </p>
+                        <div className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-gradient-to-r from-cyan-500 to-emerald-500 text-slate-950 text-xs font-black uppercase tracking-wider shadow-lg shadow-cyan-500/25">
+                          <span>Isi Kuesioner Sekarang (Pratinjau Tautan Aktif)</span>
+                          <Icon name="arrowRight" className="w-4 h-4 text-slate-950" />
+                        </div>
+                      </div>
+                    )}
+
                     {/* GALERI DOKUMENTASI */}
                     <div className="mt-10 pt-6 border-t border-white/[0.06]">
                       <div className="flex items-center justify-between mb-4">
@@ -961,6 +1368,264 @@ export default function ArticlesAdminPage() {
             <div className="flex gap-3 justify-center">
               <button onClick={() => setIsDeleteModalOpen(false)} className="px-5 py-2.5 rounded-xl bg-white/[0.03] text-sm text-white/70">Batal</button>
               <button onClick={confirmDelete} className="px-5 py-2.5 rounded-xl bg-rose-600 text-sm font-medium text-white">Ya, Hapus</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============ 🖼️ SMART IMAGE MARKER MATCHER STEP MODAL ============ */}
+      {isImageMatcherOpen && (
+        <div className="fixed inset-0 z-[140] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md" onClick={() => setIsImageMatcherOpen(false)}>
+          <div className="relative w-full max-w-2xl bg-slate-950 border border-slate-800 rounded-3xl shadow-2xl p-6 space-y-5 max-h-[85vh] overflow-y-auto custom-scrollbar" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-2xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                  <Icon name="image" className="w-5 h-5 text-amber-400" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-white">Ditemukan Tag Gambar pada File JSON</h3>
+                  <p className="text-xs text-slate-400">Silakan unggah foto untuk setiap penanda (Mark) yang terdeteksi</p>
+                </div>
+              </div>
+              <button onClick={() => setIsImageMatcherOpen(false)} className="p-2 rounded-xl bg-slate-900 text-slate-400 hover:text-white">
+                <Icon name="x" className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Sistem mengidentifikasi <strong>{detectedMarkers.length} tag/penanda gambar</strong> pada file JSON artikel. Unggah file gambar lokal untuk tiap tag berikut:
+              </p>
+
+              <div className="space-y-3">
+                {detectedMarkers.map((marker, idx) => (
+                  <div key={marker.key || idx} className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-mono font-bold text-amber-400">
+                        Tag #{idx + 1}: {marker.label}
+                      </span>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-amber-500/10 text-amber-300 border border-amber-500/30 font-bold uppercase">
+                        {marker.targetType}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0]
+                          if (file) {
+                            setDetectedMarkers((prev) =>
+                              prev.map((m, i) => (i === idx ? { ...m, file } : m))
+                            )
+                          }
+                        }}
+                        className="w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-amber-950 file:text-amber-300 hover:file:bg-amber-900 border border-slate-800 rounded-xl p-1 bg-slate-950"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between border-t border-slate-800 pt-4">
+              <button onClick={() => { setIsImageMatcherOpen(false); setIsPreviewOpen(true); }} className="px-4 py-2 text-xs text-slate-400 hover:text-white">
+                Lewati (Gunakan Fallback)
+              </button>
+
+              <button
+                onClick={handleApplyMatchedImages}
+                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-emerald-500 hover:from-amber-400 hover:to-emerald-400 text-slate-950 text-xs font-black uppercase tracking-wider shadow-lg shadow-amber-500/20"
+              >
+                Terapkan Foto & Lanjut ke Preview →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============ 📥 JSON IMPORT MODAL ============ */}
+      {isJsonImportOpen && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md" onClick={() => setIsJsonImportOpen(false)}>
+          <div className="relative w-full max-w-2xl bg-slate-950 border border-slate-800 rounded-3xl shadow-2xl p-6 space-y-5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-2xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-400">
+                  <Icon name="upload" className="w-5 h-5 text-purple-400" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-white">Import Artikel Format JSON</h3>
+                  <p className="text-xs text-slate-400">Upload file .json atau tempelkan teks struktur JSON artikel</p>
+                </div>
+              </div>
+              <button onClick={() => setIsJsonImportOpen(false)} className="p-2 rounded-xl bg-slate-900 text-slate-400 hover:text-white">
+                <Icon name="x" className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Drop File or Paste */}
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs text-slate-400 font-bold uppercase mb-1.5 block">1. Pilih File .json dari Komputer</label>
+                <input
+                  type="file"
+                  accept=".json,application/json"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) {
+                      const reader = new FileReader()
+                      reader.onload = (evt) => {
+                        const content = evt.target?.result as string
+                        if (content) {
+                          setRawJsonText(content)
+                          handleImportJson(content)
+                        }
+                      }
+                      reader.readAsText(file)
+                    }
+                  }}
+                  className="w-full text-xs text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-purple-950 file:text-purple-300 hover:file:bg-purple-900 border border-slate-800 rounded-2xl p-2 bg-slate-900"
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs text-slate-400 font-bold uppercase">2. Atau Tempelkan Teks JSON</label>
+                  <button onClick={() => setIsJsonTutorialOpen(true)} className="text-[11px] text-cyan-400 hover:underline">
+                    Lihat Contoh Format JSON →
+                  </button>
+                </div>
+                <textarea
+                  rows={6}
+                  value={rawJsonText}
+                  onChange={(e) => setRawJsonText(e.target.value)}
+                  placeholder={`{\n  "title": "Judul Artikel",\n  "category": "Teknologi",\n  "embeddedDistributionCode": "KKPDQ6M",\n  "blocks": [...]\n}`}
+                  className="w-full p-4 rounded-2xl bg-slate-900 border border-slate-800 text-xs font-mono text-cyan-300 focus:outline-none focus:border-purple-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-emerald-400 font-bold uppercase mb-1.5 flex items-center gap-1.5">
+                  <Icon name="image" className="w-3.5 h-3.5 text-emerald-400" />
+                  3. (Solusi Foto Lokal) Lampirkan Gambar (.jpg / .png) untuk Diunggah Otomatis ke Storage
+                </label>
+                <input
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  onChange={(e) => {
+                    if (e.target.files) {
+                      setAttachedLocalFiles(Array.from(e.target.files))
+                    }
+                  }}
+                  className="w-full text-xs text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-emerald-950 file:text-emerald-300 hover:file:bg-emerald-900 border border-slate-800 rounded-2xl p-2 bg-slate-900"
+                />
+                {attachedLocalFiles.length > 0 && (
+                  <p className="text-[11px] text-emerald-300 font-mono mt-1">
+                    ✓ {attachedLocalFiles.length} foto lokal siap diunggah otomatis ke Firebase Storage saat impor.
+                  </p>
+                )}
+              </div>
+
+              {jsonError && (
+                <div className="p-3.5 rounded-xl bg-rose-950/60 border border-rose-500/40 text-xs text-rose-200 font-mono">
+                  ❌ {jsonError}
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-3 border-t border-slate-800 pt-4">
+              <button onClick={() => setIsJsonImportOpen(false)} className="px-4 py-2 rounded-xl text-xs text-slate-400 hover:text-white">
+                Batal
+              </button>
+              <button
+                onClick={() => handleImportJson(rawJsonText)}
+                disabled={!rawJsonText.trim()}
+                className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white text-xs font-extrabold shadow-lg shadow-purple-600/20"
+              >
+                Import Sekarang
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============ 💡 JSON TUTORIAL & TEMPLATE MODAL ============ */}
+      {isJsonTutorialOpen && (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md" onClick={() => setIsJsonTutorialOpen(false)}>
+          <div className="relative w-full max-w-3xl bg-slate-950 border border-slate-800 rounded-3xl shadow-2xl p-6 space-y-5 max-h-[85vh] overflow-y-auto custom-scrollbar" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-2xl bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
+                  <Icon name="info" className="w-5 h-5 text-cyan-400" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-white">Tutorial & Struktur Format JSON Artikel</h3>
+                  <p className="text-xs text-slate-400">Panduan mudah membuat dan mengimpor materi edukasi berbasis JSON</p>
+                </div>
+              </div>
+              <button onClick={() => setIsJsonTutorialOpen(false)} className="p-2 rounded-xl bg-slate-900 text-slate-400 hover:text-white">
+                <Icon name="x" className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Content Tutorial Steps */}
+            <div className="space-y-5 text-xs text-slate-300 font-sans">
+              <div className="p-4 rounded-2xl bg-cyan-950/30 border border-cyan-500/30 space-y-2">
+                <h4 className="font-extrabold text-cyan-300 text-sm">💡 Cara Kerja Import JSON Artikel</h4>
+                <p className="text-slate-300 leading-relaxed">
+                  Fitur ini memungkinkan Anda atau Kader mengimpor materi artikel edukasi secara otomatis dalam sekali klik tanpa perlu mengetik ulang dari awal. Format JSON akan secara otomatis disusun secara elegan di kanvas editor visual publik.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <h4 className="font-extrabold text-white text-xs uppercase tracking-wider">Struktur Skema JSON Resmi:</h4>
+                <div className="relative rounded-2xl bg-slate-900 border border-slate-800 p-4 font-mono text-[11px] text-cyan-300 overflow-x-auto">
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(JSON.stringify(sampleJsonTemplate, null, 2))
+                      alert('Format skema JSON berhasil disalin ke clipboard!')
+                    }}
+                    className="absolute top-3 right-3 px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-[10px] font-sans font-bold border border-slate-700"
+                  >
+                    📋 Salin JSON
+                  </button>
+                  <pre>{JSON.stringify(sampleJsonTemplate, null, 2)}</pre>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 space-y-1">
+                  <span className="font-mono text-cyan-400 font-bold">embeddedDistributionCode</span>
+                  <p className="text-[11px] text-slate-400">Kode Akses Distribusi Kader (misal: <code className="text-cyan-300">KKPDQ6M</code>). Otomatis membuat tombol kuesioner interaktif.</p>
+                </div>
+                <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 space-y-1">
+                  <span className="font-mono text-purple-400 font-bold">blocks (Tipe Elemen)</span>
+                  <p className="text-[11px] text-slate-400">Dukungan jenis elemen: <code className="text-purple-300 font-bold">"h2"</code> (Sub-Judul), <code className="text-purple-300 font-bold">"p"</code> (Paragraf), <code className="text-purple-300 font-bold">"quote"</code>, <code className="text-purple-300 font-bold">"image"</code>.</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between border-t border-slate-800 pt-4">
+              <button
+                onClick={downloadJsonTemplate}
+                className="px-4 py-2.5 rounded-xl bg-emerald-600/30 hover:bg-emerald-600/50 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center gap-2 transition-all"
+              >
+                <Icon name="download" className="w-4 h-4 text-emerald-400" />
+                <span>Download File Template (.json)</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setIsJsonTutorialOpen(false)
+                  setRawJsonText(JSON.stringify(sampleJsonTemplate, null, 2))
+                  setIsJsonImportOpen(true)
+                }}
+                className="px-5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-extrabold shadow-lg shadow-cyan-600/20"
+              >
+                Gunakan Template Ini →
+              </button>
             </div>
           </div>
         </div>
