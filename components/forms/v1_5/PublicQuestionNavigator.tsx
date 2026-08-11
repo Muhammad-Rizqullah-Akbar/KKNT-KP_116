@@ -12,6 +12,7 @@ interface PublicQuestionNavigatorProps {
   onSelectQuestionIndex: (index: number) => void
   isMobileDrawer?: boolean
   onCloseMobileDrawer?: () => void
+  hasAttemptedSubmit?: boolean
 }
 
 export function PublicQuestionNavigator({
@@ -22,6 +23,7 @@ export function PublicQuestionNavigator({
   onSelectQuestionIndex,
   isMobileDrawer,
   onCloseMobileDrawer,
+  hasAttemptedSubmit,
 }: PublicQuestionNavigatorProps) {
   // Map questions grouped by aspect
   const questionsByAspect = React.useMemo(() => {
@@ -32,17 +34,23 @@ export function PublicQuestionNavigator({
     })
 
     questions.forEach((q, idx) => {
-      const aspId = (q as any).aspectId || aspects[0]?.aspectId || 'default'
+      const aspId = (q as any).aspectId || (q as any).stageId || (q as any).stage_id || (q as any).aspect || (q as any).category || aspects[0]?.aspectId || 'default'
       if (!map.has(aspId)) {
+        const matched = aspects.find((a) => a.aspectId === aspId)
         map.set(aspId, {
-          aspect: { aspectId: aspId, title: 'Aspek Penilaian', description: '' },
+          aspect: matched || { aspectId: aspId, title: (q as any).aspectTitle || (aspId === 'default' ? 'Aspek Penilaian' : `Aspek ${aspId}`), description: '' },
           items: [],
         })
       }
       map.get(aspId)!.items.push({ question: q, globalIndex: idx })
     })
 
-    return Array.from(map.values()).filter((group) => group.items.length > 0)
+    const groups = Array.from(map.values()).filter((group) => group.items.length > 0)
+    groups.forEach((group) => {
+      group.items.sort((a, b) => a.globalIndex - b.globalIndex)
+    })
+    groups.sort((a, b) => (a.items[0]?.globalIndex ?? 0) - (b.items[0]?.globalIndex ?? 0))
+    return groups
   }, [aspects, questions])
 
   const isQuestionAnswered = (q: PublicQuestion) => {
@@ -51,9 +59,9 @@ export function PublicQuestionNavigator({
 
     const type = q.answerType || (q as any).type
     if (type === 'indicator-table' || type === 'likert') {
-      const indicators = q.config?.indicators || []
+      const indicators = q.presentation?.indicators || (q as any).indicators || (q as any).config?.indicators || []
       if (indicators.length === 0) return true
-      return typeof val === 'object' && indicators.every((ind: any) => val[ind.indicatorId || ind.id || ind] !== undefined)
+      return typeof val === 'object' && indicators.every((ind: any) => val[ind.indicatorId || ind.id || ind] !== undefined && val[ind.indicatorId || ind.id || ind] !== null && val[ind.indicatorId || ind.id || ind] !== '')
     }
 
     if (type === 'multiple-choice') {
@@ -86,6 +94,7 @@ export function PublicQuestionNavigator({
               {items.map(({ globalIndex, question }) => {
                 const isCurrent = globalIndex === currentQuestionIndex
                 const isAnswered = isQuestionAnswered(question)
+                const isUnansweredAlert = hasAttemptedSubmit && !isAnswered
                 const numStr = String(globalIndex + 1).padStart(2, '0')
 
                 return (
@@ -99,15 +108,20 @@ export function PublicQuestionNavigator({
                     className={`h-9 rounded-xl font-mono text-xs font-bold transition-all flex items-center justify-center relative ${
                       isCurrent
                         ? 'bg-cyan-500 text-slate-950 ring-2 ring-cyan-400 ring-offset-2 ring-offset-slate-950 scale-105 z-10 shadow-md shadow-cyan-500/20'
+                        : isUnansweredAlert
+                        ? 'bg-rose-950/90 text-rose-300 border border-rose-500 ring-2 ring-rose-500/50 animate-pulse shadow-md shadow-rose-500/20'
                         : isAnswered
                         ? 'bg-emerald-950/60 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-900/60'
                         : 'bg-slate-900 text-slate-400 border border-slate-800 hover:bg-slate-800 hover:text-slate-200'
                     }`}
-                    title={`Soal ${numStr}`}
+                    title={`Soal ${numStr} ${isAnswered ? '(Terisi)' : '(Belum Terisi)'}`}
                   >
                     <span>{numStr}</span>
                     {isAnswered && !isCurrent && (
                       <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-400 border border-slate-950" />
+                    )}
+                    {isUnansweredAlert && !isCurrent && (
+                      <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-rose-500 border border-slate-950 animate-ping" />
                     )}
                   </button>
                 )

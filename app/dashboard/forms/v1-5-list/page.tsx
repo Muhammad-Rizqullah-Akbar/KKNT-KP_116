@@ -9,6 +9,7 @@ import { FormVersionHistoryModal } from '@/components/forms/v1_5/FormVersionHist
 import { FormPreviewModal } from '@/components/forms/v1_5/FormPreviewModal'
 import type { FormAggregateDoc } from '@/lib/firebase/repositories/v1_5/v1_5Forms.repo'
 import { useAuth } from '@/context/AuthContext'
+import { safeFetchJson } from '@/lib/shared/safeFetch'
 
 export default function V15FormsDashboardPage() {
   const router = useRouter()
@@ -48,27 +49,26 @@ export default function V15FormsDashboardPage() {
     setTimeout(() => setToastMessage(null), 3500)
   }
 
-  // Load V1.5 Aggregate Forms List from API
+  // Cost Control & Pagination States
+  const [lastFetchedAt, setLastFetchedAt] = useState<string | null>(null)
+  const [pageSize, setPageSize] = useState<number>(10)
+  const [currentPage, setCurrentPage] = useState<number>(1)
+
+  // Load V1.5 Aggregate Forms List from API (Single Fetch to Minimize Read Costs)
   const fetchForms = async () => {
     setIsLoading(true)
     setError(null)
     try {
-      const queryParams = new URLSearchParams()
-      if (statusFilter !== 'all') queryParams.set('status', statusFilter)
-      if (categoryFilter !== 'all') queryParams.set('category', categoryFilter)
-      if (searchTerm) queryParams.set('search', searchTerm)
+      const { ok, data, error: fetchErr } = await safeFetchJson('/api/v1_5/forms')
 
-      const res = await fetch(`/api/v1_5/forms?${queryParams.toString()}`)
-      const data = await res.json()
-
-      if (data.success && Array.isArray(data.forms)) {
-        // STRICT V1.5 FILTER: Ensure only native V1.5 aggregate documents with valid formId are shown
+      if (ok && data && Array.isArray(data.forms)) {
         const v15Forms = data.forms.filter(
-          (f: any) => Boolean(f?.formId) && (Boolean(f?.activeVersionId) || Boolean(f?.aspects))
+          (f: any) => Boolean(f?.formId) && (Boolean(f?.activeVersionId) || Boolean(f?.aspects) || Boolean(f?.metadata))
         )
         setForms(v15Forms)
+        setLastFetchedAt(new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }))
       } else {
-        setError(data.message || 'Gagal memuat daftar formulir V1.5.')
+        setError(fetchErr || 'Gagal memuat daftar formulir V1.5.')
       }
     } catch (err: any) {
       setError(err.message || 'Gagal terhubung ke server.')
@@ -79,18 +79,38 @@ export default function V15FormsDashboardPage() {
 
   useEffect(() => {
     fetchForms()
-  }, [statusFilter, categoryFilter])
+  }, [])
 
-  // Filtered List Client-Side Search Backup
+  // Flexible Client-Side Filter & Search (ZERO Read Cost on Filter Switch)
   const filteredForms = useMemo(() => {
     return forms.filter((f) => {
-      const term = searchTerm.toLowerCase()
-      const titleMatch = (f.metadata?.title || '').toLowerCase().includes(term)
-      const codeMatch = (f.formId || '').toLowerCase().includes(term)
-      const catMatch = (f.metadata?.category || '').toLowerCase().includes(term)
-      return titleMatch || codeMatch || catMatch
+      // 1. Status Filter
+      if (statusFilter !== 'all' && f.status !== statusFilter) return false
+
+      // 2. Category Filter
+      if (categoryFilter !== 'all' && (f.metadata?.category || '').toLowerCase() !== categoryFilter.toLowerCase()) return false
+
+      // 3. Search Term Match
+      if (searchTerm.trim()) {
+        const term = searchTerm.toLowerCase().trim()
+        const titleMatch = (f.metadata?.title || '').toLowerCase().includes(term)
+        const codeMatch = (f.formId || '').toLowerCase().includes(term)
+        const catMatch = (f.metadata?.category || '').toLowerCase().includes(term)
+        const descMatch = (f.metadata?.description || '').toLowerCase().includes(term)
+        if (!titleMatch && !codeMatch && !catMatch && !descMatch) return false
+      }
+
+      return true
     })
-  }, [forms, searchTerm])
+  }, [forms, statusFilter, categoryFilter, searchTerm])
+
+  // Paginated Forms Subset
+  const paginatedForms = useMemo(() => {
+    const start = (currentPage - 1) * pageSize
+    return filteredForms.slice(start, start + pageSize)
+  }, [filteredForms, currentPage, pageSize])
+
+  const totalPages = Math.ceil(filteredForms.length / pageSize) || 1
 
   // Stats
   const stats = useMemo(() => {
@@ -186,6 +206,55 @@ export default function V15FormsDashboardPage() {
     showToast(`Form ID "${id}" disalin ke clipboard!`)
   }
 
+  // Toggle Cadre/Mitra Distribution Permission
+  const handleToggleCadrePermission = async (formId: string, currentVal: boolean) => {
+    const newVal = !currentVal
+    // Optimistic UI update
+    setForms((prev) =>
+      prev.map((f) =>
+        f.formId === formId
+          ? {
+              ...f,
+              allowCadreDistribution: newVal,
+              metadata: { ...(f.metadata || {}), allowCadreDistribution: newVal },
+            }
+          : f
+      )
+    )
+
+    try {
+      const res = await safeFetchJson(`/api/v1_5/forms/${formId}/permission`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ allowCadreDistribution: newVal }),
+      })
+
+      if (res.ok && res.data?.success) {
+        showToast(
+          newVal
+            ? `🟢 Akses distribusi kader & mitra untuk "${formId}" diizinkan!`
+            : `🔒 Akses distribusi "${formId}" dibatasi khusus Admin!`
+        )
+      } else {
+        // Revert on error
+        setForms((prev) =>
+          prev.map((f) =>
+            f.formId === formId
+              ? {
+                  ...f,
+                  allowCadreDistribution: currentVal,
+                  metadata: { ...(f.metadata || {}), allowCadreDistribution: currentVal },
+                }
+              : f
+          )
+        )
+        showToast(res.error || 'Gagal mengubah hak akses distribusi.')
+      }
+    } catch (err: any) {
+      showToast('Gagal terhubung ke server.')
+    }
+  }
+
   return (
     <div className="flex flex-col min-h-screen bg-[#06060E] text-slate-100 font-sans">
       <Topbar
@@ -230,8 +299,8 @@ export default function V15FormsDashboardPage() {
           </div>
         </div>
 
-        {/* Filter & View Mode Bar */}
-        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+        {/* Filter & View Mode Bar with Read Cost Control */}
+        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 bg-slate-900/60 p-4 rounded-2xl border border-slate-800">
           <div className="flex flex-wrap items-center gap-3">
             {/* Search Input */}
             <div className="relative flex-1 sm:flex-initial">
@@ -240,18 +309,23 @@ export default function V15FormsDashboardPage() {
                 type="text"
                 placeholder="Cari judul / Form ID V1.5..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && fetchForms()}
-                className="pl-10 pr-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500 w-full sm:w-64"
+                onChange={(e) => {
+                  setSearchTerm(e.target.value)
+                  setCurrentPage(1)
+                }}
+                className="pl-10 pr-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500 w-full sm:w-64"
               />
             </div>
 
             {/* Status Filter */}
-            <div className="flex items-center p-1 bg-slate-900 border border-slate-800 rounded-xl text-xs">
+            <div className="flex items-center p-1 bg-slate-950 border border-slate-800 rounded-xl text-xs">
               {(['all', 'draft', 'published', 'archived'] as const).map((st) => (
                 <button
                   key={st}
-                  onClick={() => setStatusFilter(st)}
+                  onClick={() => {
+                    setStatusFilter(st)
+                    setCurrentPage(1)
+                  }}
                   className={`px-3 py-1.5 rounded-lg font-semibold capitalize transition-all ${
                     statusFilter === st
                       ? 'bg-cyan-500/20 text-cyan-200 border border-cyan-500/40 shadow-sm'
@@ -262,30 +336,67 @@ export default function V15FormsDashboardPage() {
                 </button>
               ))}
             </div>
+
+            {/* Page Size Selector */}
+            <div className="flex items-center gap-2 text-xs text-slate-400 bg-slate-950 border border-slate-800 px-3 py-1.5 rounded-xl">
+              <span>Tampil:</span>
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value))
+                  setCurrentPage(1)
+                }}
+                className="bg-transparent text-slate-200 font-bold focus:outline-none cursor-pointer"
+              >
+                <option value={10} className="bg-slate-900 text-slate-200">10 data</option>
+                <option value={25} className="bg-slate-900 text-slate-200">25 data</option>
+                <option value={50} className="bg-slate-900 text-slate-200">50 data</option>
+                <option value={100} className="bg-slate-900 text-slate-200">100 data</option>
+              </select>
+            </div>
           </div>
 
-          {/* Grid / Table View Switcher */}
-          <div className="flex items-center gap-1 p-1 bg-slate-900 border border-slate-800 rounded-xl self-end md:self-auto">
+          <div className="flex items-center gap-3 self-end md:self-auto flex-wrap">
+            {/* Read Cost Protection Indicator */}
+            {lastFetchedAt && (
+              <div className="hidden lg:flex items-center gap-1.5 text-[11px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-xl">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>Client Cache: {lastFetchedAt}</span>
+              </div>
+            )}
+
+            {/* Manual Fetch Button */}
             <button
-              onClick={() => setViewMode('grid')}
-              className={`p-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
-                viewMode === 'grid' ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' : 'text-slate-400'
-              }`}
-              title="Tampilan Kartu (Grid)"
+              onClick={fetchForms}
+              disabled={isLoading}
+              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-bold flex items-center gap-1.5 transition-all"
+              title="Segarkan Data dari Firestore"
             >
-              <Icon name="grid" className="w-4 h-4" />
-              <span className="hidden sm:inline">Kartu</span>
+              <Icon name="refresh" className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">Sync Data</span>
             </button>
-            <button
-              onClick={() => setViewMode('table')}
-              className={`p-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
-                viewMode === 'table' ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' : 'text-slate-400'
-              }`}
-              title="Tampilan Tabel (List)"
-            >
-              <Icon name="list" className="w-4 h-4" />
-              <span className="hidden sm:inline">Tabel</span>
-            </button>
+
+            {/* Grid / Table View Switcher */}
+            <div className="flex items-center gap-1 p-1 bg-slate-950 border border-slate-800 rounded-xl">
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`p-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                  viewMode === 'grid' ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' : 'text-slate-400'
+                }`}
+                title="Tampilan Kartu (Grid)"
+              >
+                <Icon name="grid" className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setViewMode('table')}
+                className={`p-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                  viewMode === 'table' ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' : 'text-slate-400'
+                }`}
+                title="Tampilan Tabel (List)"
+              >
+                <Icon name="list" className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -358,7 +469,7 @@ export default function V15FormsDashboardPage() {
         ) : viewMode === 'grid' ? (
           /* PREMIUM CARD GRID VIEW (WOW Visual V1.5 Layout) */
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {filteredForms.map((f) => {
+            {paginatedForms.map((f) => {
               const isPublished = f.status === 'published'
               const aspectCount = f.aspects?.length || 0
               const questionCount = f.questions?.length || 0
@@ -420,6 +531,39 @@ export default function V15FormsDashboardPage() {
                       <span className="text-cyan-400 font-bold">{aspectCount} Aspek</span>
                       <span>•</span>
                       <span>{questionCount} Soal</span>
+                    </div>
+
+                    {/* Sakelar Visual Toggle Switch Akses Distribusi Kader & Mitra */}
+                    <div className="pt-3 border-t border-slate-800/60 flex items-center justify-between gap-2 text-xs">
+                      <div className="flex items-center gap-1.5 text-slate-300 font-semibold text-[11px]">
+                        <Icon name="users" className="w-3.5 h-3.5 text-cyan-400" />
+                        <span>Akses Distribusi:</span>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <span className={`text-[10px] font-extrabold ${f.allowCadreDistribution === true || f.metadata?.allowCadreDistribution === true ? 'text-emerald-400' : 'text-slate-500'}`}>
+                          {f.allowCadreDistribution === true || f.metadata?.allowCadreDistribution === true ? '🟢 Diizinkan' : '🔒 Khusus Admin'}
+                        </span>
+
+                        {/* Visual Sliding Switch Component */}
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={f.allowCadreDistribution === true || f.metadata?.allowCadreDistribution === true}
+                          onClick={() => handleToggleCadrePermission(f.formId, Boolean(f.allowCadreDistribution === true || f.metadata?.allowCadreDistribution === true))}
+                          className={`relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                            f.allowCadreDistribution === true || f.metadata?.allowCadreDistribution === true ? 'bg-emerald-500 shadow-md shadow-emerald-500/20' : 'bg-slate-800 border-slate-700'
+                          }`}
+                          title={f.allowCadreDistribution === true || f.metadata?.allowCadreDistribution === true ? 'Klik untuk membatasi distribusi hanya untuk Admin' : 'Klik untuk mengizinkan Kader & Mitra mendistribusikan form ini'}
+                        >
+                          <span
+                            aria-hidden="true"
+                            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                              f.allowCadreDistribution === true || f.metadata?.allowCadreDistribution === true ? 'translate-x-5' : 'translate-x-0'
+                            }`}
+                          />
+                        </button>
+                      </div>
                     </div>
                   </div>
 
@@ -499,13 +643,14 @@ export default function V15FormsDashboardPage() {
                     <th className="px-4 py-3.5">Versi Aktif</th>
                     <th className="px-4 py-3.5">Kategori</th>
                     <th className="px-4 py-3.5">Status</th>
+                    <th className="px-4 py-3.5">Akses Kader & Mitra</th>
                     <th className="px-4 py-3.5">Struktur Aspek</th>
                     <th className="px-4 py-3.5">Pembaruan</th>
                     <th className="px-4 py-3.5 text-right">Aksi Management</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/80">
-                  {filteredForms.map((f) => {
+                  {paginatedForms.map((f) => {
                     const isPublished = f.status === 'published'
 
                     return (
@@ -545,6 +690,33 @@ export default function V15FormsDashboardPage() {
                           >
                             {f.status}
                           </span>
+                        </td>
+
+                        <td className="px-4 py-4">
+                          <div className="flex items-center gap-2">
+                            {/* Visual Sliding Switch Component */}
+                            <button
+                              type="button"
+                              role="switch"
+                              aria-checked={f.allowCadreDistribution === true || f.metadata?.allowCadreDistribution === true}
+                              onClick={() => handleToggleCadrePermission(f.formId, Boolean(f.allowCadreDistribution === true || f.metadata?.allowCadreDistribution === true))}
+                              className={`relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                                f.allowCadreDistribution === true || f.metadata?.allowCadreDistribution === true ? 'bg-emerald-500 shadow-md shadow-emerald-500/20' : 'bg-slate-800 border-slate-700'
+                              }`}
+                              title={f.allowCadreDistribution === true || f.metadata?.allowCadreDistribution === true ? 'Klik untuk membatasi distribusi hanya untuk Admin' : 'Klik untuk mengizinkan Kader & Mitra mendistribusikan form ini'}
+                            >
+                              <span
+                                aria-hidden="true"
+                                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                                  f.allowCadreDistribution === true || f.metadata?.allowCadreDistribution === true ? 'translate-x-5' : 'translate-x-0'
+                                }`}
+                              />
+                            </button>
+
+                            <span className={`text-[10px] font-extrabold ${f.allowCadreDistribution === true || f.metadata?.allowCadreDistribution === true ? 'text-emerald-400' : 'text-slate-500'}`}>
+                              {f.allowCadreDistribution === true || f.metadata?.allowCadreDistribution === true ? '🟢 Diizinkan' : '🔒 Khusus Admin'}
+                            </span>
+                          </div>
                         </td>
 
                         <td className="px-4 py-4 text-slate-400 font-mono">
@@ -618,6 +790,37 @@ export default function V15FormsDashboardPage() {
                   })}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {/* Pagination Footer Controls */}
+        {filteredForms.length > 0 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-slate-900 border border-slate-800 text-xs text-slate-400">
+            <div>
+              Menampilkan <span className="font-bold text-slate-200">{(currentPage - 1) * pageSize + 1}</span> - <span className="font-bold text-slate-200">{Math.min(currentPage * pageSize, filteredForms.length)}</span> dari <span className="font-bold text-slate-200">{filteredForms.length}</span> formulir (Total {forms.length} ter-cache)
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              >
+                &larr; Sebelumnya
+              </button>
+
+              <span className="px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 font-semibold text-slate-200">
+                Halaman {currentPage} dari {totalPages}
+              </span>
+
+              <button
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              >
+                Selanjutnya &rarr;
+              </button>
             </div>
           </div>
         )}

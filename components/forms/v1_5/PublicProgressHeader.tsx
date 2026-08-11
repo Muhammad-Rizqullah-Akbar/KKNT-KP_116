@@ -10,6 +10,8 @@ interface PublicProgressHeaderProps {
   currentQuestionIndex: number
   totalQuestions: number
   versionNumber: number
+  viewMode?: 'single' | 'aspect_all'
+  onToggleViewMode?: (mode: 'single' | 'aspect_all') => void
   onToggleNavigator?: () => void
   isNavigatorOpen?: boolean
 }
@@ -21,6 +23,8 @@ export function PublicProgressHeader({
   currentQuestionIndex,
   totalQuestions,
   versionNumber,
+  viewMode = 'aspect_all',
+  onToggleViewMode,
   onToggleNavigator,
   isNavigatorOpen,
 }: PublicProgressHeaderProps) {
@@ -44,11 +48,38 @@ export function PublicProgressHeader({
             </div>
           </div>
 
-          <div className="flex items-center gap-3 flex-shrink-0">
-            <span className="hidden md:inline-flex items-center gap-1 text-[11px] text-slate-400 font-mono bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800">
-              <kbd className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 font-mono text-[10px]">←</kbd>
-              <kbd className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 font-mono text-[10px]">→</kbd> Navigasi
-            </span>
+          <div className="flex items-center gap-2.5 flex-shrink-0">
+            {/* View Mode Toggle Pill */}
+            {onToggleViewMode && (
+              <div className="flex items-center p-0.5 rounded-xl bg-slate-950 border border-slate-800 text-[11px] font-medium">
+                <button
+                  type="button"
+                  onClick={() => onToggleViewMode('single')}
+                  className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 font-semibold ${
+                    viewMode === 'single'
+                      ? 'bg-cyan-500 text-slate-950 font-bold shadow-sm'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                  title="Tampilkan 1 Soal per Halaman"
+                >
+                  <Icon name="fileText" className="w-3.5 h-3.5" />
+                  <span className="hidden md:inline">1 Soal</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onToggleViewMode('aspect_all')}
+                  className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 font-semibold ${
+                    viewMode === 'aspect_all'
+                      ? 'bg-cyan-500 text-slate-950 font-bold shadow-sm'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                  title="Tampilkan Semua Soal dalam Aspek Ini"
+                >
+                  <Icon name="layers" className="w-3.5 h-3.5" />
+                  <span className="hidden md:inline">Semua Soal Aspek</span>
+                </button>
+              </div>
+            )}
 
             <span className="text-xs font-mono font-bold text-slate-300 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800">
               {String(currentQuestionIndex + 1).padStart(2, '0')} / {String(totalQuestions).padStart(2, '0')}

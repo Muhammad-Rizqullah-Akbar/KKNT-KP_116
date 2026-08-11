@@ -156,18 +156,46 @@ export function AspectManager({
         </div>
 
         {/* Aspect Points & Controls */}
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs">
-            <span className="text-slate-400">Target Poin:</span>
-            <input
-              type="number"
-              min={0}
-              value={allocatedPoints}
-              onChange={(e) => onUpdateAllocatedPoints(aspect.aspectId, Number(e.target.value) || 0)}
-              className="w-14 bg-slate-900 border border-slate-700 text-amber-300 font-bold text-center text-xs rounded px-1 py-0.5 focus:outline-none"
-            />
-            <span className="text-amber-400 font-semibold">pt</span>
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* Sakelar Toggle Penilaian */}
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs">
+            <span className="text-slate-400 font-medium">Aspek Dinilai:</span>
+            <button
+              type="button"
+              onClick={() => {
+                const nextIsScored = aspect.isScored === false ? true : false
+                onUpdateAspect(aspect.aspectId, { isScored: nextIsScored })
+              }}
+              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                aspect.isScored !== false ? 'bg-emerald-500' : 'bg-slate-700'
+              }`}
+              title={aspect.isScored !== false ? 'Aspek ini dinilai dalam skor akhir' : 'Aspek ini murni Biodata/Informasi (Tanpa Penilaian)'}
+            >
+              <span
+                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                  aspect.isScored !== false ? 'translate-x-4' : 'translate-x-0'
+                }`}
+              />
+            </button>
+            <span className={`font-bold ${aspect.isScored !== false ? 'text-emerald-400' : 'text-slate-400'}`}>
+              {aspect.isScored !== false ? 'Ya (Aktif)' : 'Tidak (Biodata)'}
+            </span>
           </div>
+
+          {/* HANYA TAMPILKAN INPUT POIN JIKA TOGGLE PENILAIAN AKTIF */}
+          {aspect.isScored !== false && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs">
+              <span className="text-slate-400">Target Poin:</span>
+              <input
+                type="number"
+                min={0}
+                value={allocatedPoints}
+                onChange={(e) => onUpdateAllocatedPoints(aspect.aspectId, Number(e.target.value) || 0)}
+                className="w-14 bg-slate-900 border border-slate-700 text-amber-300 font-bold text-center text-xs rounded px-1 py-0.5 focus:outline-none"
+              />
+              <span className="text-amber-400 font-semibold">pt</span>
+            </div>
+          )}
 
           <button
             type="button"
