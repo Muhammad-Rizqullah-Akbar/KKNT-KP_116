@@ -101,7 +101,7 @@ export default function AnalyticsDashboardPage() {
               }
             })
           }
-          if (userData?.cadreCode) myCodesSet.add(String(userData.cadreCode).toLowerCase().trim())
+          if ((userData as any)?.cadreCode) myCodesSet.add(String((userData as any).cadreCode).toLowerCase().trim())
 
           parsed = parsed.filter((r) => {
             const distCode = String(r.distributionCode || '').toLowerCase().trim()
