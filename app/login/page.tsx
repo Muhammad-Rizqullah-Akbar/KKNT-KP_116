@@ -15,16 +15,12 @@ export default function LoginPage() {
   const router = useRouter()
   const { login, isAuthenticated, userRole } = useAuth()
 
-  // ========== REDIRECT JIKA SUDAH LOGIN & MELEWATI VALIDASI ROLE ==========
+  // ========== REDIRECT JIKA SUDAH LOGIN ==========
   useEffect(() => {
     if (isAuthenticated) {
-      if (userRole === 'super_admin' || userRole === 'admin') {
-        router.push('/dashboard/overview')
-      } else {
-        router.push('/')
-      }
+      router.push('/dashboard/overview')
     }
-  }, [isAuthenticated, userRole, router])
+  }, [isAuthenticated, router])
 
   // ========== HANDLE EMAIL LOGIN ==========
   const handleSubmit = async (e: React.FormEvent) => {

@@ -44,19 +44,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  // Listen to auth state changes & Sinkronisasi Cookie untuk Middleware
+  // Listen to auth state changes & Sinkronisasi Session
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser)
       
       if (currentUser) {
         const data = await getUserData(currentUser.uid)
+        const validRoles = ['super_admin', 'admin', 'internal_bpom', 'partnership', 'cadre']
         
-        // Cek jika user terdaftar sebagai admin/super_admin
-        if (data && (data.role === 'admin' || data.role === 'super_admin')) {
+        // Cek jika user terdaftar memiliki role yang valid
+        if (data && data.role && validRoles.includes(data.role)) {
           setUserData(data)
         } else {
-          // Jika bukan admin/super_admin, bersihkan session
           setUserData(null)
         }
       } else {
@@ -85,6 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const userRole = userData?.role || null
+  const validRoles = ['super_admin', 'admin', 'internal_bpom', 'partnership', 'cadre']
 
   return (
     <AuthContext.Provider
@@ -93,7 +94,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         userData,
         userRole,
         loading,
-        isAuthenticated: !!user && (userRole === 'admin' || userRole === 'super_admin'),
+        isAuthenticated: !!user && !!userRole && validRoles.includes(userRole),
         login,
         logout: handleLogout,
         refreshUser,
