@@ -83,11 +83,11 @@ function toPublicQuestion(question: any): PublicQuestion {
       ratingMax: question.presentation?.ratingMax || question.ratingMax || question.config?.ratingMax || 5,
       indicators: indicators.length > 0 ? indicators : undefined,
       indicatorScales: indicatorScales.length > 0 ? indicatorScales : [
-        { value: 1, label: '1 - Sangat Buruk' },
-        { value: 2, label: '2 - Buruk' },
-        { value: 3, label: '3 - Cukup' },
-        { value: 4, label: '4 - Baik' },
-        { value: 5, label: '5 - Sangat Baik' },
+        { value: 1, label: 'STS' },
+        { value: 2, label: 'TS' },
+        { value: 3, label: 'N' },
+        { value: 4, label: 'S' },
+        { value: 5, label: 'SS' },
       ],
     }
   }
