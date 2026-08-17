@@ -28,6 +28,13 @@ import type {
 import { randomInt, randomBytes } from 'crypto'
 
 /**
+ * Global Role Scope Boundary Check
+ */
+function isGlobalRole(role: string): boolean {
+  return role === 'super_admin' || role === 'admin' || role === 'internal_bpom'
+}
+
+/**
  * Generates an opaque, human-friendly, collision-resistant code (e.g. KKPD7X9).
  */
 async function generateUniqueDistributionCode(): Promise<string> {
@@ -196,8 +203,43 @@ export async function resolveDistributionWorkflow(
 }
 
 /**
+ * Helper to verify server-side document ownership / hierarchy scope.
+ */
+async function verifyDistributionAccess(
+  existing: DistributionDoc,
+  authContext: AuthorizationContext
+): Promise<void> {
+  if (isGlobalRole(authContext.role)) return
+
+  let userPartnershipId = ''
+  try {
+    const userDoc = await safeGetDoc('users', authContext.uid)
+    if (userDoc?.data) {
+      userPartnershipId = userDoc.data.partnershipId || ''
+    }
+  } catch (e) {
+    console.warn('Could not resolve user partnership ID for permission verification:', e)
+  }
+
+  if (authContext.role === 'partnership') {
+    const isOwnDoc = existing.createdBy === authContext.uid || existing.ownerId === authContext.uid
+    const isSubordinateCadreDoc = Boolean(userPartnershipId) && existing.partnershipId === userPartnershipId
+    if (isOwnDoc || isSubordinateCadreDoc) return
+    throw new Error('Otorisasi Ditolak: Anda tidak memiliki izin untuk mengelola distribusi milik mitra lain.')
+  }
+
+  if (authContext.role === 'cadre') {
+    const isOwnDoc = existing.createdBy === authContext.uid || existing.ownerId === authContext.uid
+    if (isOwnDoc) return
+    throw new Error('Otorisasi Ditolak: Kader hanya dapat mengelola kode distribusi yang dibuat oleh diri sendiri.')
+  }
+
+  throw new Error('Otorisasi Ditolak: Peran pengguna Anda tidak memiliki akses ke distribusi ini.')
+}
+
+/**
  * CREATE DISTRIBUTION WORKFLOW:
- * Enforces role access and server session verification.
+ * Enforces role access, form distribution permission, and server session verification.
  */
 export async function createDistributionWorkflow(
   params: CreateDistributionParams,
@@ -213,12 +255,12 @@ export async function createDistributionWorkflow(
     throw new Error(`Formulir "${formAggregate.metadata?.title || params.formId}" belum diterbitkan (masih berstatus draft) sehingga tidak dapat didistribusikan.`)
   }
 
-  const isAdmin = authContext.role === 'admin' || authContext.role === 'super_admin'
+  const isGlobal = isGlobalRole(authContext.role)
 
-  // Non-admin roles (cadre / partnership) check allowCadreDistribution on form
-  if (!isAdmin) {
+  // Non-global roles (cadre / partnership) MUST respect allowCadreDistribution on form
+  if (!isGlobal) {
     if (formAggregate.allowCadreDistribution !== true && formAggregate.metadata?.allowCadreDistribution !== true) {
-      throw new Error('Formulir ini belum diizinkan oleh Admin untuk didistribusikan oleh Kader/Mitra. Akses terbatas khusus Admin.')
+      throw new Error('Formulir ini belum diizinkan oleh BPOM Pusat untuk didistribusikan oleh Kader/Mitra. Akses terbatas khusus Admin/Internal BPOM.')
     }
   }
 
@@ -229,9 +271,13 @@ export async function createDistributionWorkflow(
 
   // Resolve creator's user profile strictly from Firestore
   let creatorProfile: any = null
+  let userPartnershipId = ''
   try {
     const userDoc = await safeGetDoc('users', authContext.uid)
-    if (userDoc?.data) creatorProfile = userDoc.data
+    if (userDoc?.data) {
+      creatorProfile = userDoc.data
+      userPartnershipId = creatorProfile.partnershipId || ''
+    }
   } catch (e) {
     console.warn('Could not resolve user profile for distribution owner:', e)
   }
@@ -254,7 +300,7 @@ export async function createDistributionWorkflow(
 
   // If Admin is target-assigning distribution to a specific user (Cadre or Mitra)
   if (params.targetUserId && params.targetUserId !== authContext.uid) {
-    if (!isAdmin) {
+    if (!isGlobal) {
       throw new Error('Anda tidak memiliki hak otorisasi untuk melakukan target assignment ke pengguna lain.')
     }
     ownerId = params.targetUserId
@@ -266,6 +312,7 @@ export async function createDistributionWorkflow(
         if (targetRole === 'partnership') ownerType = 'partnership'
         else if (targetRole === 'cadre') ownerType = 'cadre'
         else ownerType = 'admin'
+        if (targetDoc.data.partnershipId) userPartnershipId = targetDoc.data.partnershipId
       } else if (params.targetUserName) {
         ownerName = params.targetUserName
       }
@@ -284,6 +331,8 @@ export async function createDistributionWorkflow(
     ownerType: ownerType as any,
     ownerId,
     ownerName,
+    partnershipId: userPartnershipId || params.partnershipId || '',
+    createdByRole: authContext.role,
     versionMode: params.versionMode || 'active',
     pinnedVersionId: params.versionMode === 'pinned' ? (params.pinnedVersionId || '') : '',
     status: 'active',
@@ -299,27 +348,44 @@ export async function createDistributionWorkflow(
 
 /**
  * LIST DISTRIBUTIONS WORKFLOW:
- * Scopes data according to current user role.
+ * Scopes data according to current user role and partnership hierarchy.
  */
 export async function listDistributionsWorkflow(
   authContext: AuthorizationContext,
   options?: { status?: string; search?: string; formId?: string }
 ): Promise<DistributionDoc[]> {
-  const isAdmin = authContext.role === 'admin' || authContext.role === 'super_admin'
+  const allDocs = await listDistributionsDoc(options)
 
-  if (isAdmin) {
-    return await listDistributionsDoc(options)
+  if (isGlobalRole(authContext.role)) {
+    return allDocs
   }
 
-  return await listDistributionsDoc({
-    ...options,
-    ownerId: authContext.uid,
-  })
+  // Resolve user profile for partnership context
+  let userPartnershipId = ''
+  try {
+    const userDoc = await safeGetDoc('users', authContext.uid)
+    if (userDoc?.data) {
+      userPartnershipId = userDoc.data.partnershipId || ''
+    }
+  } catch (e) {
+    console.warn('Could not resolve user partnership ID:', e)
+  }
+
+  if (authContext.role === 'partnership') {
+    return allDocs.filter((d) => {
+      const isOwnDoc = d.createdBy === authContext.uid || d.ownerId === authContext.uid
+      const isSubordinateCadreDoc = Boolean(userPartnershipId) && d.partnershipId === userPartnershipId
+      return isOwnDoc || isSubordinateCadreDoc
+    })
+  }
+
+  // Cadre Scope: Only own created distribution codes
+  return allDocs.filter((d) => d.createdBy === authContext.uid || d.ownerId === authContext.uid)
 }
 
 /**
  * UPDATE DISTRIBUTION WORKFLOW:
- * Server-enforced ownership check.
+ * Server-enforced ownership & hierarchy check.
  */
 export async function updateDistributionWorkflow(
   distributionId: string,
@@ -331,10 +397,7 @@ export async function updateDistributionWorkflow(
     throw new Error(`Distribusi dengan ID "${distributionId}" tidak ditemukan.`)
   }
 
-  const isAdmin = authContext.role === 'admin' || authContext.role === 'super_admin'
-  if (!isAdmin && existing.ownerId !== authContext.uid) {
-    throw new Error('Anda tidak memiliki hak untuk mengubah distribusi ini.')
-  }
+  await verifyDistributionAccess(existing, authContext)
 
   return await updateDistributionDoc(distributionId, {
     ...params,
@@ -354,10 +417,7 @@ export async function pauseDistributionWorkflow(
     throw new Error(`Distribusi dengan ID "${distributionId}" tidak ditemukan.`)
   }
 
-  const isAdmin = authContext.role === 'admin' || authContext.role === 'super_admin'
-  if (!isAdmin && existing.ownerId !== authContext.uid) {
-    throw new Error('Anda tidak memiliki hak untuk mengubah status distribusi ini.')
-  }
+  await verifyDistributionAccess(existing, authContext)
 
   return await pauseDistributionDoc(distributionId, authContext.uid)
 }
@@ -374,10 +434,7 @@ export async function archiveDistributionWorkflow(
     throw new Error(`Distribusi dengan ID "${distributionId}" tidak ditemukan.`)
   }
 
-  const isAdmin = authContext.role === 'admin' || authContext.role === 'super_admin'
-  if (!isAdmin && existing.ownerId !== authContext.uid) {
-    throw new Error('Anda tidak memiliki hak untuk mengarsipkan distribusi ini.')
-  }
+  await verifyDistributionAccess(existing, authContext)
 
   return await archiveDistributionDoc(distributionId, authContext.uid)
 }
@@ -394,12 +451,7 @@ export async function deleteDistributionWorkflow(
     throw new Error(`Distribusi dengan ID "${distributionId}" tidak ditemukan.`)
   }
 
-  const isAdmin = authContext.role === 'admin' || authContext.role === 'super_admin' || authContext.role === 'internal_bpom'
-  const isOwner = existing.ownerId === authContext.uid || existing.createdBy === authContext.uid
-
-  if (!isAdmin && !isOwner) {
-    throw new Error('Anda tidak memiliki hak otorisasi untuk menghapus distribusi ini.')
-  }
+  await verifyDistributionAccess(existing, authContext)
 
   await deleteDistributionDoc(distributionId)
   return { success: true, message: `Kode distribusi "${distributionId}" berhasil dihapus.` }

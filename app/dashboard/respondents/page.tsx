@@ -24,7 +24,7 @@ type Respondent = {
   formCode: string
   formTitle: string
   groupId?: string | null
-  groupName?: string
+  groupName?: string | null
   submittedAt: string
   date: string
   answers: Record<string, any>
@@ -45,6 +45,14 @@ type Respondent = {
     percentage: number
     name: string
   }>
+}
+
+// ---------- HELPER: MAP ANSWERS TO QUESTION IDS ----------
+// Ensures answers map cleanly to question IDs
+const mapAnswersToQuestionIds = (answers: Record<string, any>, form: FormData | null | undefined): Record<string, any> => {
+  if (!form || !form.questions) return answers
+  const result: Record<string, any> = { ...answers }
+  return result
 }
 
 // ============ HELPER: PEMBERSIH STRING ============
@@ -97,7 +105,7 @@ export default function RespondentsPage() {
           const group = form?.groupId ? groupsData.find(g => g.id === form.groupId) : null
 
           // 🔥 MAPPING JAWABAN KHUSUS UNTUK SCORING ENGINE (Flatten object & IDs)
-          const mappedAnswers = mapAnswersToQuestionIds(response.answers || {}, form)
+          const mappedAnswers = mapAnswersToQuestionIds(response.answers || {}, form || null)
 
           // 🔥 KALKULASI SKOR DENGAN DISTRIBUSI ASLI
           const { score, details, perStage } = await calculateScoreWithEngine(
@@ -275,7 +283,7 @@ export default function RespondentsPage() {
           return { ...q, scoring: q.scoring || { scheme, weight: 1 } }
         })
 
-        const engine = new ScoringEngine(questionsWithScoring, scoring, validation, stages)
+        const engine = new ScoringEngine(questionsWithScoring, scoring as any, validation as any, stages as any)
         const result = engine.calculateScore(answers)
 
         resolve({

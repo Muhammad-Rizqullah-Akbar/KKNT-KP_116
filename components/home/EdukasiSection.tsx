@@ -6,11 +6,12 @@ import { ArticleCard } from './ArticleCard'
 
 interface EdukasiSectionProps {
   articles: any[]
+  isLoading?: boolean
   categoryBadgeColors: Record<string, string>
   onOpenArticleModal: (article: any) => void
 }
 
-export function EdukasiSection({ articles, categoryBadgeColors, onOpenArticleModal }: EdukasiSectionProps) {
+export function EdukasiSection({ articles, isLoading, categoryBadgeColors, onOpenArticleModal }: EdukasiSectionProps) {
   return (
     <section id="edukasi" className="relative w-full max-w-6xl mx-auto overflow-hidden rounded-3xl bg-[#080812] bg-grid-pattern mb-8 sm:mb-12 scroll-mt-24 px-4 sm:px-6 lg:px-8">
       <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-emerald-500/8 rounded-full blur-[120px] pointer-events-none animate-pulse-slow" />

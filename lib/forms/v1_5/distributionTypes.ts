@@ -20,6 +20,8 @@ export interface DistributionDoc {
   ownerType: DistributionOwnerType
   ownerId: string
   ownerName: string
+  partnershipId?: string
+  createdByRole?: string
   versionMode: DistributionVersionMode
   pinnedVersionId?: string
   status: DistributionStatus
@@ -54,8 +56,12 @@ export interface PublicDistributionDTO {
   resolvedVersionNumber: number
   expiresAt?: string
   ownerName: string
+  responseId?: string
+  submissionToken?: string
   form: PublicFormProjection
 }
+
+export type PublicResponseSessionDTO = PublicDistributionDTO
 
 export interface CreateDistributionParams {
   formId: string

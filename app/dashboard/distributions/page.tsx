@@ -13,6 +13,9 @@ import { safeFetchJson } from '@/lib/shared/safeFetch'
 export default function DistributionsDashboardPage() {
   const router = useRouter()
   const { user, userData, userRole } = useAuth()
+  const isGlobalRole = ['super_admin', 'admin', 'internal_bpom'].includes(userRole || '')
+  const isPartnershipRole = userRole === 'partnership'
+  const isCadreRole = userRole === 'cadre'
 
   const [distributions, setDistributions] = useState<DistributionDoc[]>([])
   const [publishedForms, setPublishedForms] = useState<FormAggregateDoc[]>([])
@@ -60,6 +63,78 @@ export default function DistributionsDashboardPage() {
   // Custom Delete Confirmation Modal State
   const [deleteTargetDoc, setDeleteTargetDoc] = useState<{ id: string; code: string; title: string } | null>(null)
   const [isExecutingDelete, setIsExecutingDelete] = useState(false)
+
+  // Distribution Access Permission & Active Version Snapshot Modal State
+  const [isPermissionModalOpen, setIsPermissionModalOpen] = useState(false)
+  const [permissionFormId, setPermissionFormId] = useState('')
+  const [permissionAllowCadre, setPermissionAllowCadre] = useState(true)
+  const [permissionVersions, setPermissionVersions] = useState<any[]>([])
+  const [permissionActiveVersionId, setPermissionActiveVersionId] = useState('')
+  const [isSavingPermission, setIsSavingPermission] = useState(false)
+  const [isLoadingPermissionVersions, setIsLoadingPermissionVersions] = useState(false)
+
+  const openPermissionModal = async (formIdToSelect?: string) => {
+    setIsPermissionModalOpen(true)
+    const targetId = formIdToSelect || (publishedForms.length > 0 ? publishedForms[0].formId : '')
+    setPermissionFormId(targetId)
+    if (targetId) {
+      await loadPermissionFormDetails(targetId)
+    }
+  }
+
+  const loadPermissionFormDetails = async (formId: string) => {
+    if (!formId) return
+    setIsLoadingPermissionVersions(true)
+    try {
+      const [formRes, verRes] = await Promise.all([
+        safeFetchJson(`/api/v1_5/forms/${formId}`),
+        safeFetchJson(`/api/v1_5/forms/${formId}/versions`),
+      ])
+
+      if (formRes.ok && formRes.data && formRes.data.form) {
+        const f = formRes.data.form
+        setPermissionAllowCadre(f.allowCadreDistribution !== false)
+        setPermissionActiveVersionId(f.activeVersionId || '')
+      }
+
+      if (verRes.ok && verRes.data && Array.isArray(verRes.data.versions)) {
+        setPermissionVersions(verRes.data.versions)
+      } else {
+        setPermissionVersions([])
+      }
+    } catch (err) {
+      showToast('Gagal memuat detail versi formulir.')
+    } finally {
+      setIsLoadingPermissionVersions(false)
+    }
+  }
+
+  const handleSavePermission = async () => {
+    if (!permissionFormId) return
+    setIsSavingPermission(true)
+    try {
+      const res = await safeFetchJson(`/api/v1_5/forms/${permissionFormId}/permission`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          allowCadreDistribution: permissionAllowCadre,
+          activeVersionId: permissionActiveVersionId,
+        }),
+      })
+
+      if (res.ok && res.data?.success) {
+        showToast('Izin & versi aktif distribusi berhasil diperbarui!')
+        setIsPermissionModalOpen(false)
+        loadData()
+      } else {
+        showToast(res.error || 'Gagal memperbarui izin & versi.')
+      }
+    } catch (err) {
+      showToast('Gagal menyimpan ke server.')
+    } finally {
+      setIsSavingPermission(false)
+    }
+  }
 
   // Toast
   const [toastMessage, setToastMessage] = useState<string | null>(null)
@@ -177,12 +252,14 @@ export default function DistributionsDashboardPage() {
       }
 
       let formsList = formRes.ok && formRes.data && Array.isArray(formRes.data.forms) ? formRes.data.forms : []
-      // Strictly enforce status === published AND allowCadreDistribution === true (only Admin-permitted forms)
-      const permittedForms = formsList.filter(
-        (f: any) =>
-          (f.status === 'published' || f.metadata?.status === 'published') &&
-          (f.allowCadreDistribution === true || f.metadata?.allowCadreDistribution === true)
-      )
+      const isGlobal = ['super_admin', 'admin', 'internal_bpom'].includes(userRole || '')
+      
+      const permittedForms = formsList.filter((f: any) => {
+        const isPublished = f.status === 'published' || f.metadata?.status === 'published'
+        if (!isPublished) return false
+        if (isGlobal) return true
+        return f.allowCadreDistribution === true || f.metadata?.allowCadreDistribution === true
+      })
 
       setPublishedForms(permittedForms)
       if (permittedForms.length > 0) {
@@ -401,17 +478,27 @@ export default function DistributionsDashboardPage() {
               <option value="expired">Masa Berlaku Habis</option>
             </select>
 
-            {/* Owner Filter */}
-            <select
-              value={ownerFilter}
-              onChange={(e) => setOwnerFilter(e.target.value)}
-              className="px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
-            >
-              <option value="all">Semua Pemilik</option>
-              <option value="admin">BPOM Pusat</option>
-              <option value="cadre">Kader Desa</option>
-              <option value="partnership">Kemitraan</option>
-            </select>
+            {/* Owner Filter (Global Roles Only) */}
+            {isGlobalRole ? (
+              <select
+                value={ownerFilter}
+                onChange={(e) => setOwnerFilter(e.target.value)}
+                className="px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
+              >
+                <option value="all">Semua Pemilik</option>
+                <option value="admin">BPOM Pusat</option>
+                <option value="cadre">Kader Desa</option>
+                <option value="partnership">Kemitraan</option>
+              </select>
+            ) : isPartnershipRole ? (
+              <span className="px-3 py-1.5 rounded-xl bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 text-xs font-semibold">
+                🏢 Skop Kemitraan: [Mitra Saya + Kader Subordinat]
+              </span>
+            ) : (
+              <span className="px-3 py-1.5 rounded-xl bg-purple-500/10 text-purple-300 border border-purple-500/20 text-xs font-semibold">
+                👤 Skop Kader: [Kode Distribusi Saya]
+              </span>
+            )}
 
             {/* Refresh Button */}
             <button
@@ -424,12 +511,24 @@ export default function DistributionsDashboardPage() {
             </button>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Permission & Active Version Modal Trigger (Strictly Restricted to Global Roles) */}
+            {isGlobalRole && (
+              <button
+                type="button"
+                onClick={() => openPermissionModal()}
+                className="px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 font-bold text-xs border border-slate-800 shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer"
+              >
+                <Icon name="settings" className="w-4 h-4 text-emerald-400" />
+                <span>Izin & Versi Aktif</span>
+              </button>
+            )}
+
             {/* Create Distribution Trigger Button */}
             <button
               type="button"
               onClick={() => setIsCreateModalOpen(true)}
-              className="px-4 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-extrabold text-xs shadow-lg shadow-cyan-600/20 flex items-center justify-center gap-2 transition-all"
+              className="px-4 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-extrabold text-xs shadow-lg shadow-cyan-600/20 flex items-center justify-center gap-2 transition-all cursor-pointer"
             >
               <Icon name="plus" className="w-4 h-4" />
               <span>Buat Kode Distribusi</span>
@@ -779,7 +878,7 @@ export default function DistributionsDashboardPage() {
 
                           <div>
                             <h4 className={`font-bold text-xs line-clamp-2 transition-colors ${isSelected ? 'text-cyan-200' : 'text-slate-200'}`}>
-                              {f.metadata?.title || f.title || f.formId}
+                              {f.metadata?.title || (f as any).title || f.formId}
                             </h4>
                             <p className="text-[10px] text-slate-400 mt-0.5 line-clamp-1">
                               {f.metadata?.category || 'Kuesioner Evaluasi'}
@@ -1182,6 +1281,173 @@ export default function DistributionsDashboardPage() {
                     <span>{deleteTargetDoc.id === 'bulk' ? `Ya, Hapus All (${selectedDistIds.length})` : 'Ya, Hapus Permanen'}</span>
                   </>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DISTRIBUTION PERMISSION & ACTIVE VERSION SNAPSHOT MODAL */}
+      {isPermissionModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm"
+          onClick={() => setIsPermissionModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-xl bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="space-y-0.5">
+                <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                  <Icon name="settings" className="w-4 h-4 text-emerald-400" />
+                  <span>Izin & Status Versi Distribusi</span>
+                </h3>
+                <p className="text-[11px] text-slate-400">
+                  Kelola hak izin distribusi kader/mitra dan tentukan versi snapshot mana yang aktif disebar ke publik.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsPermissionModalOpen(false)}
+                className="text-slate-400 hover:text-slate-200 text-xs p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Select Form Dropdown */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-300">Pilih Formulir Terpublikasi</label>
+              <select
+                value={permissionFormId}
+                onChange={(e) => {
+                  setPermissionFormId(e.target.value)
+                  loadPermissionFormDetails(e.target.value)
+                }}
+                className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-emerald-500 cursor-pointer font-medium"
+              >
+                {publishedForms.map((f) => (
+                  <option key={f.formId} value={f.formId}>
+                    {f.metadata?.title || f.formId} (V{f.activeVersionNumber || 1}.0)
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Section 1: Toggle Cadre/Partner Distribution Switch */}
+            <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800/80 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="space-y-0.5">
+                  <h4 className="text-xs font-bold text-slate-200">Izin Distribusi Kader & Mitra</h4>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    Bila diaktifkan, kader desa dan mitra dapat membuat kode distribusi mandiri untuk kuesioner ini.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setPermissionAllowCadre(!permissionAllowCadre)}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer border ${
+                    permissionAllowCadre
+                      ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
+                      : 'bg-rose-500/20 text-rose-300 border-rose-500/40 hover:bg-rose-500/30'
+                  }`}
+                >
+                  {permissionAllowCadre ? '✓ DIIZINKAN' : '✕ DIBATASI (ADMIN)'}
+                </button>
+              </div>
+            </div>
+
+            {/* Section 2: Published Version Snapshots & Active Version Selector */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                  <Icon name="history" className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Versi Snapshot & Status Aktif Didistribusikan</span>
+                </h4>
+                <span className="text-[11px] font-mono text-slate-400">
+                  {permissionVersions.length} Versi Terdaftar
+                </span>
+              </div>
+
+              {isLoadingPermissionVersions ? (
+                <div className="py-8 text-center space-y-2">
+                  <Icon name="spinner" className="w-6 h-6 text-emerald-400 animate-spin mx-auto" />
+                  <p className="text-xs text-slate-400">Memuat versi snapshot formulir...</p>
+                </div>
+              ) : permissionVersions.length === 0 ? (
+                <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 text-center text-xs text-slate-400">
+                  Belum ada versi snapshot terpublikasi yang terdaftar.
+                </div>
+              ) : (
+                <div className="space-y-2.5 max-h-60 overflow-y-auto pr-1">
+                  {permissionVersions.map((v) => {
+                    const isActive = v.versionId === permissionActiveVersionId
+                    return (
+                      <div
+                        key={v.versionId}
+                        className={`p-3.5 rounded-xl border transition-all flex items-center justify-between gap-3 ${
+                          isActive
+                            ? 'bg-emerald-950/30 border-emerald-500/50 shadow-sm'
+                            : 'bg-slate-950 border-slate-800/80 hover:border-slate-700'
+                        }`}
+                      >
+                        <div className="space-y-1 min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded ${
+                                isActive ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-slate-800 text-slate-400 border border-slate-700'
+                              }`}
+                            >
+                              VERSI {v.versionNumber || 1}.0
+                            </span>
+
+                            {isActive && (
+                              <span className="text-[10px] font-bold text-emerald-400 flex items-center gap-1">
+                                🟢 DIDISTRIBUSIKAN SAAT INI
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="text-[11px] text-slate-400 font-mono">
+                            Dipublikasikan pada {v.publishedAt ? new Date(v.publishedAt).toLocaleDateString('id-ID') : '—'}
+                          </div>
+                        </div>
+
+                        {!isActive && (
+                          <button
+                            type="button"
+                            onClick={() => setPermissionActiveVersionId(v.versionId)}
+                            className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition-all cursor-pointer shrink-0"
+                          >
+                            Set Versi Aktif →
+                          </button>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setIsPermissionModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleSavePermission}
+                disabled={isSavingPermission || !permissionFormId}
+                className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 text-white font-bold text-xs shadow-lg cursor-pointer flex items-center gap-1.5"
+              >
+                {isSavingPermission ? 'Simpan...' : 'Simpan Pengaturan Izin & Versi'}
               </button>
             </div>
           </div>

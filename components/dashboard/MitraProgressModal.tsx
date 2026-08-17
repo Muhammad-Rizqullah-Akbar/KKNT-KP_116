@@ -78,8 +78,8 @@ export function MitraProgressModal({ mitra, isOpen, onClose }: MitraProgressModa
         if (mitra.displayName && mitra.displayName.length > 2) cadreNamesSet.add(mitra.displayName.toLowerCase().trim())
 
         const myArticles = allArticles.filter((a) => {
-          if (a.authorId && cadreUidsSet.has(a.authorId)) return true
-          if (a.createdBy && cadreUidsSet.has(a.createdBy)) return true
+          if ((a as any).authorId && cadreUidsSet.has((a as any).authorId)) return true
+          if ((a as any).createdBy && cadreUidsSet.has((a as any).createdBy)) return true
 
           const authorLower = (a.author || '').toLowerCase().trim()
           if (cadreEmailsSet.has(authorLower)) return true

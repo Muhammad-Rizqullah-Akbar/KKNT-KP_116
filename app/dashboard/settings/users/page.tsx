@@ -130,8 +130,8 @@ export default function UserManagementPage() {
       const targetName = (userToInspect.displayName || '').toLowerCase().trim()
 
       const userArticles = allArticles.filter((a) => {
-        if (a.authorId && targetUid && a.authorId === targetUid) return true
-        if (a.createdBy && targetUid && a.createdBy === targetUid) return true
+        if ((a as any).authorId && targetUid && (a as any).authorId === targetUid) return true
+        if ((a as any).createdBy && targetUid && (a as any).createdBy === targetUid) return true
 
         const authorLower = (a.author || '').toLowerCase().trim()
         if (targetEmail && authorLower === targetEmail) return true
