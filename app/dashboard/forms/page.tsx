@@ -540,9 +540,9 @@ export default function LegacyFormsPage() {
         <PreviewModal
           isOpen={Boolean(previewForm)}
           onClose={() => setPreviewForm(null)}
-          elements={previewForm.questions || []}
+          elements={(previewForm.questions || []) as any}
           formTitle={previewForm.title || 'Pratinjau Kuesioner V1.0'}
-          stages={previewForm.stages || []}
+          stages={(previewForm.stages || []) as any}
           validationMode={previewForm.validation?.mode || 'all_required'}
           validationExceptions={previewForm.validation?.exceptions || []}
           scoringDistribution={previewForm.scoring?.distribution || {}}

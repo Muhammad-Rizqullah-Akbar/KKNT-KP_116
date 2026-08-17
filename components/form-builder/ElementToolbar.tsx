@@ -39,7 +39,7 @@ export function ElementToolbar({ onAddElement, isMobile = false }: ElementToolba
     <div className="fixed bottom-0 left-0 right-0 z-30 bg-[#080812] border-t border-white/[0.06]">
       {/* Kategori Filter */}
       <div className="flex gap-1 overflow-x-auto custom-scrollbar px-3 pt-2 pb-1.5">
-        {(isMobile ? quickCategories : CATEGORIES).map((cat) => (
+        {(isMobile ? CATEGORIES.filter(c => ['all', 'Input', 'Pilihan', 'Skala', 'Tabel'].includes(c.id)) : CATEGORIES).map((cat) => (
           <button
             key={cat.id}
             onClick={() => setActiveCategory(cat.id)}

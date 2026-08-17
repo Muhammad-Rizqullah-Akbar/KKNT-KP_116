@@ -5,6 +5,7 @@ import type { Question, QuestionType, ScoringConfig } from '@/lib/forms/v1_5/typ
 import type { FormAspect, BuilderQuestion } from '@/lib/forms/v1_5/builderState'
 import type { DetailedIndicator } from './LikertScaleEditor'
 import { QUESTION_TYPES } from '@/lib/forms/v1_5/types'
+import { calculateQuestionScore } from '@/lib/forms/v1_5/scoring/scoringEngine'
 import { Icon } from '@/components/ui/Icons'
 
 interface AnswerKeyInspectorProps {
@@ -27,12 +28,29 @@ export function AnswerKeyInspector({
   const [search, setSearch] = useState('')
   const [filterType, setFilterType] = useState<string>('all')
   const [filterAspect, setFilterAspect] = useState<string>('all')
+  const [collapsedAspects, setCollapsedAspects] = useState<Record<string, boolean>>({})
 
-  // Calculate total weight excluding indicator-table / likert (which have no separate question weight)
-  const totalWeight = questions.reduce((sum, q) => {
-    if (q.type === 'indicator-table' || q.type === 'likert') return sum
-    return sum + (q.scoring.weight || 0)
-  }, 0)
+  const toggleAspectCollapse = (aspectId: string) => {
+    setCollapsedAspects((prev) => ({ ...prev, [aspectId]: !prev[aspectId] }))
+  }
+
+  // Calculate total weight and total indicator table max score using authoritative calculateQuestionScore
+  const { totalWeight, totalTableMaxPoints } = React.useMemo(() => {
+    let weight = 0
+    let tableMax = 0
+
+    questions.forEach((q) => {
+      const qScore = calculateQuestionScore(q, null)
+      if (q.type === 'indicator-table' || q.type === 'likert') {
+        tableMax += qScore.maximumScore
+      } else {
+        weight += qScore.maximumScore
+      }
+    })
+
+    return { totalWeight: weight, totalTableMaxPoints: tableMax }
+  }, [questions])
+
   const questionsWithKeys = questions.filter((q) => q.answerKey.kind !== 'none')
 
   // 1. STRICT FORM ORDER: Aspect order -> Question order inside Aspect
@@ -85,52 +103,65 @@ export function AnswerKeyInspector({
 
     onUpdateQuestion(question.questionId, {
       presentation: { ...question.presentation, indicators: updatedIndicators },
+      answerKey: { kind: 'indicator' },
     })
   }
 
   return (
     <div className="space-y-6">
       {/* Summary Bar */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 flex items-center gap-3">
-          <div className="p-3 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
-            <Icon name="fileQuestion" className="w-5 h-5" />
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 flex items-center gap-3">
+          <div className="p-2.5 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 shrink-0">
+            <Icon name="fileQuestion" className="w-4 h-4" />
           </div>
-          <div>
-            <div className="text-xs font-medium text-slate-400">Total Pertanyaan</div>
-            <div className="text-xl font-bold text-slate-100">{questions.length}</div>
+          <div className="min-w-0">
+            <div className="text-[11px] font-medium text-slate-400 truncate">Total Pertanyaan</div>
+            <div className="text-lg font-bold text-slate-100">{questions.length}</div>
           </div>
         </div>
 
-        <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 flex items-center gap-3">
-          <div className="p-3 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-            <Icon name="checkCircle" className="w-5 h-5" />
+        <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 flex items-center gap-3">
+          <div className="p-2.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0">
+            <Icon name="checkCircle" className="w-4 h-4" />
           </div>
-          <div>
-            <div className="text-xs font-medium text-slate-400">Kunci Terkonfigurasi</div>
-            <div className="text-xl font-bold text-emerald-400">
+          <div className="min-w-0">
+            <div className="text-[11px] font-medium text-slate-400 truncate">Kunci Terkonfigurasi</div>
+            <div className="text-lg font-bold text-emerald-400">
               {questionsWithKeys.length} <span className="text-xs font-normal text-slate-400">/ {questions.length}</span>
             </div>
           </div>
         </div>
 
-        <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 flex items-center gap-3">
-          <div className="p-3 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20">
-            <Icon name="zap" className="w-5 h-5" />
+        <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 flex items-center gap-3">
+          <div className="p-2.5 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20 shrink-0">
+            <Icon name="zap" className="w-4 h-4" />
           </div>
-          <div>
-            <div className="text-xs font-medium text-slate-400">Total Bobot Skor Pilihan</div>
-            <div className="text-xl font-bold text-amber-300">{totalWeight} pt</div>
+          <div className="min-w-0">
+            <div className="text-[11px] font-medium text-slate-400 truncate">Bobot Soal Biasa</div>
+            <div className="text-lg font-bold text-amber-300">{totalWeight} pt</div>
           </div>
         </div>
 
-        <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 flex items-center gap-3">
-          <div className="p-3 rounded-lg bg-purple-500/10 text-purple-400 border border-purple-500/20">
-            <Icon name="sliders" className="w-5 h-5" />
+        <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 flex items-center gap-3">
+          <div className="p-2.5 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 shrink-0">
+            <Icon name="layers" className="w-4 h-4" />
           </div>
-          <div>
-            <div className="text-xs font-medium text-slate-400">Target Poin Versi</div>
-            <div className="text-xl font-bold text-purple-300">{scoring.totalPoints} pt</div>
+          <div className="min-w-0">
+            <div className="text-[11px] font-medium text-slate-400 truncate">Max Tabel Indikator</div>
+            <div className="text-lg font-bold text-blue-300">{totalTableMaxPoints} pt</div>
+          </div>
+        </div>
+
+        <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 flex items-center gap-3 col-span-2 sm:col-span-1">
+          <div className="p-2.5 rounded-lg bg-purple-500/10 text-purple-400 border border-purple-500/20 shrink-0">
+            <Icon name="sliders" className="w-4 h-4" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-[11px] font-medium text-slate-400 truncate">Target Evaluasi</div>
+            <div className="text-xs font-extrabold text-purple-300 truncate">
+              {scoring?.outputMode === 'per_aspect' ? '100% Per-Aspek' : `${scoring?.totalPoints ?? 100} pt (Keseluruhan)`}
+            </div>
           </div>
         </div>
       </div>
@@ -182,6 +213,10 @@ export function AnswerKeyInspector({
       {/* STRICT ASPECT-GROUPED QUESTION LIST */}
       <div className="space-y-6">
         {orderedAspects.map((asp, aspIdx) => {
+          if (asp.isScored === false) {
+            return null // Biodata aspects have no answer keys
+          }
+
           const aspectQuestions = questions.filter((q) => {
             const matchesAspect = filterAspect === 'all' || q.aspectId === filterAspect
             const matchesSearch = q.prompt.toLowerCase().includes(search.toLowerCase()) || q.questionId.toLowerCase().includes(search.toLowerCase())
@@ -192,21 +227,49 @@ export function AnswerKeyInspector({
 
           if (aspectQuestions.length === 0) return null
 
+          // Calculate max score across ALL questions belonging to this aspect (unfiltered by UI search filter)
+          const allAspQuestions = questions.filter(
+            (q) => (q.aspectId || orderedAspects[0].aspectId) === asp.aspectId
+          )
+
+          const aspChoiceWeight = allAspQuestions.reduce((sum, q) => {
+            if (q.type === 'indicator-table' || q.type === 'likert') return sum
+            return sum + calculateQuestionScore(q, null).maximumScore
+          }, 0)
+
+          const aspTableMax = allAspQuestions.reduce((sum, q) => {
+            if (q.type !== 'indicator-table' && q.type !== 'likert') return sum
+            return sum + calculateQuestionScore(q, null).maximumScore
+          }, 0)
+
+          const aspMaxScore = aspChoiceWeight + aspTableMax
+
           return (
             <div key={asp.aspectId} className="space-y-4">
-              {/* Aspect Header Banner */}
-              <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl flex items-center justify-between">
+              {/* Aspect Header Accordion Banner */}
+              <button
+                type="button"
+                onClick={() => toggleAspectCollapse(asp.aspectId)}
+                className="w-full p-3 bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-xl flex items-center justify-between transition-all cursor-pointer text-left shadow-sm"
+              >
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">
                     ASPEK {String(aspIdx + 1).padStart(2, '0')}
                   </span>
                   <h3 className="text-sm font-bold text-slate-100">{asp.title}</h3>
                 </div>
-                <span className="text-xs font-mono text-slate-400">({aspectQuestions.length} Pertanyaan)</span>
-              </div>
+                <div className="flex items-center gap-2 text-xs font-mono text-slate-400">
+                  <span className="text-amber-300 font-bold bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                    Max {aspMaxScore} pt {aspTableMax > 0 ? `(${aspChoiceWeight} pt Opsi + ${aspTableMax} pt Tabel)` : ''}
+                  </span>
+                  <span>({aspectQuestions.length} Soal)</span>
+                  <Icon name={collapsedAspects[asp.aspectId] ? 'chevronDown' : 'chevronUp'} className="w-4 h-4 text-cyan-400 shrink-0" />
+                </div>
+              </button>
 
               {/* Questions inside Aspect */}
-              <div className="space-y-4">
+              {!collapsedAspects[asp.aspectId] && (
+                <div className="space-y-4">
                 {aspectQuestions.map((q) => {
                   const displayNum = displayNumbers.get(q.questionId) || 1
                   const isIndicatorTable = q.type === 'indicator-table' || q.type === 'likert'
@@ -340,6 +403,85 @@ export function AnswerKeyInspector({
                           </div>
                         )}
 
+                        {/* Rating Scale Direct Key Config */}
+                        {q.type === 'rating' && (
+                          <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 space-y-2 text-xs">
+                            <div className="font-semibold text-slate-200">Konfigurasi Target Nilai Rating:</div>
+                            <div className="flex items-center gap-3">
+                              <span className="text-slate-400">Target Skala Maksimal:</span>
+                              <input
+                                type="number"
+                                min={1}
+                                max={10}
+                                value={q.presentation?.ratingMax || 5}
+                                onChange={(e) =>
+                                  onUpdateQuestion(q.questionId, {
+                                    presentation: { ...q.presentation, ratingMax: Number(e.target.value) || 5 },
+                                  })
+                                }
+                                className="w-16 bg-slate-950 border border-slate-700 text-amber-300 font-bold text-center text-xs rounded px-2 py-1 focus:outline-none"
+                              />
+                              <span className="text-slate-400">Skala Bintang/Poin</span>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Text / Textarea / Short Text / Long Text Direct Key Notes */}
+                        {['text', 'textarea', 'short-text', 'long-text'].includes(q.type) && (
+                          <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 space-y-2 text-xs">
+                            <div className="font-semibold text-slate-200">Kunci Referensi Jawaban Teks / Uraian:</div>
+                            <textarea
+                              rows={2}
+                              value={q.presentation?.placeholder || ''}
+                              onChange={(e) =>
+                                onUpdateQuestion(q.questionId, {
+                                  presentation: { ...q.presentation, placeholder: e.target.value },
+                                })
+                              }
+                              placeholder="Tuliskan kata kunci / panduan penilaian uraian di sini..."
+                              className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg p-2.5 focus:outline-none focus:border-cyan-500"
+                            />
+                          </div>
+                        )}
+
+                        {/* Number / Date Direct Key Reference */}
+                        {['number', 'date'].includes(q.type) && (
+                          <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 space-y-2 text-xs">
+                            <div className="font-semibold text-slate-200">
+                              Target Referensi {q.type === 'number' ? 'Angka / Nilai' : 'Tanggal'}:
+                            </div>
+                            <input
+                              type={q.type === 'number' ? 'number' : 'text'}
+                              value={q.presentation?.placeholder || ''}
+                              onChange={(e) =>
+                                onUpdateQuestion(q.questionId, {
+                                  presentation: { ...q.presentation, placeholder: e.target.value },
+                                })
+                              }
+                              placeholder={q.type === 'number' ? 'Misal: 100' : 'Misal: YYYY-MM-DD'}
+                              className="w-full bg-slate-950 border border-slate-700 text-amber-300 font-bold text-xs rounded-lg px-3 py-2 focus:outline-none"
+                            />
+                          </div>
+                        )}
+
+                        {/* File Upload / Image / Signature Verification Note */}
+                        {['file-upload', 'image', 'signature'].includes(q.type) && (
+                          <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 space-y-2 text-xs">
+                            <div className="font-semibold text-slate-200">Panduan Verifikasi Lampiran / Tanda Tangan:</div>
+                            <input
+                              type="text"
+                              value={q.presentation?.placeholder || ''}
+                              onChange={(e) =>
+                                onUpdateQuestion(q.questionId, {
+                                  presentation: { ...q.presentation, placeholder: e.target.value },
+                                })
+                              }
+                              placeholder="Panduan verifikasi berkas / Bukti fisik..."
+                              className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-2 focus:outline-none"
+                            />
+                          </div>
+                        )}
+
                         {/* Indicator Table / Likert Direct Detailed Score Customization for EVERY Single Indicator */}
                         {isIndicatorTable && (
                           <div className="space-y-3">
@@ -370,20 +512,24 @@ export function AnswerKeyInspector({
                                               key={sIdx}
                                               className="p-1.5 rounded bg-slate-950 border border-slate-800 flex items-center justify-between gap-1 text-[11px]"
                                             >
-                                              <span className="text-slate-400 truncate pr-1">
-                                                {s.label.split(' ')[0] || `Opsi ${sIdx + 1}`}
+                                              <span className="text-slate-400 truncate pr-1 font-medium">
+                                                {s.label}
                                               </span>
                                               <input
                                                 type="number"
+                                                min={0}
+                                                max={scales.length}
                                                 value={currentScoreVal}
-                                                onChange={(e) =>
+                                                onChange={(e) => {
+                                                  const rawVal = Number(e.target.value) || 0
+                                                  const clampedVal = Math.min(scales.length, Math.max(0, rawVal))
                                                   updateIndicatorScoreInInspector(
                                                     q,
                                                     ind.indicatorId,
                                                     choiceKey,
-                                                    Number(e.target.value) || 0
+                                                    clampedVal
                                                   )
-                                                }
+                                                }}
                                                 className="w-10 bg-slate-900 border border-slate-700 text-amber-300 font-bold text-center text-xs rounded px-1 py-0.5 focus:outline-none focus:border-amber-500"
                                               />
                                             </div>
@@ -423,26 +569,9 @@ export function AnswerKeyInspector({
 
                       {/* Question Weight Section (ONLY FOR ORDINARY SCORED QUESTIONS, HIDDEN FOR INDICATOR TABLES) */}
                       {!isIndicatorTable && (
-                        <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-                          <div className="flex items-center gap-3 w-full sm:w-auto">
-                            <span className="font-bold text-amber-400">SKEMA PENILAIAN:</span>
-                            <select
-                              value={q.scoring.scheme}
-                              onChange={(e) =>
-                                onUpdateQuestion(q.questionId, {
-                                  scoring: { ...q.scoring, scheme: e.target.value as Question['scoring']['scheme'] },
-                                })
-                              }
-                              className="bg-slate-900 border border-slate-700 text-amber-200 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none"
-                            >
-                              <option value="none">none (Tanpa Skor)</option>
-                              <option value="binary">binary (Biner)</option>
-                              <option value="rating">rating (Rating)</option>
-                            </select>
-                          </div>
-
+                        <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-3 text-xs">
+                          <span className="font-bold text-slate-300">BOBOT / POIN SOAL (WEIGHT 0–50):</span>
                           <div className="flex items-center gap-2">
-                            <span className="font-bold text-amber-400">BOBOT (WEIGHT 0–50):</span>
                             <input
                               type="number"
                               min={0}
@@ -467,6 +596,7 @@ export function AnswerKeyInspector({
                   )
                 })}
               </div>
+              )}
             </div>
           )
         })}

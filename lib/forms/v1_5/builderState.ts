@@ -69,6 +69,7 @@ export const DEFAULT_DISTRIBUTION: FormDistributionConfig = {
 export const DEFAULT_SCORING_CONFIG: ScoringConfig = {
   totalPoints: 100,
   mode: 'auto',
+  outputMode: 'both',
   stagePointDistribution: { aspect_hygiene: 50, aspect_storage: 50 },
   allowOverride: true,
   autoBalance: true,
@@ -137,14 +138,23 @@ export function moveQuestionToAspect(state: BuilderState, questionId: string, ta
   }
 }
 
+export function computeBalancedAspectWeights(aspects: FormAspect[]): Record<string, number> {
+  const scoredAspects = aspects.filter((a) => a.isScored !== false)
+  const stageDist: Record<string, number> = {}
+  if (scoredAspects.length === 0) return stageDist
+
+  const autoPoints = Math.floor(100 / scoredAspects.length)
+  scoredAspects.forEach((a, idx) => {
+    stageDist[a.aspectId] =
+      idx === scoredAspects.length - 1 ? 100 - autoPoints * (scoredAspects.length - 1) : autoPoints
+  })
+  return stageDist
+}
+
 export function addAspect(state: BuilderState, aspect: FormAspect): BuilderState {
   if (state.aspects.some((a) => a.aspectId === aspect.aspectId)) throw new Error('aspectId must be unique.')
   const updatedAspects = [...state.aspects, structuredClone(aspect)]
-  const autoPoints = Math.floor(100 / updatedAspects.length)
-  const stageDist: Record<string, number> = {}
-  updatedAspects.forEach((a, idx) => {
-    stageDist[a.aspectId] = idx === updatedAspects.length - 1 ? 100 - autoPoints * (updatedAspects.length - 1) : autoPoints
-  })
+  const stageDist = computeBalancedAspectWeights(updatedAspects)
 
   return {
     ...state,
@@ -155,11 +165,7 @@ export function addAspect(state: BuilderState, aspect: FormAspect): BuilderState
 
 export function updateAspect(state: BuilderState, aspectId: string, update: Partial<FormAspect>): BuilderState {
   const updatedAspects = state.aspects.map((a) => (a.aspectId === aspectId ? { ...a, ...structuredClone(update), aspectId } : a))
-  const stageDist = { ...(state.scoring?.stagePointDistribution || {}) }
-
-  if (update.isScored === false) {
-    delete stageDist[aspectId]
-  }
+  const stageDist = computeBalancedAspectWeights(updatedAspects)
 
   return {
     ...state,
@@ -173,8 +179,8 @@ export function deleteAspect(state: BuilderState, aspectId: string): BuilderStat
   const updatedAspects = state.aspects.filter((a) => a.aspectId !== aspectId)
   const fallbackAspectId = updatedAspects[0].aspectId
   const updatedQuestions = state.questions.map((q) => (q.aspectId === aspectId ? { ...q, aspectId: fallbackAspectId } : q))
-  const stageDist = { ...state.scoring.stagePointDistribution }
-  delete stageDist[aspectId]
+  const stageDist = computeBalancedAspectWeights(updatedAspects)
+
   return {
     ...state,
     aspects: updatedAspects,

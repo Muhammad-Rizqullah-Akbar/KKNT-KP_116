@@ -62,3 +62,24 @@ export function formAggregateToCanonicalForm(doc: FormAggregateDoc): CanonicalFo
     },
   }
 }
+
+/**
+ * Convert BuilderState to CanonicalForm for local validation.
+ */
+export function builderStateToCanonicalForm(state: BuilderState): CanonicalForm {
+  return {
+    form: {
+      formId: 'draft',
+      metadata: state.metadata,
+    },
+    version: {
+      versionId: 'draft',
+      formId: 'draft',
+      versionNumber: 1,
+      status: 'draft',
+      questions: state.questions,
+      scoring: state.scoring,
+      validation: state.validation,
+    },
+  }
+}

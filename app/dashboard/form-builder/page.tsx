@@ -616,7 +616,7 @@ export default function FormBuilderPage() {
         result = { id: formId }
       } else {
         result = await createForm(formData)
-        setFormId(result.id)
+        setFormId(result.id || null)
         
         const url = new URL(window.location.href)
         url.searchParams.set('id', result.id || '')
