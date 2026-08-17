@@ -486,6 +486,45 @@ export async function getResponseDetailWorkflow(
     throw new Error('Anda tidak memiliki hak akses untuk melihat respon ini.')
   }
 
+  // Preserve legacy forms vs V1.5 modern forms
+  if (!resp.result || !Array.isArray(resp.result.aspects) || resp.result.aspects.length === 0) {
+    try {
+      if (resp.formId || resp.versionId) {
+        const { recalculatedResult } = await recalculateResponseResultWorkflow(responseId)
+        if (recalculatedResult && recalculatedResult.aspects && recalculatedResult.aspects.length > 0) {
+          resp.result = recalculatedResult
+          return resp
+        }
+      }
+    } catch (e) {
+      console.warn(`Lazy recalculate fallback for response ${responseId}:`, e)
+    }
+
+    if (!resp.result) {
+      const legacyScore =
+        (resp as any).score ??
+        (resp as any).totalScore ??
+        (resp as any).finalScore ??
+        (resp as any).scoringDetails?.score ??
+        0
+      const scorePct = Math.min(100, Math.max(0, Math.round(Number(legacyScore) || 0)))
+
+      resp.result = {
+        scoringEngineVersion: 'legacy-v1',
+        calculatedAt: resp.submittedAt || (resp as any).createdAt || (resp as any).updatedAt || new Date().toISOString(),
+        rawScore: scorePct,
+        maximumScore: 100,
+        percentage: scorePct,
+        grade: scorePct >= 80 ? 'Grade A' : scorePct >= 60 ? 'Grade B' : 'Grade C',
+        thresholdId: 'legacy-threshold',
+        thresholdTitle: scorePct >= 80 ? 'Memenuhi Syarat (MS)' : scorePct >= 60 ? 'Binaan Lanjutan' : 'Perlu Perbaikan',
+        aspects: [],
+        questions: [],
+        recommendations: [],
+      }
+    }
+  }
+
   return resp
 }
 

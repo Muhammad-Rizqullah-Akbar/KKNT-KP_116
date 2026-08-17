@@ -75,6 +75,32 @@ function CircularScoreGauge({ score, grade }: { score: number; grade: string }) 
   )
 }
 
+function expandScaleLabel(label: any): string {
+  if (label === undefined || label === null || label === '') return '-'
+  const str = String(label).trim()
+  const clean = str.replace(/^(\d+[\.\-\s\(\)\:]+)+/g, '').replace(/[\(\)]/g, '').trim()
+  const upper = clean.toUpperCase()
+
+  if (upper === 'STS') return 'Sangat Tidak Setuju'
+  if (upper === 'TS') return 'Tidak Setuju'
+  if (upper === 'N') return 'Netral'
+  if (upper === 'S') return 'Setuju'
+  if (upper === 'SS') return 'Sangat Setuju'
+
+  if (upper === 'STMS') return 'Sangat Tidak Memenuhi Syarat'
+  if (upper === 'TMS') return 'Tidak Memenuhi Syarat'
+  if (upper === 'MS') return 'Memenuhi Syarat'
+  if (upper === 'SMS') return 'Sangat Memenuhi Syarat'
+
+  if (upper === 'SK') return 'Sangat Kurang'
+  if (upper === 'K') return 'Kurang'
+  if (upper === 'C') return 'Cukup'
+  if (upper === 'B') return 'Baik'
+  if (upper === 'SB') return 'Sangat Baik'
+
+  return str
+}
+
 // FORMAT ANSWER VALUE HELPER (MATCHING DATA RESPONDEN)
 const formatAnswerValue = (value: any): { type: 'text' | 'signature' | 'table' | 'array'; content: any } => {
   if (value === null || value === undefined) return { type: 'text', content: '-' }
@@ -877,12 +903,91 @@ export default function ResponsesDashboardPage() {
               </div>
 
               {/* MAIN SECTION: RESPONDENT ANSWERS */}
-              <div className="space-y-3 pt-2">
-                <h4 className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+              <div className="space-y-4 pt-2">
+                <h4 className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-800 pb-2">
                   <Icon name="fileText" className="w-3.5 h-3.5 text-cyan-400" />
                   Rincian Pertanyaan & Jawaban Responden:
                 </h4>
-                  {Object.entries(selectedRespondent.answers || {}).map(([key, value], idx) => {
+
+                {selectedRespondent.result?.questions && selectedRespondent.result.questions.length > 0 ? (
+                  selectedRespondent.result.questions.map((q: any, qIdx: number) => {
+                    const type = q.questionType || q.type
+                    const prompt = q.prompt || `Pertanyaan ${qIdx + 1}`
+                    const aspectTitle = q.aspectTitle || (q.aspectId !== 'default' ? q.aspectId : '')
+
+                    return (
+                      <div key={q.questionId || qIdx} className="p-4 rounded-2xl bg-slate-900 border border-slate-800/80 space-y-3">
+                        <div className="flex items-center justify-between gap-2 flex-wrap text-[10px] font-mono font-bold text-cyan-400">
+                          <span>Pertanyaan #{String(qIdx + 1).padStart(2, '0')} {aspectTitle ? `• ${aspectTitle}` : ''}</span>
+                          {q.maximumScore > 0 && (
+                            <span className="px-2 py-0.5 rounded-md bg-cyan-950 border border-cyan-500/30 text-cyan-300">
+                              {q.percentage}% ({q.rawScore}/{q.maximumScore} Poin)
+                            </span>
+                          )}
+                        </div>
+
+                        <p className="text-xs font-bold text-slate-100 leading-snug">{prompt}</p>
+
+                        {/* INDICATOR TABLE QUESTION */}
+                        {(type === 'indicator-table' || type === 'likert') && q.details?.indicators && (
+                          <div className="overflow-x-auto rounded-xl border border-slate-800/80">
+                            <table className="w-full text-xs font-mono">
+                              <thead className="bg-slate-950 text-slate-400 text-[10px] uppercase font-bold">
+                                <tr>
+                                  <th className="text-left p-2.5 px-3.5 border-r border-slate-800 font-sans">Indikator Penilaian</th>
+                                  <th className="text-right p-2.5 px-3.5 font-sans">Jawaban Responden</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-800/80 bg-slate-900">
+                                {q.details.indicators.map((ind: any, iIdx: number) => (
+                                  <tr key={iIdx} className="hover:bg-slate-800/40 transition-colors">
+                                    <td className="p-2.5 px-3.5 font-sans text-slate-200 border-r border-slate-800">{ind.label || `Indikator ${iIdx + 1}`}</td>
+                                    <td className="p-2.5 px-3.5 text-right font-bold text-cyan-300">
+                                      {expandScaleLabel(ind.selectedValue ?? ind.value ?? '-')}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+
+                        {/* SINGLE CHOICE / DROPDOWN / BINARY */}
+                        {(type === 'single-choice' || type === 'dropdown' || type === 'binary') && (
+                          <div className="p-3 rounded-xl bg-slate-950 border border-slate-800/80 text-xs font-mono text-cyan-300 font-bold">
+                            {expandScaleLabel(q.selectedValue || q.value || '-')}
+                          </div>
+                        )}
+
+                        {/* MULTIPLE CHOICE / ARRAY */}
+                        {type === 'multiple-choice' && (
+                          <div className="flex flex-wrap gap-1.5 pt-1">
+                            {(Array.isArray(q.selectedValue) ? q.selectedValue : [q.selectedValue]).map((item: any, i: number) => (
+                              <span key={i} className="px-3 py-1 rounded-xl bg-cyan-950 border border-cyan-500/40 text-xs font-mono text-cyan-300 font-bold">
+                                {expandScaleLabel(item)}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* SIGNATURE */}
+                        {type === 'signature' && (
+                          <div className="rounded-xl overflow-hidden border border-slate-800 bg-white p-2 max-w-xs">
+                            <img src={q.selectedValue || (selectedRespondent.answers as any)?.[q.questionId]} alt="Tanda Tangan" className="max-h-32 mx-auto" />
+                          </div>
+                        )}
+
+                        {/* TEXT / OTHER */}
+                        {!['indicator-table', 'likert', 'single-choice', 'dropdown', 'binary', 'multiple-choice', 'signature'].includes(type) && (
+                          <div className="p-3 rounded-xl bg-slate-950 border border-slate-800/80 text-xs font-mono text-slate-200">
+                            {String(q.selectedValue || (selectedRespondent.answers as any)?.[q.questionId] || '-')}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })
+                ) : (
+                  Object.entries(selectedRespondent.answers || {}).map(([key, value], idx) => {
                     if (
                       [
                         'respondentName',
@@ -912,7 +1017,6 @@ export default function ResponsesDashboardPage() {
                         {type === 'signature' && (
                           <div className="rounded-xl overflow-hidden border border-slate-800 bg-white p-2 max-w-xs">
                             <img src={content} alt="Tanda Tangan Digital" className="max-h-32 mx-auto" />
-                            <p className="text-[10px] text-cyan-600 text-center font-mono mt-1">📝 Tanda tangan digital</p>
                           </div>
                         )}
 
@@ -930,7 +1034,7 @@ export default function ResponsesDashboardPage() {
                                   <tr key={i}>
                                     <td className="p-2.5 px-3.5 font-sans text-slate-300 border-r border-slate-800">{subKey}</td>
                                     <td className="p-2.5 px-3.5 text-right font-bold text-cyan-300">
-                                      {typeof subVal === 'object' ? JSON.stringify(subVal) : String(subVal)}
+                                      {expandScaleLabel(subVal)}
                                     </td>
                                   </tr>
                                 ))}
@@ -946,7 +1050,7 @@ export default function ResponsesDashboardPage() {
                                 key={i}
                                 className="px-3 py-1 rounded-xl bg-cyan-950 border border-cyan-500/40 text-xs font-mono text-cyan-300 font-bold"
                               >
-                                {typeof item === 'object' ? JSON.stringify(item) : String(item)}
+                                {expandScaleLabel(item)}
                               </span>
                             ))}
                           </div>
@@ -954,13 +1058,14 @@ export default function ResponsesDashboardPage() {
 
                         {type === 'text' && (
                           <div className="p-3 rounded-xl bg-slate-950 border border-slate-800/80 text-xs font-mono text-slate-200">
-                            {content}
+                            {expandScaleLabel(content)}
                           </div>
                         )}
                       </div>
                     )
-                  })}
-                </div>
+                  })
+                )}
+              </div>
             </div>
 
             {/* Modal Footer */}
