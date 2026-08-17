@@ -181,10 +181,11 @@ export function ProfileProgressModal({ isOpen, onClose, userOverride }: ProfileP
 
   useEffect(() => {
     if (userData) {
-      setEditDisplayName(userData.displayName || '')
-      setEditOrganization(userData.organization || '')
-      setEditPartnershipType(userData.partnershipType || 'Sekolah')
-      setEditPhone(userData.phone || '')
+      const u = userData as any
+      setEditDisplayName(u.displayName || '')
+      setEditOrganization(u.organization || '')
+      setEditPartnershipType(u.partnershipType || 'Sekolah')
+      setEditPhone(u.phone || '')
     }
   }, [userData])
 
@@ -278,7 +279,7 @@ export function ProfileProgressModal({ isOpen, onClose, userOverride }: ProfileP
                 </span>
               </div>
               <p className="text-xs text-slate-400 font-mono">
-                {user?.email} • Instansi: <span className="text-cyan-300 font-bold">{userData?.organization || 'BPOM / Umum'}</span> ({userData?.partnershipType || 'Sekolah'})
+                {user?.email} • Instansi: <span className="text-cyan-300 font-bold">{(userData as any)?.organization || 'BPOM / Umum'}</span> ({(userData as any)?.partnershipType || 'Sekolah'})
               </p>
             </div>
           </div>

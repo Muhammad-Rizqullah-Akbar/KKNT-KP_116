@@ -181,7 +181,7 @@ export function Navbar({ transparent = false, onOpenCodeModal }: NavbarProps) {
               href="/dashboard/overview"
               className="px-3.5 py-2 rounded-xl text-xs font-medium text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 hover:bg-cyan-500/20 transition-all flex items-center gap-1.5"
             >
-              <Icon name="layoutDashboard" className="w-3.5 h-3.5" />
+              <Icon name="layoutGrid" className="w-3.5 h-3.5" />
               <span>Dashboard</span>
             </Link>
           )}
@@ -192,7 +192,7 @@ export function Navbar({ transparent = false, onOpenCodeModal }: NavbarProps) {
             className="group relative inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-semibold text-white bg-gradient-to-r from-cyan-600 via-teal-600 to-cyan-600 hover:from-cyan-500 hover:to-teal-500 shadow-lg shadow-cyan-600/20 hover:shadow-cyan-500/35 transition-all duration-300 hover:-translate-y-0.5 overflow-hidden cursor-pointer active:scale-95"
           >
             <span className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-in-out" />
-            <Icon name="key" className="w-4 h-4 text-cyan-200 group-hover:rotate-12 transition-transform duration-300" />
+            <Icon name="keyRound" className="w-4 h-4 text-cyan-200 group-hover:rotate-12 transition-transform duration-300" />
             <span>Buka Formulir</span>
           </button>
         </div>
@@ -203,7 +203,7 @@ export function Navbar({ transparent = false, onOpenCodeModal }: NavbarProps) {
             onClick={onOpenCodeModal}
             className="px-3 py-2 rounded-xl bg-cyan-600/20 border border-cyan-500/30 text-cyan-400 text-xs font-medium flex items-center gap-1.5 active:scale-95 transition-transform"
           >
-            <Icon name="key" className="w-3.5 h-3.5" />
+            <Icon name="keyRound" className="w-3.5 h-3.5" />
             <span>Form</span>
           </button>
 
@@ -282,7 +282,7 @@ export function Navbar({ transparent = false, onOpenCodeModal }: NavbarProps) {
                 onClick={() => setIsMobileMenuOpen(false)}
                 className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 rounded-xl"
               >
-                <Icon name="layoutDashboard" className="w-4 h-4" />
+                <Icon name="layoutGrid" className="w-4 h-4" />
                 <span>Masuk ke Dashboard Admin</span>
               </Link>
             )}
@@ -295,7 +295,7 @@ export function Navbar({ transparent = false, onOpenCodeModal }: NavbarProps) {
               }}
               className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-cyan-600 via-teal-600 to-cyan-600 text-white text-sm font-semibold flex items-center justify-center gap-2 shadow-lg shadow-cyan-600/20 active:scale-95 transition-all"
             >
-              <Icon name="key" className="w-4 h-4" />
+              <Icon name="keyRound" className="w-4 h-4" />
               <span>Buka Formulir Publik</span>
             </button>
           </div>

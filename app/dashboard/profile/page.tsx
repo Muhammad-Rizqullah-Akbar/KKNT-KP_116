@@ -48,8 +48,8 @@ export default function UserProfileProgressPage() {
         const userDisplayName = (userData?.displayName || user?.displayName || '').toLowerCase().trim()
 
         const myArticles = allArticles.filter((a) => {
-          if (a.authorId && userUid && a.authorId === userUid) return true
-          if (a.createdBy && userUid && a.createdBy === userUid) return true
+          if ((a as any).authorId && userUid && (a as any).authorId === userUid) return true
+          if ((a as any).createdBy && userUid && (a as any).createdBy === userUid) return true
 
           const authorLower = (a.author || '').toLowerCase().trim()
           if (userEmail && authorLower === userEmail) return true

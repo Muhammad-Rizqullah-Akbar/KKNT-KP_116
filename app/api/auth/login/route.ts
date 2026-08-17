@@ -26,79 +26,59 @@ export async function POST(request: NextRequest) {
       console.warn('Firestore user fetch warning:', fsErr)
     }
 
-    if (userDoc) {
-      uid = userDoc.uid || userDoc.id
-      userRole = userDoc.role || 'cadre'
-      userDisplayName = userDoc.displayName || cleanEmail.split('@')[0]
+    // Authentication Boundary: Login ≠ Registration.
+    // Non-registered users MUST NOT be automatically created via login.
+    if (!userDoc) {
+      return NextResponse.json(
+        { success: false, message: 'Akun belum terdaftar pada sistem. Hubungi administrator.' },
+        { status: 401 }
+      )
     }
 
-    // 2. Check/sync user in Firebase Auth via Admin SDK or REST API
+    uid = userDoc.uid || userDoc.id
+    userRole = userDoc.role || 'cadre'
+    userDisplayName = userDoc.displayName || cleanEmail.split('@')[0]
+
+    // 2. Resolve Auth user in Firebase Auth via Admin SDK or REST API
     let authUser: any = null
     try {
       authUser = await adminAuth.getUserByEmail(cleanEmail)
       uid = authUser.uid
     } catch (e) {
-      // User not in Firebase Auth yet; auto-create user in Firebase Auth
+      // If user exists in Firestore but Auth user is missing, sync Auth account for this registered user
       try {
         authUser = await adminAuth.createUser({
+          uid,
           email: cleanEmail,
           password,
           displayName: userDisplayName,
           emailVerified: true,
         })
-        uid = authUser.uid
       } catch (createErr: any) {
-        console.warn('Failed to create Firebase Auth user via adminAuth, trying REST fallback:', createErr?.message || createErr)
+        console.warn('Failed to sync Auth user for registered profile:', createErr?.message || createErr)
       }
     }
 
     if (authUser) {
-      // Sync password to ensure future client logins work
+      // Sync password to ensure client logins work
       try {
         await adminAuth.updateUser(authUser.uid, { password })
       } catch (e) {
         console.warn('Password sync warning:', e)
       }
-    }
-
-    // Fallback: If adminAuth failed, use REST API to authenticate/register in Firebase Auth
-    if (!uid || !authUser) {
-      const { restSignInWithEmail, restSignUpWithEmail } = await import('@/lib/firebaseRestAuth')
+    } else {
+      const { restSignInWithEmail } = await import('@/lib/firebaseRestAuth')
       const restSignIn = await restSignInWithEmail(cleanEmail, password)
       if (restSignIn?.uid) {
         uid = restSignIn.uid
-      } else {
-        const restSignUp = await restSignUpWithEmail(cleanEmail, password, userDisplayName)
-        if (restSignUp?.uid) {
-          uid = restSignUp.uid
-        }
       }
     }
 
     if (!uid) {
       return NextResponse.json(
-        { success: false, message: 'Akun belum terdaftar pada sistem.' },
+        { success: false, message: 'Gagal memverifikasi identitas akun yang terdaftar.' },
         { status: 401 }
       )
-    }
-
-    // Ensure user document profile exists in Firestore
-    if (!userDoc) {
-      const newUserProfile = {
-        uid,
-        email: cleanEmail,
-        displayName: userDisplayName,
-        role: userRole,
-        photoURL: '',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      }
-      try {
-        await adminFirestore.collection('users').doc(uid).set(newUserProfile, { merge: true })
-        userDoc = newUserProfile
-      } catch (e) {
-        console.warn('Failed to auto-create user profile in Firestore:', e)
-      }
     }
 
     // 3. Generate custom token for client SDK authentication
@@ -110,15 +90,13 @@ export async function POST(request: NextRequest) {
     }
 
     // 4. Return user credentials & role
-    const response = NextResponse.json({
+    return NextResponse.json({
       success: true,
       customToken,
       uid,
       role: userRole,
-      userData: userDoc || { uid, email: cleanEmail, displayName: userDisplayName, role: userRole },
+      userData: userDoc,
     })
-
-    return response
   } catch (error: any) {
     console.error('Server login route error:', error)
     return NextResponse.json(

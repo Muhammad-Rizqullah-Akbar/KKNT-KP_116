@@ -23,6 +23,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<LoginResult>
   logout: () => Promise<void>
   refreshUser: () => Promise<void>
+  refreshUserData: () => Promise<void>
 }
 
 // ============ CONTEXT ============
@@ -44,6 +45,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  const validRoles = ['super_admin', 'admin', 'internal_bpom', 'partnership', 'cadre']
+
   // Listen to auth state changes & Sinkronisasi Session
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -51,7 +54,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       if (currentUser) {
         const data = await getUserData(currentUser.uid)
-        const validRoles = ['super_admin', 'admin', 'internal_bpom', 'partnership', 'cadre']
         
         // Cek jika user terdaftar memiliki role yang valid
         if (data && data.role && validRoles.includes(data.role)) {
@@ -69,23 +71,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => unsubscribe()
   }, [])
 
-  // Login Email & Password wrapper
-  const login = async (email: string, password: string) => {
-    const result = await loginWithEmail(email, password)
+  // Login wrapper
+  const handleLogin = async (email: string, pass: string): Promise<LoginResult> => {
+    const result = await loginWithEmail(email, pass)
     setUser(result.user)
     setUserData(result.userData)
     return result
   }
 
   // Logout wrapper
-  const handleLogout = async () => {
+  const handleLogout = async (): Promise<void> => {
     await logout()
     setUser(null)
     setUserData(null)
   }
 
   const userRole = userData?.role || null
-  const validRoles = ['super_admin', 'admin', 'internal_bpom', 'partnership', 'cadre']
 
   return (
     <AuthContext.Provider
@@ -95,9 +96,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         userRole,
         loading,
         isAuthenticated: !!user && !!userRole && validRoles.includes(userRole),
-        login,
+        login: handleLogin,
         logout: handleLogout,
         refreshUser,
+        refreshUserData: refreshUser,
       }}
     >
       {children}

@@ -22,6 +22,8 @@ export interface ArticleData {
   slug: string
   author: string
   authorUid?: string
+  authorId?: string
+  createdBy?: string
   authorRole?: string
   authorOrganization?: string
   authorBio: string

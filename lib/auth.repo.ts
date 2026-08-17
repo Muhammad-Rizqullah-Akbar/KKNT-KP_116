@@ -30,6 +30,10 @@ export interface UserData {
   displayName: string
   role: UserRole
   photoURL?: string
+  organization?: string
+  partnershipType?: string
+  phone?: string
+  cadreCode?: string
   createdAt?: string
   updatedAt?: string
 }
@@ -189,8 +193,8 @@ export const loginWithEmail = async (
         }
 
         if (!user) {
-          const { restSignInWithEmail, restSignUpWithEmail } = await import('@/lib/firebaseRestAuth')
-          const restRes = (await restSignInWithEmail(email, password)) || (await restSignUpWithEmail(email, password, serverData.userData?.displayName))
+          const { restSignInWithEmail } = await import('@/lib/firebaseRestAuth')
+          const restRes = await restSignInWithEmail(email, password)
           if (restRes?.uid) {
             try {
               const reCred2 = await signInWithEmailAndPassword(auth, email, password)

@@ -303,7 +303,7 @@ function AdminOverviewDashboard() {
         if (!localStorage.getItem('dashboard_db_widgets_config_v2')) {
           const dynamicWidgets: any[] = []
           let pos = 0
-          formsData.forEach((form) => {
+          formsData.forEach((form: any) => {
             form.questions?.forEach((q: any) => {
               const type = q.answerType || q.type || 'short-text'
               if (['single-choice', 'multiple-choice', 'dropdown', 'indicator-table', 'likert', 'rating', 'binary'].includes(type)) {

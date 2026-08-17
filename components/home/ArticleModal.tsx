@@ -106,12 +106,12 @@ export function ArticleModal({ article, isOpen, onClose, categoryBadgeColors }: 
           {/* 🔥 DEDUPLIKASI TAGS + UNIQUE COMBINED KEY */}
           {uniqueTags.length > 0 && (
             <div className="flex flex-wrap gap-2 pt-4 border-t border-white/[0.06]">
-              {uniqueTags.map((tag: string, index: number) => (
+              {uniqueTags.map((tag: any, index: number) => (
                 <span 
-                  key={`${tag}-${index}`} 
+                  key={`${String(tag)}-${index}`} 
                   className="px-3 py-1.5 rounded-full bg-emerald-500/8 border border-emerald-500/15 text-xs text-emerald-400"
                 >
-                  {tag.startsWith('#') ? tag : `#${tag}`}
+                  {String(tag).startsWith('#') ? String(tag) : `#${String(tag)}`}
                 </span>
               ))}
             </div>
