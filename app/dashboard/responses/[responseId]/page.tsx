@@ -27,55 +27,6 @@ export default function ResponseDetailPage({ params }: PageProps) {
 
       if (data.success && data.response) {
         const resp = data.response
-        // Guarantee score & result structure for any response (legacy or modern)
-        if (!resp.result || typeof resp.result.percentage !== 'number') {
-          const rawScoreVal =
-            resp.result?.percentage ??
-            resp.result?.rawScore ??
-            resp.score ??
-            resp.totalScore ??
-            resp.percentage ??
-            resp.scoringDetails?.score ??
-            resp.finalScore
-
-          let scorePct = Math.round(Number(rawScoreVal) || 0)
-
-          if (!scorePct && resp.answers && typeof resp.answers === 'object') {
-            const entries = Object.entries(resp.answers)
-            let totalPts = 0
-            let earnedPts = 0
-            entries.forEach(([_, val]) => {
-              if (typeof val === 'number') {
-                totalPts += 5
-                earnedPts += Math.min(5, Math.max(0, val))
-              } else if (typeof val === 'object' && val !== null) {
-                Object.values(val).forEach((subVal) => {
-                  if (typeof subVal === 'number') {
-                    totalPts += 5
-                    earnedPts += Math.min(5, Math.max(0, subVal))
-                  } else if (subVal) {
-                    totalPts += 5
-                    earnedPts += 4
-                  }
-                })
-              } else if (val !== undefined && val !== null && val !== '') {
-                totalPts += 5
-                earnedPts += 4
-              }
-            })
-            scorePct = totalPts > 0 ? Math.round((earnedPts / totalPts) * 100) : (entries.length > 0 ? 80 : 0)
-          }
-
-          resp.result = {
-            percentage: scorePct,
-            grade: resp.result?.grade || (scorePct >= 80 ? 'A' : scorePct >= 60 ? 'B' : 'C'),
-            thresholdTitle: resp.result?.thresholdTitle || (scorePct >= 80 ? 'Memenuhi Syarat (MS)' : scorePct >= 60 ? 'Binaan Lanjutan' : 'Perlu Perbaikan'),
-            rawScore: resp.result?.rawScore || scorePct,
-            maximumScore: resp.result?.maximumScore || 100,
-            aspects: resp.result?.aspects || [],
-            questions: resp.result?.questions || [],
-          }
-        }
         setResponseDoc(resp)
       } else {
         setError(data.message || 'Gagal memuat detail respon.')
@@ -128,10 +79,10 @@ export default function ResponseDetailPage({ params }: PageProps) {
   const answerEntries = Object.entries(answers || {})
 
   // Low score indicators
-  const lowScoreQuestions = result?.questions?.filter((q) => q.includedInTotal && q.percentage < 60) || []
+  const lowScoreQuestions = result?.questions?.filter((q: any) => q.includedInTotal && q.percentage < 60) || []
   const allIndicators: Array<{ questionPrompt: string; label: string; score: number; max: number; value: any }> = []
 
-  result?.questions?.forEach((q) => {
+  result?.questions?.forEach((q: any) => {
     if (q.details?.indicators) {
       q.details.indicators.forEach((ind: any) => {
         allIndicators.push({
@@ -148,7 +99,7 @@ export default function ResponseDetailPage({ params }: PageProps) {
   const lowScoreIndicators = allIndicators.filter((ind) => ind.max > 0 && (ind.score / ind.max) < 0.6)
 
   // Filtered Question Results
-  const filteredQuestionResults = (result?.questions || []).filter((q) => {
+  const filteredQuestionResults = (result?.questions || []).filter((q: any) => {
     const matchesSearch =
       q.prompt.toLowerCase().includes(searchQuery.toLowerCase()) ||
       q.questionId.toLowerCase().includes(searchQuery.toLowerCase())
@@ -243,7 +194,7 @@ export default function ResponseDetailPage({ params }: PageProps) {
               <div className="flex items-center gap-4 text-xs text-slate-400 font-mono flex-wrap print:text-gray-700">
                 {responseDoc.respondent?.email && <span>Email: {responseDoc.respondent.email}</span>}
                 {responseDoc.respondent?.phone && <span>Telp: {responseDoc.respondent.phone}</span>}
-                {responseDoc.respondent?.address && <span>Lokasi: {responseDoc.respondent.address}</span>}
+                {(responseDoc.respondent as any)?.address && <span>Lokasi: {(responseDoc.respondent as any).address}</span>}
               </div>
             </div>
 
@@ -321,7 +272,7 @@ export default function ResponseDetailPage({ params }: PageProps) {
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {result.aspects.map((asp, idx) => (
+              {result.aspects.map((asp: any, idx: number) => (
                 <div key={asp.aspectId || idx} className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3 print:border-black print:bg-gray-50">
                   <div className="flex justify-between items-start gap-2">
                     <div>
