@@ -277,33 +277,38 @@ function renderQuestionInput(
             { value: 5, label: 'Sangat Baik' },
           ]
 
-      const sanitizedScales = rawScales.map((sc: any) => {
+      const sanitizedScales = rawScales.map((sc: any, sIdx: number) => {
         let text = String(sc.label || sc.text || sc.name || '')
         let clean = text.replace(/^(\d+[\.\-\s\(\)\:]+)+/g, '').replace(/[\(\)]/g, '').trim()
-        if (!clean) clean = text || `Opsi ${sc.value}`
+        if (!clean) clean = text || `Skala ${sIdx + 1}`
         return {
-          value: sc.value ?? sc.id ?? 1,
+          value: sc.value ?? sc.id ?? (sIdx + 1),
+          key: sc.id || clean,
           label: clean,
         }
       })
 
       return (
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-          {sanitizedScales.map((sc: any) => (
-            <button
-              key={sc.value}
-              type="button"
-              onClick={() => onChange(sc.value)}
-              disabled={isDisabled}
-              className={`p-4 rounded-xl border text-center text-xs font-semibold transition-all ${
-                value === sc.value
-                  ? 'bg-cyan-500/20 border-cyan-500 text-cyan-200 ring-1 ring-cyan-500/40 shadow-sm'
-                  : 'bg-slate-950/60 border-slate-800 text-slate-300 hover:bg-slate-800/80 hover:border-slate-700'
-              }`}
-            >
-              <div className="text-xs font-bold font-sans truncate">{sc.label}</div>
-            </button>
-          ))}
+          {sanitizedScales.map((sc: any) => {
+            const isSelected = value === sc.label || value === sc.key || value === sc.value
+
+            return (
+              <button
+                key={sc.key}
+                type="button"
+                onClick={() => onChange(sc.label)}
+                disabled={isDisabled}
+                className={`p-4 rounded-xl border text-center text-xs font-semibold transition-all ${
+                  isSelected
+                    ? 'bg-cyan-500/20 border-cyan-500 text-cyan-200 ring-1 ring-cyan-500/40 shadow-sm font-bold'
+                    : 'bg-slate-950/60 border-slate-800 text-slate-300 hover:bg-slate-800/80 hover:border-slate-700'
+                }`}
+              >
+                <div className="text-xs font-bold font-sans truncate">{sc.label}</div>
+              </button>
+            )
+          })}
         </div>
       )
     }
@@ -322,20 +327,24 @@ function renderQuestionInput(
             { value: 5, label: 'Sangat Baik' },
           ]
 
-      const sanitizedScales = rawScales.map((sc: any) => {
+      const sanitizedScales = rawScales.map((sc: any, sIdx: number) => {
         let text = String(sc.label || sc.text || sc.name || '')
         let clean = text.replace(/^(\d+[\.\-\s\(\)\:]+)+/g, '').replace(/[\(\)]/g, '').trim()
-        if (!clean) clean = text || String(sc.value)
+        if (!clean) clean = text || `Skala ${sIdx + 1}`
         return {
-          value: sc.value ?? sc.id ?? sc.score ?? 1,
+          value: sc.value ?? sc.id ?? sc.score ?? (sIdx + 1),
+          key: sc.id || clean,
           label: clean,
         }
       })
 
-      const tableAnswers: Record<string, number> = typeof value === 'object' && value ? value : {}
+      const tableAnswers: Record<string, any> = typeof value === 'object' && value ? value : {}
 
-      const setIndicatorVal = (indId: string, val: number) => {
-        onChange({ ...tableAnswers, [indId]: val })
+      const setIndicatorVal = (indId: string, val: any) => {
+        onChange({
+          ...tableAnswers,
+          [indId]: val,
+        })
       }
 
       if (indicators.length === 0) {
@@ -343,38 +352,93 @@ function renderQuestionInput(
       }
 
       return (
-        <div className="overflow-x-auto rounded-2xl border border-slate-800 shadow-sm">
-          <table className="w-full text-xs text-left text-slate-300">
-            <thead className="bg-slate-950 text-slate-400 font-bold uppercase tracking-wider border-b border-slate-800">
-              <tr>
-                <th className="p-4 px-5">Indikator Penilaian</th>
-                {sanitizedScales.map((sc: any) => (
-                  <th key={sc.value} className="p-4 px-3 text-center min-w-[5rem]">
-                    {sc.label}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800/70 bg-slate-900/50">
-              {indicators.map((ind: any) => (
-                <tr key={ind.indicatorId || ind.id} className="hover:bg-slate-800/30 transition-colors">
-                  <td className="p-4 px-5 font-semibold text-slate-200 leading-relaxed">{ind.label || ind.prompt || ind.name}</td>
+        <div className="space-y-4">
+          {/* DESKTOP & TABLET HORIZONTAL TABLE GRID (md and above) */}
+          <div className="hidden md:block overflow-x-auto rounded-2xl border border-slate-800 shadow-sm">
+            <table className="w-full text-xs text-left text-slate-300">
+              <thead className="bg-slate-950 text-slate-400 font-bold uppercase tracking-wider border-b border-slate-800">
+                <tr>
+                  <th className="p-4 px-5">Indikator Penilaian</th>
                   {sanitizedScales.map((sc: any) => (
-                    <td key={sc.value} className="p-4 text-center">
-                      <input
-                        type="radio"
-                        name={`${question.questionId}-${ind.indicatorId || ind.id}`}
-                        checked={tableAnswers[ind.indicatorId || ind.id] === sc.value}
-                        onChange={() => setIndicatorVal(ind.indicatorId || ind.id, sc.value)}
-                        disabled={isDisabled}
-                        className="w-4 h-4 text-cyan-500 focus:ring-cyan-400"
-                      />
-                    </td>
+                    <th key={sc.key} className="p-4 px-3 text-center min-w-[6rem]">
+                      {sc.label}
+                    </th>
                   ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-slate-800/70 bg-slate-900/50">
+                {indicators.map((ind: any, iIdx: number) => {
+                  const indId = ind.indicatorId || ind.id || ind
+                  const indexKey = `${question.questionId}-${iIdx}`
+                  const altKey = `${question.questionId}_${iIdx}`
+                  const currentVal = tableAnswers[indId] ?? tableAnswers[indexKey] ?? tableAnswers[altKey]
+
+                  return (
+                    <tr key={indId} className="hover:bg-slate-800/30 transition-colors">
+                      <td className="p-4 px-5 font-semibold text-slate-200 leading-relaxed">{ind.label || ind.prompt || ind.name}</td>
+                      {sanitizedScales.map((sc: any) => {
+                        const isChecked = currentVal === sc.value || currentVal === sc.label || currentVal === sc.key || String(currentVal) === String(sc.value) || String(currentVal) === String(sc.label)
+
+                        return (
+                          <td key={sc.key} className="p-4 text-center">
+                            <input
+                              type="radio"
+                              name={`${question.questionId}-${indId}`}
+                              checked={isChecked}
+                              onChange={() => setIndicatorVal(indId, sc.value ?? sc.label)}
+                              disabled={isDisabled}
+                              className="w-4 h-4 text-cyan-500 focus:ring-cyan-400 cursor-pointer"
+                            />
+                          </td>
+                        )
+                      })}
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* MOBILE VERTICAL CARD LAYOUT (< md) */}
+          <div className="block md:hidden space-y-3">
+            {indicators.map((ind: any, iIdx: number) => {
+              const indId = ind.indicatorId || ind.id || ind
+              const indexKey = `${question.questionId}-${iIdx}`
+              const altKey = `${question.questionId}_${iIdx}`
+              const currentVal = tableAnswers[indId] ?? tableAnswers[indexKey] ?? tableAnswers[altKey]
+
+              return (
+                <div key={indId} className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
+                  <div className="text-xs font-semibold text-slate-100 leading-relaxed">
+                    {iIdx + 1}. {ind.label || ind.prompt || ind.name}
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {sanitizedScales.map((sc: any) => {
+                      const isSelected = currentVal === sc.value || currentVal === sc.label || currentVal === sc.key || String(currentVal) === String(sc.value) || String(currentVal) === String(sc.label)
+
+                      return (
+                        <button
+                          key={sc.key}
+                          type="button"
+                          disabled={isDisabled}
+                          onClick={() => setIndicatorVal(indId, sc.value ?? sc.label)}
+                          className={`p-3 rounded-xl border text-center text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${
+                            isSelected
+                              ? 'bg-cyan-500/20 text-cyan-200 border-cyan-500 ring-1 ring-cyan-500/40 shadow-sm font-bold'
+                              : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-cyan-400' : 'bg-slate-700'}`} />
+                          <span className="truncate">{sc.label}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         </div>
       )
     }

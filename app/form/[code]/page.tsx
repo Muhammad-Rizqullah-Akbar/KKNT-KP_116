@@ -34,6 +34,7 @@ export default function PublicDistributionPage({ params }: PageProps) {
     responseId: string
     submittedAt: string
     result?: any
+    biodata?: Array<{ label: string; value: string }>
   } | null>(null)
 
   // Submission lock guard to prevent double-clicks
@@ -255,10 +256,47 @@ export default function PublicDistributionPage({ params }: PageProps) {
         console.error('Failed to clear draft:', e)
       }
 
+      // Extract biodata entries for receipt summary
+      const questionsList = sessionData.form?.version?.questions || sessionData.form?.questions || []
+      const extractedBiodata: { label: string; value: string }[] = []
+
+      questionsList.forEach((q: any) => {
+        const prompt = q.prompt || q.title || q.label || ''
+        const promptLower = prompt.toLowerCase()
+        const isBiodataQuestion =
+          q.category === 'biodata' ||
+          q.isBiodata === true ||
+          promptLower.includes('nama') ||
+          promptLower.includes('email') ||
+          promptLower.includes('telepon') ||
+          promptLower.includes('no. hp') ||
+          promptLower.includes('hp') ||
+          promptLower.includes('instansi') ||
+          promptLower.includes('organisasi') ||
+          promptLower.includes('lokasi') ||
+          promptLower.includes('alamat')
+
+        if (isBiodataQuestion) {
+          const val = answers[q.questionId]
+          if (val !== undefined && val !== null && val !== '') {
+            let displayVal = String(val)
+            if (typeof val === 'string' && q.options) {
+              const opt = q.options.find((o: any) => o.id === val || o.optionId === val || o.val === val || o.value === val)
+              if (opt) displayVal = opt.label || opt.text || opt.prompt || val
+            }
+            extractedBiodata.push({
+              label: prompt,
+              value: displayVal,
+            })
+          }
+        }
+      })
+
       setSubmittedReceipt({
         responseId: data.receipt.responseId,
         submittedAt: data.receipt.submittedAt,
         result: data.receipt.result,
+        biodata: extractedBiodata,
       })
       setFlowStep('submitted')
     } catch (err: any) {
@@ -310,6 +348,7 @@ export default function PublicDistributionPage({ params }: PageProps) {
         code={code}
         submittedAt={submittedReceipt.submittedAt}
         result={submittedReceipt.result}
+        biodata={submittedReceipt.biodata}
       />
     )
   }
@@ -395,13 +434,13 @@ export default function PublicDistributionPage({ params }: PageProps) {
     const activeAspect = aspects.find((a) => a.aspectId === activeAspectId) || aspects[0]
 
     // Questions belonging to active aspect for 'aspect_all' mode, sorted by global question index
-    const activeAspectQuestions = questions.filter((q) => {
+    const activeAspectQuestions = questions.filter((q: any) => {
       const aId = (q as any).aspectId || (q as any).stageId || (q as any).stage_id || 'default'
       return aId === activeAspectId || aId === activeAspect?.aspectId
     })
-    activeAspectQuestions.sort((a, b) => {
-      const idxA = questions.findIndex((q) => q.questionId === a.questionId)
-      const idxB = questions.findIndex((q) => q.questionId === b.questionId)
+    activeAspectQuestions.sort((a: any, b: any) => {
+      const idxA = questions.findIndex((q: any) => q.questionId === a.questionId)
+      const idxB = questions.findIndex((q: any) => q.questionId === b.questionId)
       return idxA - idxB
     })
 
@@ -512,7 +551,7 @@ export default function PublicDistributionPage({ params }: PageProps) {
                       if (!isFirstAspect) {
                         const prevAspect = aspects[currentAspectIndex - 1]
                         const firstQ = questions.findIndex(
-                          (q) => ((q as any).aspectId || (q as any).stageId || 'default') === prevAspect.aspectId
+                          (q: any) => ((q as any).aspectId || (q as any).stageId || 'default') === prevAspect.aspectId
                         )
                         if (firstQ >= 0) setCurrentQuestionIndex(firstQ)
                       }
@@ -525,25 +564,35 @@ export default function PublicDistributionPage({ params }: PageProps) {
                     <span>Aspek Sebelumnya</span>
                   </button>
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (isLastAspect) {
+                  {isLastAspect ? (
+                    <button
+                      type="button"
+                      onClick={() => {
                         handleGoToReview()
-                      } else {
+                        window.scrollTo({ top: 0, behavior: 'smooth' })
+                      }}
+                      className="px-6 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-extrabold shadow-lg shadow-cyan-600/25 flex items-center gap-2 transition-all cursor-pointer"
+                    >
+                      <span>Tinjau & Kirim Jawaban</span>
+                      <Icon name="arrowRight" className="w-4 h-4" />
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
                         const nextAspect = aspects[currentAspectIndex + 1]
                         const firstQ = questions.findIndex(
-                          (q) => ((q as any).aspectId || (q as any).stageId || 'default') === nextAspect.aspectId
+                          (q: any) => ((q as any).aspectId || (q as any).stageId || 'default') === nextAspect.aspectId
                         )
                         if (firstQ >= 0) setCurrentQuestionIndex(firstQ)
-                      }
-                      window.scrollTo({ top: 0, behavior: 'smooth' })
-                    }}
-                    className="px-5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-extrabold shadow-lg shadow-cyan-600/25 flex items-center gap-2 transition-all"
-                  >
-                    <span>{isLastAspect ? 'Tinjau Jawaban 📋' : 'Lanjut ke Aspek Berikutnya'}</span>
-                    <Icon name="arrowRight" className="w-4 h-4" />
-                  </button>
+                        window.scrollTo({ top: 0, behavior: 'smooth' })
+                      }}
+                      className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <span>Aspek Selanjutnya</span>
+                      <Icon name="arrowRight" className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               </div>
             ) : (

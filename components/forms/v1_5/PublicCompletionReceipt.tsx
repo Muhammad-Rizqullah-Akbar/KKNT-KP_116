@@ -5,9 +5,10 @@ import Link from 'next/link'
 import { Icon } from '@/components/ui/Icons'
 
 interface PublicCompletionReceiptProps {
-  responseId: string
+  responseId?: string
   code: string
   submittedAt: string
+  biodata?: Array<{ label: string; value: string }>
   result?: {
     percentage: number
     grade: string
@@ -34,6 +35,7 @@ export function PublicCompletionReceipt({
   responseId,
   code,
   submittedAt,
+  biodata,
   result,
 }: PublicCompletionReceiptProps) {
   return (
@@ -51,6 +53,24 @@ export function PublicCompletionReceipt({
             </p>
           </div>
         </div>
+
+        {/* Respondent Biodata Card (Rendered ABOVE score if available) */}
+        {biodata && biodata.length > 0 && (
+          <div className="p-5 rounded-3xl bg-slate-900 border border-slate-800 space-y-3 shadow-lg">
+            <h3 className="text-xs font-bold text-cyan-300 uppercase tracking-wider font-mono flex items-center gap-2 border-b border-slate-800 pb-2">
+              <Icon name="user" className="w-4 h-4 text-cyan-400" />
+              <span>Data Biodata Responden</span>
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+              {biodata.map((b, idx) => (
+                <div key={idx} className="p-3 rounded-2xl bg-slate-950 border border-slate-800/90 space-y-0.5">
+                  <span className="text-[10px] text-slate-400 block font-mono font-medium">{b.label}</span>
+                  <strong className="text-slate-100 font-sans font-semibold text-xs block">{b.value}</strong>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Calculated Result Card */}
         {result && (
@@ -131,45 +151,44 @@ export function PublicCompletionReceipt({
             </h3>
 
             <div className="space-y-2.5">
-              {result.recommendations.map((item) => (
-                <div
-                  key={item.articleId}
-                  className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-3 hover:border-slate-700 transition-colors shadow-sm"
-                >
-                  <div className="min-w-0 space-y-0.5">
-                    <span className="text-[10px] font-mono text-cyan-400 uppercase font-semibold">
-                      {item.category || 'Rekomendasi Edukasi BPOM'}
-                    </span>
-                    <h4 className="text-xs font-bold text-slate-200 line-clamp-1">{item.title}</h4>
-                  </div>
-
-                  <Link
-                    href={item.slug ? `/articles/${item.slug}` : `/articles`}
-                    target="_blank"
-                    className="px-3.5 py-1.5 rounded-xl bg-cyan-950 hover:bg-cyan-900 text-cyan-300 text-xs font-bold flex-shrink-0 border border-cyan-500/40 transition-colors flex items-center gap-1"
+              {result.recommendations.map((item) => {
+                const articleUrl = item.slug ? `/edukasi/${item.slug}` : `/edukasi`
+                return (
+                  <div
+                    key={item.articleId}
+                    className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-3 hover:border-slate-700 transition-colors shadow-sm"
                   >
-                    <span>Baca Artikel</span>
-                    <Icon name="externalLink" className="w-3.5 h-3.5" />
-                  </Link>
-                </div>
-              ))}
+                    <div className="min-w-0 space-y-0.5">
+                      <span className="text-[10px] font-mono text-cyan-400 uppercase font-semibold">
+                        {item.category || 'Rekomendasi Edukasi BPOM'}
+                      </span>
+                      <h4 className="text-xs font-bold text-slate-200 line-clamp-1">{item.title}</h4>
+                    </div>
+
+                    <Link
+                      href={articleUrl}
+                      target="_blank"
+                      className="px-3.5 py-1.5 rounded-xl bg-cyan-950 hover:bg-cyan-900 text-cyan-300 text-xs font-bold flex-shrink-0 border border-cyan-500/40 transition-colors flex items-center gap-1.5"
+                    >
+                      <span>Pelajari Materi</span>
+                      <Icon name="externalLink" className="w-3.5 h-3.5 text-cyan-400" />
+                    </Link>
+                  </div>
+                )
+              })}
             </div>
           </div>
         )}
 
-        {/* Technical Metadata Bar */}
+        {/* Technical Metadata Bar (No Response ID) */}
         <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-xs text-slate-300 space-y-2 font-mono">
-          <div className="flex justify-between">
-            <span className="text-slate-500">Response ID:</span>
-            <strong className="text-cyan-400">{responseId}</strong>
-          </div>
-          <div className="flex justify-between">
+          <div className="flex justify-between items-center">
             <span className="text-slate-500">Kode Akses Formulir:</span>
-            <strong className="text-slate-200">{code}</strong>
+            <strong className="text-cyan-400 font-bold">{code}</strong>
           </div>
-          <div className="flex justify-between">
-            <span className="text-slate-500">Waktu Kirim:</span>
-            <strong className="text-slate-400 text-[11px]">
+          <div className="flex justify-between items-center">
+            <span className="text-slate-500">Waktu Pengiriman:</span>
+            <strong className="text-slate-300 text-[11px]">
               {new Date(submittedAt).toLocaleString('id-ID')}
             </strong>
           </div>

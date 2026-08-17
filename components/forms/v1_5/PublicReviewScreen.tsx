@@ -19,6 +19,132 @@ interface PublicReviewScreenProps {
   errorMessage?: string | null
 }
 
+function expandScaleLabel(label: any): string {
+  if (label === undefined || label === null || label === '') return '-'
+  const str = String(label).trim()
+  const clean = str.replace(/^(\d+[\.\-\s\(\)\:]+)+/g, '').replace(/[\(\)]/g, '').trim()
+  const upper = clean.toUpperCase()
+
+  if (upper === 'STS') return 'Sangat Tidak Setuju'
+  if (upper === 'TS') return 'Tidak Setuju'
+  if (upper === 'N') return 'Netral'
+  if (upper === 'S') return 'Setuju'
+  if (upper === 'SS') return 'Sangat Setuju'
+
+  if (upper === 'STMS') return 'Sangat Tidak Memenuhi Syarat'
+  if (upper === 'TMS') return 'Tidak Memenuhi Syarat'
+  if (upper === 'MS') return 'Memenuhi Syarat'
+  if (upper === 'SMS') return 'Sangat Memenuhi Syarat'
+
+  if (upper === 'SK') return 'Sangat Kurang'
+  if (upper === 'K') return 'Kurang'
+  if (upper === 'C') return 'Cukup'
+  if (upper === 'B') return 'Baik'
+  if (upper === 'SB') return 'Sangat Baik'
+
+  return str
+}
+
+function formatAnswerDisplay(question: PublicQuestion, val: any): React.ReactNode {
+  if (val === undefined || val === null || val === '') return '-'
+
+  const options = (question as any).options || (question as any).presentation?.options || []
+
+  // Single Choice / Dropdown / Radio / Boolean
+  if (typeof val === 'string') {
+    const matchOpt = options.find((o: any) => o.id === val || o.optionId === val || o.val === val || o.value === val)
+    if (matchOpt) {
+      return expandScaleLabel(matchOpt.label || matchOpt.text || matchOpt.prompt || val)
+    }
+    return expandScaleLabel(val)
+  }
+
+  // Multiple Choice / Checkbox (array)
+  if (Array.isArray(val)) {
+    const labels = val.map((itemVal) => {
+      const matchOpt = options.find((o: any) => o.id === itemVal || o.optionId === itemVal || o.val === itemVal || o.value === itemVal)
+      return expandScaleLabel(matchOpt ? (matchOpt.label || matchOpt.text || matchOpt.prompt || itemVal) : String(itemVal))
+    })
+    return labels.join(', ')
+  }
+
+  // Indicator Table / Likert Matrix (object: { indId: optId })
+  if (typeof val === 'object' && val !== null) {
+    const indicators = (question as any).presentation?.indicators || (question as any).indicators || (question as any).config?.indicators || []
+    const rawScales = (question as any).presentation?.indicatorScales || (question as any).config?.indicatorScales || (question as any).indicatorScales || (question as any).scales || options || []
+
+    const sanitizedScales = rawScales.map((sc: any, sIdx: number) => {
+      let text = String(sc.label || sc.text || sc.name || '')
+      let clean = text.replace(/^(\d+[\.\-\s\(\)\:]+)+/g, '').replace(/[\(\)]/g, '').trim()
+      if (!clean) clean = text || `Skala ${sIdx + 1}`
+      return {
+        value: sc.value ?? sc.id ?? (sIdx + 1),
+        id: sc.id || sc.optionId || sc.key || clean,
+        label: clean,
+      }
+    })
+
+    const rows: { label: string; optLabel: string }[] = []
+
+    if (indicators.length > 0) {
+      indicators.forEach((ind: any, iIdx: number) => {
+        const indId = ind.indicatorId || ind.id || ind
+        const indLabel = ind.label || ind.title || ind.prompt || ind.name || `Indikator ${iIdx + 1}`
+
+        const rawOptVal =
+          val[indId] ??
+          val[`${question.questionId}-${iIdx}`] ??
+          val[`${question.questionId}_${iIdx}`] ??
+          val[ind.id] ??
+          val[ind.indicatorId]
+
+        if (rawOptVal !== undefined && rawOptVal !== null && rawOptVal !== '') {
+          const strVal = String(rawOptVal).trim().toLowerCase()
+          const matchedScale = sanitizedScales.find(
+            (s: any) =>
+              String(s.label).trim().toLowerCase() === strVal ||
+              String(s.id).trim().toLowerCase() === strVal ||
+              String(s.value).trim().toLowerCase() === strVal
+          )
+          const optLabel = matchedScale ? matchedScale.label : String(rawOptVal)
+          rows.push({ label: indLabel, optLabel: expandScaleLabel(optLabel) })
+        }
+      })
+    } else {
+      Object.entries(val).forEach(([k, rawOptVal]) => {
+        if (k.startsWith(`${question.questionId}-`) || k.startsWith(`${question.questionId}_`)) return
+        if (rawOptVal !== undefined && rawOptVal !== null && rawOptVal !== '') {
+          const strVal = String(rawOptVal).trim().toLowerCase()
+          const matchedScale = sanitizedScales.find(
+            (s: any) =>
+              String(s.label).trim().toLowerCase() === strVal ||
+              String(s.id).trim().toLowerCase() === strVal ||
+              String(s.value).trim().toLowerCase() === strVal
+          )
+          const optLabel = matchedScale ? matchedScale.label : String(rawOptVal)
+          rows.push({ label: k, optLabel: expandScaleLabel(optLabel) })
+        }
+      })
+    }
+
+    if (rows.length > 0) {
+      return (
+        <div className="space-y-1.5 text-xs">
+          {rows.map((row, idx) => (
+            <div key={idx} className="flex items-center justify-between gap-2 border-b border-slate-800/60 pb-1.5 last:border-0 last:pb-0">
+              <span className="text-slate-300 font-sans">{row.label}</span>
+              <strong className="text-cyan-300 font-semibold">{row.optLabel}</strong>
+            </div>
+          ))}
+        </div>
+      )
+    }
+    return '-'
+  }
+
+  return String(val)
+}
+
 export function PublicReviewScreen({
   code,
   title,
@@ -165,7 +291,7 @@ export function PublicReviewScreen({
                     <div className="pl-10 text-xs font-mono">
                       {answered ? (
                         <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-cyan-300 break-words font-sans">
-                          {typeof val === 'object' ? JSON.stringify(val) : String(val)}
+                          {formatAnswerDisplay(question, val)}
                         </div>
                       ) : (
                         <span className="text-rose-400 italic">Belum diisi - Klik di sini untuk mengisi</span>
