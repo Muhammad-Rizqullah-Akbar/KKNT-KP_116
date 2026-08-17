@@ -19,33 +19,35 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       token: {} as any,
     }
 
-    if (authContext.role !== 'admin' && authContext.role !== 'super_admin') {
+    if (authContext.role !== 'admin' && authContext.role !== 'super_admin' && authContext.role !== 'internal_bpom') {
       return NextResponse.json(
-        { success: false, message: 'Hanya Admin / Super Admin yang dapat mengubah hak akses distribusi.' },
+        { success: false, message: 'Hanya Super Admin, Admin, dan Internal BPOM yang dapat mengontrol izin distribusi dan versi aktif formulir.' },
         { status: 403 }
       )
     }
 
-    const { allowCadreDistribution } = await request.json()
-    if (typeof allowCadreDistribution !== 'boolean') {
-      return NextResponse.json(
-        { success: false, message: 'Properti allowCadreDistribution (boolean) wajib disertakan.' },
-        { status: 400 }
-      )
-    }
+    const body = await request.json()
+    const { allowCadreDistribution, activeVersionId, activeVersionNumber } = body
 
     const [existing, existingV15] = await Promise.all([
       safeGetDoc('forms', formId),
       safeGetDoc('v1_5_forms', formId),
     ])
 
+    const currentData = existingV15?.data || existing?.data || {}
+    const newCadrePerm = typeof allowCadreDistribution === 'boolean' ? allowCadreDistribution : (currentData.allowCadreDistribution ?? true)
+    const newVersionId = activeVersionId || currentData.activeVersionId
+    const newVersionNumber = activeVersionNumber || currentData.activeVersionNumber
+
     const updatedData = {
-      ...(existingV15?.data || existing?.data || {}),
+      ...currentData,
       formId,
-      allowCadreDistribution,
+      allowCadreDistribution: newCadrePerm,
+      activeVersionId: newVersionId,
+      activeVersionNumber: newVersionNumber,
       metadata: {
-        ...(existingV15?.data?.metadata || existing?.data?.metadata || {}),
-        allowCadreDistribution,
+        ...(currentData.metadata || {}),
+        allowCadreDistribution: newCadrePerm,
       },
       updatedAt: new Date().toISOString(),
       updatedBy: authContext.uid,
@@ -58,10 +60,10 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json({
       success: true,
-      message: `Akses distribusi kader & mitra untuk formulir "${formId}" berhasil diubah menjadi ${
-        allowCadreDistribution ? 'diizinkan' : 'dibatasi (khusus admin)'
-      }.`,
-      allowCadreDistribution,
+      message: `Pengaturan izin & versi distribusi untuk "${formId}" berhasil diperbarui.`,
+      allowCadreDistribution: newCadrePerm,
+      activeVersionId: newVersionId,
+      activeVersionNumber: newVersionNumber,
     })
   } catch (error: any) {
     console.error('Update form distribution permission error:', error)

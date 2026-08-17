@@ -772,12 +772,12 @@ export function PreviewModal({
     const missing: string[] = []
     
     elements.forEach(q => {
-      const type = q.answerType || 'short-text'
+      const type = (q.answerType || 'short-text') as string
       if (isQuestionRequired(q)) {
         const isAnswered = (() => {
           if (type === 'indicator-table' || type === 'likert') {
             const indicators = q.config?.indicators || []
-            const statements = q.config?.statements || q.options || []
+            const statements = (q.config as any)?.statements || (q as any).options || []
             const rows = indicators.length > 0 ? indicators : statements
             return rows.every((_: any, i: number) => {
               const key = `${q.id}-${i}`

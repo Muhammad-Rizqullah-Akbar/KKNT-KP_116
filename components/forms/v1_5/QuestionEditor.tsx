@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import type { Question, QuestionType, AnswerKey, Indicator, IndicatorScale } from '@/lib/forms/v1_5/types'
+import type { QuestionType, BiodataKey } from '@/lib/forms/v1_5/types'
 import type { FormAspect, BuilderQuestion } from '@/lib/forms/v1_5/builderState'
 import { QUESTION_TYPES } from '@/lib/forms/v1_5/types'
 import { LikertScaleEditor } from './LikertScaleEditor'
@@ -14,8 +14,8 @@ interface QuestionEditorProps {
   onClose: () => void
 }
 
-export function QuestionEditor({ question, aspects = [], onUpdate, onClose }: QuestionEditorProps) {
-  const [activeTab, setActiveTab] = useState<'content' | 'answer' | 'scoring' | 'validation'>('content')
+export function QuestionEditor({ question, aspects = [], onUpdate }: QuestionEditorProps) {
+  const [activeTab, setActiveTab] = useState<'content' | 'answer'>('content')
 
   // Helpers for options
   const addOption = () => {
@@ -43,10 +43,22 @@ export function QuestionEditor({ question, aspects = [], onUpdate, onClose }: Qu
     onUpdate({ options: updatedOptions, answerKey: updatedAnswerKey })
   }
 
-  // Answer Key Toggles
+  const updateOptionScore = (optionId: string, score: number) => {
+    const updatedOptions = question.options.map((opt) =>
+      opt.optionId === optionId ? { ...opt, score } : opt
+    )
+    const currentScores = (question.answerKey.kind === 'option' ? question.answerKey.optionScores : {}) || {}
+    const updatedOptionScores = { ...currentScores, [optionId]: score }
+    const updatedAnswerKey =
+      question.answerKey.kind === 'option'
+        ? { ...question.answerKey, optionScores: updatedOptionScores }
+        : question.answerKey
+
+    onUpdate({ options: updatedOptions, answerKey: updatedAnswerKey })
+  }
+
   const toggleCorrectOption = (optionId: string) => {
-    const currentCorrect =
-      question.answerKey.kind === 'option' ? question.answerKey.correctOptionIds : []
+    const currentCorrect = question.answerKey.kind === 'option' ? question.answerKey.correctOptionIds : []
     const isSingle = question.type === 'single-choice' || question.type === 'binary' || question.type === 'dropdown'
 
     let nextCorrect: string[]
@@ -63,68 +75,75 @@ export function QuestionEditor({ question, aspects = [], onUpdate, onClose }: Qu
     })
   }
 
+  const targetAspect = aspects.find((a) => a.aspectId === (question.aspectId || aspects[0]?.aspectId))
+  const isScoredAspect = targetAspect?.isScored !== false
+
   return (
-    <div className="p-5 border-t border-slate-800 bg-slate-950/80 rounded-b-2xl space-y-5 animate-in slide-in-from-top-2 duration-150 shadow-inner">
-      {/* Navigation Tabs */}
-      <div className="flex items-center gap-1.5 p-1 bg-slate-900 border border-slate-800 rounded-xl overflow-x-auto">
+    <div className="p-4 border-t border-slate-800 bg-slate-950/90 rounded-b-2xl space-y-4 shadow-inner">
+      {!isScoredAspect && (
+        <div className="p-3.5 rounded-xl bg-purple-500/10 border border-purple-500/30 space-y-2">
+          <div className="flex items-center gap-2 text-xs text-purple-300 font-bold">
+            <Icon name="info" className="w-4 h-4 text-purple-400 shrink-0" />
+            <span>Standardisasi Identitas Responden (Biodata Field Normalization):</span>
+          </div>
+          <p className="text-[11px] text-purple-300/80 leading-relaxed">
+            Pilih peran identitas data ini agar otomatis ternormalisasi pada laporan hasil, analisis responden, dan ekspor data tanpa perlu dinilai.
+          </p>
+
+          <div className="pt-1">
+            <select
+              value={question.biodataKey || 'custom_biodata'}
+              onChange={(e) => onUpdate({ biodataKey: e.target.value as BiodataKey })}
+              className="w-full bg-slate-900 border border-purple-500/40 text-purple-200 text-xs font-semibold rounded-xl px-3 py-2 focus:outline-none focus:border-purple-400"
+            >
+              <option value="custom_biodata">Data Informasi Umum / Biodata Lainnya</option>
+              <option value="respondent_name">Nama Lengkap Responden (respondent_name)</option>
+              <option value="respondent_phone">Nomor Telepon / WhatsApp (respondent_phone)</option>
+              <option value="respondent_email">Alamat Email (respondent_email)</option>
+              <option value="respondent_institution">Instansi / Organisasi / Nama Sarana (respondent_institution)</option>
+              <option value="respondent_address">Alamat Lengkap / Lokasi (respondent_address)</option>
+              <option value="source_info">Sumber Informasi / Media (source_info)</option>
+            </select>
+          </div>
+        </div>
+      )}
+
+      {/* 2 Focused Tabs */}
+      <div className="flex items-center gap-2 p-1 bg-slate-900 border border-slate-800 rounded-xl">
         <button
           type="button"
           onClick={() => setActiveTab('content')}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
             activeTab === 'content'
               ? 'bg-blue-500/20 text-blue-200 border border-blue-500/40 shadow-sm'
               : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
           }`}
         >
           <span className="w-2 h-2 rounded-full bg-blue-400" />
-          <span>🔵 KONTEN</span>
+          <span>KONTEN DAN VALIDASI</span>
         </button>
 
-        <button
-          type="button"
-          onClick={() => setActiveTab('answer')}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all ${
-            activeTab === 'answer'
-              ? 'bg-emerald-500/20 text-emerald-200 border border-emerald-500/40 shadow-sm'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-          }`}
-        >
-          <span className="w-2 h-2 rounded-full bg-emerald-400" />
-          <span>🟢 KUNCI JAWABAN & SKALA</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('scoring')}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all ${
-            activeTab === 'scoring'
-              ? 'bg-amber-500/20 text-amber-200 border border-amber-500/40 shadow-sm'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-          }`}
-        >
-          <span className="w-2 h-2 rounded-full bg-amber-400" />
-          <span>🟡 SKOR & BOBOT</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('validation')}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all ${
-            activeTab === 'validation'
-              ? 'bg-purple-500/20 text-purple-200 border border-purple-500/40 shadow-sm'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-          }`}
-        >
-          <span className="w-2 h-2 rounded-full bg-purple-400" />
-          <span>🟣 VALIDASI</span>
-        </button>
+        {isScoredAspect && (
+          <button
+            type="button"
+            onClick={() => setActiveTab('answer')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+              activeTab === 'answer'
+                ? 'bg-emerald-500/20 text-emerald-200 border border-emerald-500/40 shadow-sm'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+            }`}
+          >
+            <span className="w-2 h-2 rounded-full bg-emerald-400" />
+            <span>KUNCI JAWABAN, OPSI DAN SKALA</span>
+          </button>
+        )}
       </div>
 
-      {/* 🔵 SECTION 1: CONTENT */}
+      {/* TAB 1: KONTEN & VALIDASI */}
       {activeTab === 'content' && (
-        <div className="space-y-4">
+        <div className="space-y-4 pt-1">
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1.5">
+            <label className="block text-xs font-semibold text-slate-300 mb-1.5">
               Teks Pertanyaan <span className="text-rose-400">*</span>
             </label>
             <input
@@ -132,33 +151,82 @@ export function QuestionEditor({ question, aspects = [], onUpdate, onClose }: Qu
               value={question.prompt}
               onChange={(e) => onUpdate({ prompt: e.target.value })}
               placeholder="Tuliskan teks pertanyaan di sini..."
-              className="w-full bg-slate-900 border border-slate-700 text-slate-100 text-sm rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-cyan-500"
+              className="w-full bg-slate-900 border border-slate-700 text-slate-100 text-xs font-medium rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-cyan-500"
             />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1.5">Tipe Pertanyaan</label>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">Tipe Pertanyaan</label>
               <select
                 value={question.type}
-                onChange={(e) => onUpdate({ type: e.target.value as QuestionType })}
-                className="w-full bg-slate-900 border border-slate-700 text-slate-100 text-sm rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-cyan-500"
+                onChange={(e) => {
+                  const selectedType = e.target.value as QuestionType
+                  const biodataMap: Record<string, BiodataKey> = {
+                    'biodata-name': 'respondent_name',
+                    'biodata-email': 'respondent_email',
+                    'biodata-phone': 'respondent_phone',
+                    'biodata-address': 'respondent_address',
+                    'biodata-institution': 'respondent_institution',
+                  }
+                  if (biodataMap[selectedType]) {
+                    onUpdate({ type: selectedType, biodataKey: biodataMap[selectedType] })
+                  } else {
+                    onUpdate({ type: selectedType })
+                  }
+                }}
+                className="w-full bg-slate-900 border border-slate-700 text-slate-100 text-xs font-medium rounded-xl px-3 py-2 focus:outline-none focus:border-cyan-500"
               >
-                {QUESTION_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
+                {!isScoredAspect ? (
+                  <>
+                    <optgroup label="Field Biodata Terstandardisasi">
+                      <option value="biodata-name">Nama Lengkap Responden</option>
+                      <option value="biodata-email">Alamat Email / Gmail</option>
+                      <option value="biodata-phone">Nomor Telepon / WhatsApp</option>
+                      <option value="biodata-address">Lokasi Asal / Alamat</option>
+                      <option value="biodata-institution">Organisasi / Instansi Asal</option>
+                    </optgroup>
+                    <optgroup label="Tipe Pertanyaan Standar">
+                      <option value="text">Teks Isian Singkat</option>
+                      <option value="textarea">Teks Uraian Panjang</option>
+                      <option value="number">Isian Numerik</option>
+                      <option value="single-choice">Pilihan Ganda Tunggal</option>
+                      <option value="multiple-choice">Pilihan Ganda Kompleks</option>
+                      <option value="dropdown">Menu Dropdown</option>
+                      <option value="date">Tanggal</option>
+                      <option value="file-upload">Unggah Berkas / Dokumen</option>
+                      <option value="signature">Tanda Tangan</option>
+                    </optgroup>
+                  </>
+                ) : (
+                  [
+                    { type: 'single-choice', label: 'Pilihan Ganda Tunggal (Single Choice)' },
+                    { type: 'multiple-choice', label: 'Pilihan Ganda Kompleks (Multiple Choice)' },
+                    { type: 'binary', label: 'Ya / Tidak (Biner)' },
+                    { type: 'dropdown', label: 'Menu Dropdown' },
+                    { type: 'indicator-table', label: 'Tabel Indikator / Likert Scale' },
+                    { type: 'rating', label: 'Skala Rating (1-5 / 1-10)' },
+                    { type: 'text', label: 'Teks Isian Singkat' },
+                    { type: 'textarea', label: 'Teks Uraian Panjang' },
+                    { type: 'file-upload', label: 'Unggah Berkas / Dokumen' },
+                    { type: 'date', label: 'Tanggal' },
+                    { type: 'number', label: 'Angka / Isian Numerik' },
+                  ].map((item) => (
+                    <option key={item.type} value={item.type}>
+                      {item.label}
+                    </option>
+                  ))
+                )}
               </select>
             </div>
 
             {aspects.length > 0 && (
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5">Aspek / Bagian</label>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">Aspek / Bagian</label>
                 <select
                   value={question.aspectId || aspects[0]?.aspectId}
                   onChange={(e) => onUpdate({ aspectId: e.target.value })}
-                  className="w-full bg-slate-900 border border-slate-700 text-cyan-300 text-sm font-semibold rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-cyan-500"
+                  className="w-full bg-slate-900 border border-slate-700 text-cyan-300 text-xs font-bold rounded-xl px-3 py-2 focus:outline-none focus:border-cyan-500"
                 >
                   {aspects.map((asp) => (
                     <option key={asp.aspectId} value={asp.aspectId}>
@@ -170,21 +238,50 @@ export function QuestionEditor({ question, aspects = [], onUpdate, onClose }: Qu
             )}
 
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1.5">Petunjuk / Deskripsi</label>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">Teks Placeholder Input</label>
+              <input
+                type="text"
+                value={question.presentation.placeholder || ''}
+                onChange={(e) =>
+                  onUpdate({ presentation: { ...question.presentation, placeholder: e.target.value } })
+                }
+                placeholder="Contoh: Pilih salah satu jawaban..."
+                className="w-full bg-slate-900 border border-slate-700 text-slate-200 text-xs rounded-xl px-3 py-2 focus:outline-none focus:border-cyan-500"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">Petunjuk / Deskripsi</label>
               <input
                 type="text"
                 value={question.presentation.description || ''}
                 onChange={(e) =>
                   onUpdate({ presentation: { ...question.presentation, description: e.target.value } })
                 }
-                placeholder="Petunjuk pengerjaan..."
-                className="w-full bg-slate-900 border border-slate-700 text-slate-100 text-sm rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-cyan-500"
+                placeholder="Petunjuk pengerjaan soal ini..."
+                className="w-full bg-slate-900 border border-slate-700 text-slate-100 text-xs rounded-xl px-3.5 py-2 focus:outline-none focus:border-cyan-500"
+              />
+            </div>
+
+            {/* Validation: Wajib Diisi (Required default true) */}
+            <div className="flex items-center justify-between p-3 rounded-xl bg-slate-900 border border-slate-800 self-end">
+              <div>
+                <span className="text-xs font-bold text-slate-200">Wajib Diisi (Required)</span>
+                <p className="text-[10px] text-slate-400">Responden harus memilih/mengisi sebelum submit</p>
+              </div>
+              <input
+                type="checkbox"
+                checked={question.required ?? true}
+                onChange={(e) => onUpdate({ required: e.target.checked })}
+                className="w-4 h-4 text-cyan-500 rounded focus:ring-cyan-400"
               />
             </div>
           </div>
 
           {/* Lampiran Gambar */}
-          <div className="p-4 rounded-xl border border-slate-800 bg-slate-900/40 space-y-3">
+          <div className="p-3.5 rounded-xl border border-slate-800 bg-slate-900/40 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-slate-300 flex items-center gap-2">
                 <Icon name="image" className="w-4 h-4 text-cyan-400" />
@@ -210,26 +307,82 @@ export function QuestionEditor({ question, aspects = [], onUpdate, onClose }: Qu
             </div>
 
             {question.presentation.media?.type === 'image' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
-                <div>
-                  <label className="block text-[11px] text-slate-400 mb-1">URL Gambar</label>
-                  <input
-                    type="url"
-                    value={question.presentation.media.url || ''}
-                    onChange={(e) =>
-                      onUpdate({
-                        presentation: {
-                          ...question.presentation,
-                          media: { ...question.presentation.media, type: 'image', url: e.target.value },
-                        },
-                      })
-                    }
-                    placeholder="https://example.com/image.jpg"
-                    className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-cyan-500"
-                  />
+              <div className="space-y-3 pt-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] text-slate-400 mb-1">Upload Gambar dari Komputer</label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0]
+                        if (!file) return
+                        try {
+                          const formData = new FormData()
+                          formData.append('file', file)
+                          const res = await fetch('/api/v1_5/upload', { method: 'POST', body: formData })
+                          const data = await res.json()
+                          if (data.success && data.url) {
+                            onUpdate({
+                              presentation: {
+                                ...question.presentation,
+                                media: { ...question.presentation.media, type: 'image', url: data.url },
+                              },
+                            })
+                          } else {
+                            const reader = new FileReader()
+                            reader.onload = (evt) => {
+                              if (evt.target?.result) {
+                                onUpdate({
+                                  presentation: {
+                                    ...question.presentation,
+                                    media: { ...question.presentation.media, type: 'image', url: String(evt.target.result) },
+                                  },
+                                })
+                              }
+                            }
+                            reader.readAsDataURL(file)
+                          }
+                        } catch (err) {
+                          const reader = new FileReader()
+                          reader.onload = (evt) => {
+                            if (evt.target?.result) {
+                              onUpdate({
+                                presentation: {
+                                  ...question.presentation,
+                                  media: { ...question.presentation.media, type: 'image', url: String(evt.target.result) },
+                                },
+                              })
+                            }
+                          }
+                          reader.readAsDataURL(file)
+                        }
+                      }}
+                      className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-cyan-500/20 file:text-cyan-300"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] text-slate-400 mb-1">URL Gambar (atau Paste Link)</label>
+                    <input
+                      type="url"
+                      value={question.presentation.media.url || ''}
+                      onChange={(e) =>
+                        onUpdate({
+                          presentation: {
+                            ...question.presentation,
+                            media: { ...question.presentation.media, type: 'image', url: e.target.value },
+                          },
+                        })
+                      }
+                      placeholder="https://example.com/image.jpg"
+                      className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-cyan-500"
+                    />
+                  </div>
                 </div>
+
                 <div>
-                  <label className="block text-[11px] text-slate-400 mb-1">Caption Gambar</label>
+                  <label className="block text-[11px] text-slate-400 mb-1">Caption / Keterangan Gambar</label>
                   <input
                     type="text"
                     value={question.presentation.media.caption || ''}
@@ -241,272 +394,136 @@ export function QuestionEditor({ question, aspects = [], onUpdate, onClose }: Qu
                         },
                       })
                     }
-                    placeholder="Keterangan gambar..."
+                    placeholder="Contoh: Foto fasilitas sanitasi sarana kantin"
                     className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-cyan-500"
                   />
                 </div>
+
+                {question.presentation.media.url && (
+                  <div className="p-2 rounded-lg bg-slate-950 border border-slate-800 flex items-center gap-3">
+                    <img
+                      src={question.presentation.media.url}
+                      alt={question.presentation.media.caption || 'Preview'}
+                      className="w-16 h-16 object-cover rounded-md border border-slate-700 shrink-0"
+                    />
+                    <span className="text-[11px] text-emerald-400 font-medium">✓ Gambar Terlampir & Siap Ditampilkan</span>
+                  </div>
+                )}
               </div>
             )}
           </div>
         </div>
       )}
 
-      {/* 🟢 SECTION 2: ANSWER CONFIGURATION & LIKERT */}
+      {/* TAB 2: KUNCI JAWABAN, OPSI & SKALA */}
       {activeTab === 'answer' && (
-        <div className="space-y-4">
-          {/* Options for Choice/Binary/Dropdown */}
-          {['single-choice', 'multiple-choice', 'binary', 'dropdown'].includes(question.type) && (
+        <div className="space-y-4 pt-1">
+          {/* Option-based types */}
+          {['single-choice', 'multiple-choice', 'dropdown', 'binary'].includes(question.type) && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-semibold text-slate-200">
-                  Daftar Opsi Jawaban & Kunci Jawaban
-                </label>
+                <div>
+                  <span className="text-xs font-bold text-slate-200">
+                    Opsi Jawaban & Kunci Benar (Tandai ✓ Pada Jawaban Benar)
+                  </span>
+                  {question.type === 'multiple-choice' && (
+                    <p className="text-[11px] text-cyan-400 mt-0.5 font-medium">
+                      💡 Pilihan ganda kompleks: Responden dibatasi hanya memilih sebanyak jumlah opsi kunci yang Anda tentukan (
+                      {(question.answerKey.kind === 'option' ? question.answerKey.correctOptionIds.length : 0)} Opsi Kunci Benar).
+                    </p>
+                  )}
+                </div>
                 <button
                   type="button"
                   onClick={addOption}
-                  className="px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-xs font-medium hover:bg-emerald-500/30 transition-colors flex items-center gap-1.5"
+                  className="px-3 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-xs font-semibold flex items-center gap-1 transition-colors shrink-0"
                 >
                   <Icon name="plus" className="w-3.5 h-3.5" />
                   <span>Tambah Opsi</span>
                 </button>
               </div>
 
-              {question.options.length === 0 ? (
-                <div className="p-4 text-center border border-dashed border-slate-800 rounded-xl text-slate-400 text-xs">
-                  Belum ada opsi. Klik &quot;Tambah Opsi&quot; di atas.
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {question.options.map((opt, optIdx) => {
-                    const isCorrect =
-                      question.answerKey.kind === 'option' &&
-                      question.answerKey.correctOptionIds.includes(opt.optionId)
+              <div className="space-y-2">
+                {question.options.map((option, idx) => {
+                  const correctOptionIds =
+                    question.answerKey.kind === 'option' ? question.answerKey.correctOptionIds : []
+                  const isCorrect = correctOptionIds.includes(option.optionId)
 
-                    return (
-                      <div
-                        key={opt.optionId}
-                        className={`flex items-center gap-3 p-2.5 rounded-xl border transition-all ${
+                  return (
+                    <div
+                      key={option.optionId}
+                      className={`p-3 rounded-xl border flex items-center gap-3 transition-all ${
+                        isCorrect
+                          ? 'bg-emerald-500/10 border-emerald-500/40'
+                          : 'bg-slate-900 border-slate-800'
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => toggleCorrectOption(option.optionId)}
+                        className={`w-6 h-6 rounded-lg flex items-center justify-center border font-bold text-xs shrink-0 transition-colors ${
                           isCorrect
-                            ? 'bg-emerald-950/30 border-emerald-500/60'
-                            : 'bg-slate-900 border-slate-800'
+                            ? 'bg-emerald-500 text-slate-950 border-emerald-400'
+                            : 'bg-slate-950 text-slate-500 border-slate-700 hover:border-slate-500'
                         }`}
+                        title={isCorrect ? 'Opsi Kunci Benar' : 'Tandai Sebagai Jawaban Benar'}
                       >
+                        {isCorrect ? '✓' : idx + 1}
+                      </button>
+
+                      <input
+                        type="text"
+                        value={option.label}
+                        onChange={(e) => updateOptionLabel(option.optionId, e.target.value)}
+                        placeholder={`Label opsi ${idx + 1}...`}
+                        className="flex-1 bg-slate-950 border border-slate-700 text-slate-200 text-xs font-medium rounded-lg px-3 py-1.5 focus:outline-none focus:border-emerald-500"
+                      />
+
+                      {/* Option Score Input for Correct Answers */}
+                      {isCorrect && (
+                        <div className="flex items-center gap-1 bg-slate-950 border border-emerald-500/40 rounded-lg px-2 py-1 shrink-0">
+                          <span className="text-[10px] text-emerald-400 font-bold">Skor:</span>
+                          <input
+                            type="number"
+                            min={0}
+                            value={option.score ?? (question.answerKey.kind === 'option' ? question.answerKey.optionScores?.[option.optionId] : 5) ?? 5}
+                            onChange={(e) => updateOptionScore(option.optionId, Math.max(0, Number(e.target.value) || 0))}
+                            className="w-12 bg-transparent text-emerald-300 font-bold text-xs text-right focus:outline-none"
+                          />
+                          <span className="text-[10px] text-emerald-400 font-bold">Poin</span>
+                        </div>
+                      )}
+
+                      {question.options.length > 1 && (
                         <button
                           type="button"
-                          onClick={() => toggleCorrectOption(opt.optionId)}
-                          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all ${
-                            isCorrect
-                              ? 'bg-emerald-500 text-slate-950 border-emerald-400'
-                              : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-emerald-400'
-                          }`}
-                        >
-                          <Icon name="check" className="w-3.5 h-3.5" />
-                          <span>{isCorrect ? 'Kunci Benar' : 'Bukan Kunci'}</span>
-                        </button>
-
-                        <span className="text-xs font-mono text-slate-500 w-6 text-center">{optIdx + 1}.</span>
-
-                        <input
-                          type="text"
-                          value={opt.label}
-                          onChange={(e) => updateOptionLabel(opt.optionId, e.target.value)}
-                          placeholder="Label opsi..."
-                          className="flex-1 bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:border-cyan-500"
-                        />
-
-                        <button
-                          type="button"
-                          onClick={() => removeOption(opt.optionId)}
-                          className="p-1.5 text-slate-500 hover:text-rose-400 transition-colors"
+                          onClick={() => removeOption(option.optionId)}
+                          className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
+                          title="Hapus Opsi"
                         >
                           <Icon name="trash" className="w-3.5 h-3.5" />
                         </button>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
             </div>
           )}
 
-          {/* Configurable Likert Scale & Indicator Table Editor */}
-          {(question.type === 'likert' || question.type === 'indicator-table') && (
+          {/* Indicator Table & Likert */}
+          {(question.type === 'indicator-table' || question.type === 'likert') && (
             <LikertScaleEditor
               scales={question.presentation.indicatorScales || []}
               indicators={question.presentation.indicators || []}
               showWeightedScore={question.presentation.showWeightedScore}
-              onChangeScales={(scales: IndicatorScale[]) =>
-                onUpdate({ presentation: { ...question.presentation, indicatorScales: scales } })
-              }
-              onChangeIndicators={(indicators: Indicator[]) => {
-                const reverseIds = indicators.filter((i) => i.reverse).map((i) => i.indicatorId)
-                onUpdate({
-                  presentation: { ...question.presentation, indicators },
-                  answerKey: reverseIds.length > 0 ? { kind: 'indicator', reverseIndicatorIds: reverseIds } : { kind: 'none' },
-                })
-              }}
-              onChangeShowWeightedScore={(show: boolean) =>
-                onUpdate({ presentation: { ...question.presentation, showWeightedScore: show } })
-              }
+              onChangeScales={(scales) => onUpdate({ presentation: { ...question.presentation, indicatorScales: scales } })}
+              onChangeIndicators={(indicators) => onUpdate({ presentation: { ...question.presentation, indicators } })}
+              onChangeShowWeightedScore={(show) => onUpdate({ presentation: { ...question.presentation, showWeightedScore: show } })}
             />
           )}
-
-          {/* Non-scorable / Text / Rating / File Note */}
-          {!['single-choice', 'multiple-choice', 'binary', 'dropdown', 'likert', 'indicator-table'].includes(question.type) && (
-            <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 text-xs space-y-1">
-              <div className="font-semibold text-slate-200">Kunci Jawaban Tipe {question.type}</div>
-              <p>
-                Tipe pertanyaan ini dikonfigurasi melalui rentang nilai (misal: Rating Min/Max) atau merupakan input teks/file non-skor.
-              </p>
-            </div>
-          )}
         </div>
       )}
-
-      {/* 🟡 SECTION 3: SCORING & WEIGHTS */}
-      {activeTab === 'scoring' && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1.5">Skema Penilaian (Scoring Scheme)</label>
-              <select
-                value={question.scoring.scheme}
-                onChange={(e) =>
-                  onUpdate({
-                    scoring: {
-                      ...question.scoring,
-                      scheme: e.target.value as Question['scoring']['scheme'],
-                    },
-                  })
-                }
-                className="w-full bg-slate-900 border border-slate-700 text-slate-100 text-sm rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-amber-500"
-              >
-                <option value="none">none (Tanpa Skor)</option>
-                <option value="binary">binary (Biner 0 / Weight)</option>
-                <option value="likert">likert (Skala Likert)</option>
-                <option value="indicator">indicator (Tabel Indikator)</option>
-                <option value="rating">rating (Bintang / Skor Bertingkat)</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1.5">Bobot Pertanyaan (Weight)</label>
-              <input
-                type="number"
-                min={0}
-                step={0.5}
-                value={question.scoring.weight}
-                onChange={(e) =>
-                  onUpdate({
-                    scoring: {
-                      ...question.scoring,
-                      weight: Math.max(0, Number(e.target.value) || 0),
-                    },
-                  })
-                }
-                className="w-full bg-slate-900 border border-slate-700 text-amber-300 font-bold text-sm rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-amber-500"
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 🟣 SECTION 4: VALIDATION & CONSTRAINTS */}
-      {activeTab === 'validation' && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between p-3.5 rounded-xl bg-slate-900 border border-slate-800">
-            <div>
-              <div className="text-xs font-semibold text-slate-200">Wajib Diisi (Required)</div>
-              <div className="text-[11px] text-slate-400">Responden harus mengisi pertanyaan ini sebelum mengirimkan formulir</div>
-            </div>
-            <input
-              type="checkbox"
-              checked={question.required}
-              onChange={(e) => onUpdate({ required: e.target.checked })}
-              className="w-5 h-5 text-purple-500 rounded focus:ring-purple-400"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1.5">Teks Placeholder Input</label>
-              <input
-                type="text"
-                value={question.presentation.placeholder || ''}
-                onChange={(e) =>
-                  onUpdate({ presentation: { ...question.presentation, placeholder: e.target.value } })
-                }
-                placeholder="Contoh: Ketik di sini..."
-                className="w-full bg-slate-900 border border-slate-700 text-slate-200 text-xs rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-purple-500"
-              />
-            </div>
-
-            {/* Rating range (1-5, 1-10 support) */}
-            {question.type === 'rating' && (
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-[11px] text-slate-400 mb-1">Rating Min</label>
-                  <input
-                    type="number"
-                    value={question.presentation.ratingMin ?? 1}
-                    onChange={(e) =>
-                      onUpdate({
-                        presentation: { ...question.presentation, ratingMin: Number(e.target.value) },
-                      })
-                    }
-                    className="w-full bg-slate-900 border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-2"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] text-slate-400 mb-1">Rating Max (1-10)</label>
-                  <input
-                    type="number"
-                    min={2}
-                    max={10}
-                    value={question.presentation.ratingMax ?? 5}
-                    onChange={(e) =>
-                      onUpdate({
-                        presentation: { ...question.presentation, ratingMax: Number(e.target.value) },
-                      })
-                    }
-                    className="w-full bg-slate-900 border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-2"
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* File upload constraints */}
-            {(question.type === 'file-upload' || question.type === 'image') && (
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5">Batas Ukuran File (MB)</label>
-                <input
-                  type="number"
-                  min={1}
-                  max={50}
-                  value={question.presentation.maxFileSizeMb ?? 5}
-                  onChange={(e) =>
-                    onUpdate({
-                      presentation: { ...question.presentation, maxFileSizeMb: Number(e.target.value) },
-                    })
-                  }
-                  className="w-full bg-slate-900 border border-slate-700 text-slate-200 text-xs rounded-xl px-3.5 py-2.5"
-                />
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Done Editing */}
-      <div className="flex justify-end pt-2 border-t border-slate-800">
-        <button
-          type="button"
-          onClick={onClose}
-          className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition-colors"
-        >
-          Selesai Mengedit Pertanyaan
-        </button>
-      </div>
     </div>
   )
 }

@@ -343,6 +343,9 @@ export const ELEMENTS = ANSWER_TYPES.map((type) => ({
   defaultProps: getDefaultConfig(type.value),
 }))
 
+export type FormElement = (typeof ELEMENTS)[number]
+export type CanvasElement = any
+
 function getCategoryForAnswerType(type: AnswerType): 'Input' | 'Pilihan' | 'Skala' | 'Tabel' | 'Media' | 'Layout' {
   if (['short-text', 'long-text', 'number', 'date'].includes(type)) return 'Input'
   if (['single-choice', 'multiple-choice', 'dropdown'].includes(type)) return 'Pilihan'
@@ -451,7 +454,7 @@ export const getScoredQuestions = (
   const scoredStageIds = getScoredStages(stages).map(s => s.id)
   return questions.filter(q => 
     q.stageId && scoredStageIds.includes(q.stageId) &&
-    q.answerType !== 'image' && 
+    (q.answerType as string) !== 'image' && 
     q.answerType !== 'file-upload' &&
     q.answerType !== 'signature'
   )

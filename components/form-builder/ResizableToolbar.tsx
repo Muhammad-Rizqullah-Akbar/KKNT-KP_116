@@ -8,11 +8,12 @@ import { ELEMENTS, CATEGORIES, FormElement } from './ElementTypes'
 import { ElementButton } from './ElementButton'
 
 interface ResizableToolbarProps {
-  onAddElement: (element: FormElement) => void
+  onAddElement: (element: FormElement, targetIndex?: number) => void
+  onAddPageBreak?: () => void
   isMobile?: boolean
 }
 
-export function ResizableToolbar({ onAddElement, isMobile = false }: ResizableToolbarProps) {
+export function ResizableToolbar({ onAddElement, onAddPageBreak, isMobile = false }: ResizableToolbarProps) {
   const [activeCategory, setActiveCategory] = useState('all')
   const [height, setHeight] = useState(160)
   const [isDragging, setIsDragging] = useState(false)
@@ -149,7 +150,7 @@ export function ResizableToolbar({ onAddElement, isMobile = false }: ResizableTo
 
       {/* Kategori Filter */}
       <div className="flex gap-1 overflow-x-auto custom-scrollbar px-12 pt-4 pb-1.5">
-        {(isMobile ? quickCategories : CATEGORIES).map((cat) => (
+        {(isMobile ? CATEGORIES.filter(c => ['all', 'Input', 'Pilihan', 'Skala', 'Tabel'].includes(c.id)) : CATEGORIES).map((cat) => (
           <button
             key={cat.id}
             onClick={() => setActiveCategory(cat.id)}

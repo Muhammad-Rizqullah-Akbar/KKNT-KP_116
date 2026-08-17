@@ -130,7 +130,7 @@ export function normalizeFormAggregate(docId: string, data: any): FormAggregateD
   if (aspects.length === 0 && questions.length > 0) {
     const aspectMap = new Map<string, string>()
     questions.forEach((q: any) => {
-      const aspId = q.aspectId || 'default'
+      const aspId = q.aspectId || q.stageId || q.stage_id || 'default'
       const aspName = q.aspectTitle || q.aspect || q.category || (aspId === 'default' ? 'Evaluasi Kebersihan & Keamanan Pangan' : `Aspek ${aspId}`)
       if (!aspectMap.has(aspId)) {
         aspectMap.set(aspId, aspName)
@@ -141,7 +141,7 @@ export function normalizeFormAggregate(docId: string, data: any): FormAggregateD
       aspectId,
       title,
       description: `Aspek Penilaian: ${title}`,
-      questionIds: questions.filter((q: any) => (q.aspectId || 'default') === aspectId).map((q: any) => q.questionId),
+      questionIds: questions.filter((q: any) => (q.aspectId || q.stageId || 'default') === aspectId).map((q: any) => q.questionId),
     }))
   }
 
@@ -448,6 +448,39 @@ export async function archiveFormInDb(
   await formRef.update({
     status: 'archived',
     'metadata.status': 'archived',
+    updatedAt: now,
+    updatedBy: sessionUid,
+  })
+
+  return updated
+}
+
+/**
+ * RESTORE FORM VERSION SNAPSHOT
+ */
+export async function restoreFormInDb(
+  formId: string,
+  sessionUid: string
+): Promise<FormAggregateDoc> {
+  const existing = await getFormAggregateFromDb(formId)
+  if (!existing) {
+    throw new Error(`Formulir dengan ID "${formId}" tidak ditemukan.`)
+  }
+
+  const restoredStatus = existing.activeVersionNumber > 1 ? 'published' : 'draft'
+  const now = new Date().toISOString()
+
+  const updated: FormAggregateDoc = {
+    ...existing,
+    status: restoredStatus,
+    metadata: { ...existing.metadata, status: restoredStatus },
+    updatedAt: now,
+    updatedBy: sessionUid,
+  }
+
+  await safeSetDoc(FORMS_COLLECTION, formId, {
+    status: restoredStatus,
+    'metadata.status': restoredStatus,
     updatedAt: now,
     updatedBy: sessionUid,
   })

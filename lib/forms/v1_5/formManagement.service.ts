@@ -24,6 +24,8 @@ export {
   formAggregateToCanonicalForm,
 } from '@/lib/forms/v1_5/formConverters'
 
+import { registerNewMetadataEntry } from '@/lib/firebase/repositories/v1_5/v1_5Registry.repo'
+
 export async function createFormWorkflow(
   metadata: FormMetadata,
   sessionUid: string
@@ -36,6 +38,7 @@ export async function createFormWorkflow(
   const slug = cleanTitle.toLowerCase().replace(/[^a-z0-9]/g, '_') || 'form'
   const formId = `form_${slug}_${crypto.randomUUID().substring(0, 6)}`
 
+  const initialAspectId = `aspect_${crypto.randomUUID()}`
   const initialPayload: Partial<FormAggregateDoc> = {
     formId,
     metadata: {
@@ -48,13 +51,13 @@ export async function createFormWorkflow(
     status: 'draft',
     aspects: [
       {
-        aspectId: `aspect_${crypto.randomUUID()}`,
+        aspectId: initialAspectId,
         title: 'Aspek 1 — Evaluasi Pangan Sehat',
         description: 'Penilaian dimensi standar sarana dan hygiene...',
       },
     ],
     questions: [],
-    scoring: { totalPoints: 100, mode: 'auto', stagePointDistribution: {}, allowOverride: true, autoBalance: true },
+    scoring: { totalPoints: 100, mode: 'auto', outputMode: 'both', stagePointDistribution: { [initialAspectId]: 100 }, allowOverride: true, autoBalance: true },
     validation: { mode: 'all_required', exceptionQuestionIds: [], allowOverride: true },
     thresholds: [
       { id: 't_a', min: 90, max: 100, grade: 'A', title: 'Sangat Baik', description: 'Memenuhi seluruh standar hygiene dan sanitasi.' },
@@ -67,6 +70,7 @@ export async function createFormWorkflow(
     distribution: { allowCadreDistribution: true, distributionCodePrefix: 'KDR-BPOM' },
   }
 
+  await registerNewMetadataEntry(metadata.category, metadata.target)
   return await saveFormAggregateToDb(formId, initialPayload, sessionUid)
 }
 
@@ -84,6 +88,7 @@ export async function saveDraftWorkflow(
     throw new Error('Formulir terpublikasi tidak dapat diubah secara langsung. Buat versi baru terlebih dahulu.')
   }
 
+  await registerNewMetadataEntry(state.metadata.category, state.metadata.target)
   const payload = builderStateToFormAggregate(formId, state)
   return await saveFormAggregateToDb(formId, payload, sessionUid)
 }
@@ -120,6 +125,14 @@ export async function archiveFormWorkflow(
   sessionUid: string
 ): Promise<FormAggregateDoc> {
   return await archiveFormInDb(formId, sessionUid)
+}
+
+export async function restoreFormWorkflow(
+  formId: string,
+  sessionUid: string
+): Promise<FormAggregateDoc> {
+  const { restoreFormInDb } = await import('@/lib/firebase/repositories/v1_5/v1_5Forms.repo')
+  return await restoreFormInDb(formId, sessionUid)
 }
 
 export async function getFormVersionsWorkflow(

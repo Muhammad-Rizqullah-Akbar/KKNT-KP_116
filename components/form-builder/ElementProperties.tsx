@@ -135,7 +135,7 @@ export function ElementProperties({
             <div className="space-y-1.5">
               <label className="text-xs text-white/50 uppercase tracking-wider">Opsi Jawaban</label>
               <div className="space-y-2">
-                {(localElement.options || ['']).map((opt, index) => (
+                {(localElement.options || ['']).map((opt: any, index: number) => (
                   <div key={index} className="flex items-center gap-2">
                     <input
                       type="text"
@@ -150,7 +150,7 @@ export function ElementProperties({
                     />
                     <button
                       onClick={() => {
-                        const newOptions = (localElement.options || []).filter((_, i) => i !== index)
+                        const newOptions = (localElement.options || []).filter((_: any, i: number) => i !== index)
                         setLocalElement({ ...localElement, options: newOptions })
                       }}
                       className="p-2 rounded-lg hover:bg-red-500/10 transition-colors"
@@ -180,7 +180,7 @@ export function ElementProperties({
                   className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-white/70 focus:outline-none focus:border-cyan-400/40 transition-all"
                 >
                   <option value="" className="bg-[#0e0e1a]">Tidak ada (tidak dinilai)</option>
-                  {(localElement.options || []).map((opt, i) => (
+                  {(localElement.options || []).map((opt: any, i: number) => (
                     <option key={i} value={opt} className="bg-[#0e0e1a]">{opt}</option>
                   ))}
                 </select>
@@ -206,7 +206,7 @@ export function ElementProperties({
             <div className="space-y-1.5">
               <label className="text-xs text-white/50 uppercase tracking-wider">Baris / Indikator</label>
               <div className="space-y-2">
-                {(localElement.rows || []).map((row, index) => (
+                {(localElement.rows || []).map((row: any, index: number) => (
                   <div key={row.id} className="flex items-center gap-2">
                     <input
                       type="text"
@@ -221,7 +221,7 @@ export function ElementProperties({
                     />
                     <button
                       onClick={() => {
-                        const newRows = (localElement.rows || []).filter((_, i) => i !== index)
+                        const newRows = (localElement.rows || []).filter((_: any, i: number) => i !== index)
                         setLocalElement({ ...localElement, rows: newRows })
                       }}
                       className="p-2 rounded-lg hover:bg-red-500/10 transition-colors"
@@ -261,7 +261,7 @@ export function ElementProperties({
             <div className="space-y-1.5">
               <label className="text-xs text-white/50 uppercase tracking-wider">Pernyataan</label>
               <div className="space-y-2">
-                {(localElement.options || ['']).map((opt, index) => (
+                {(localElement.options || ['']).map((opt: any, index: number) => (
                   <div key={index} className="flex items-center gap-2">
                     <input
                       type="text"
@@ -276,7 +276,7 @@ export function ElementProperties({
                     />
                     <button
                       onClick={() => {
-                        const newOptions = (localElement.options || []).filter((_, i) => i !== index)
+                        const newOptions = (localElement.options || []).filter((_: any, i: number) => i !== index)
                         setLocalElement({ ...localElement, options: newOptions })
                       }}
                       className="p-2 rounded-lg hover:bg-red-500/10 transition-colors"
@@ -339,7 +339,7 @@ export function ElementProperties({
             <div className="space-y-1.5">
               <label className="text-xs text-white/50 uppercase tracking-wider">Opsi Jawaban</label>
               <div className="space-y-2">
-                {(localElement.options || ['']).map((opt, index) => (
+                {(localElement.options || ['']).map((opt: any, index: number) => (
                   <div key={index} className="flex items-center gap-2">
                     <input
                       type="text"
@@ -354,7 +354,7 @@ export function ElementProperties({
                     />
                     <button
                       onClick={() => {
-                        const newOptions = (localElement.options || []).filter((_, i) => i !== index)
+                        const newOptions = (localElement.options || []).filter((_: any, i: number) => i !== index)
                         setLocalElement({ ...localElement, options: newOptions })
                       }}
                       className="p-2 rounded-lg hover:bg-red-500/10 transition-colors"

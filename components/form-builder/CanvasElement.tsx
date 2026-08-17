@@ -128,7 +128,7 @@ export function CanvasElement({
           <div className="space-y-2">
             <p className="text-sm text-white/90">{element.question}</p>
             <div className="space-y-1.5">
-              {(element.options || ['Opsi 1', 'Opsi 2', 'Opsi 3']).map((opt, i) => (
+              {(element.options || ['Opsi 1', 'Opsi 2', 'Opsi 3']).map((opt: any, i: number) => (
                 <label key={i} className="flex items-center gap-2 text-sm text-white/60 cursor-pointer">
                   <input type="radio" name={element.id} disabled className="accent-cyan-400 w-4 h-4" />
                   {opt}
@@ -143,7 +143,7 @@ export function CanvasElement({
           <div className="space-y-2">
             <p className="text-sm text-white/90">{element.question}</p>
             <div className="space-y-1.5">
-              {(element.options || ['Opsi 1', 'Opsi 2', 'Opsi 3']).map((opt, i) => (
+              {(element.options || ['Opsi 1', 'Opsi 2', 'Opsi 3']).map((opt: any, i: number) => (
                 <label key={i} className="flex items-center gap-2 text-sm text-white/60 cursor-pointer">
                   <input type="checkbox" disabled className="accent-cyan-400 w-4 h-4" />
                   {opt}
@@ -162,7 +162,7 @@ export function CanvasElement({
               className="w-full max-w-[250px] px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-white/40 focus:outline-none focus:border-cyan-400/40 transition-all cursor-default"
             >
               <option>Pilih opsi...</option>
-              {(element.options || ['Opsi 1', 'Opsi 2', 'Opsi 3']).map((opt, i) => (
+              {(element.options || ['Opsi 1', 'Opsi 2', 'Opsi 3']).map((opt: any, i: number) => (
                 <option key={i}>{opt}</option>
               ))}
             </select>
@@ -178,7 +178,7 @@ export function CanvasElement({
               disabled
               className="w-full max-w-[250px] px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-white/40 focus:outline-none focus:border-cyan-400/40 transition-all cursor-default"
             >
-              {(element.options || ['Opsi 1', 'Opsi 2', 'Opsi 3']).map((opt, i) => (
+              {(element.options || ['Opsi 1', 'Opsi 2', 'Opsi 3']).map((opt: any, i: number) => (
                 <option key={i}>{opt}</option>
               ))}
             </select>
@@ -201,7 +201,7 @@ export function CanvasElement({
                   </tr>
                 </thead>
                 <tbody>
-                  {(element.options || ['Pernyataan 1', 'Pernyataan 2']).map((row, i) => (
+                  {(element.options || ['Pernyataan 1', 'Pernyataan 2']).map((row: any, i: number) => (
                     <tr key={i} className="border-t border-white/[0.05]">
                       <td className="py-2 px-3 text-sm text-white/60">{row}</td>
                       {['STS', 'TS', 'CS', 'S', 'SS'].map((label) => (
@@ -245,7 +245,7 @@ export function CanvasElement({
                   </tr>
                 </thead>
                 <tbody>
-                  {(element.rows || [{ id: '1', label: 'Indikator 1' }, { id: '2', label: 'Indikator 2' }]).map((row) => (
+                  {(element.rows || [{ id: '1', label: 'Indikator 1' }, { id: '2', label: 'Indikator 2' }]).map((row: any) => (
                     <tr key={row.id} className="border-t border-white/[0.05]">
                       <td className="py-2 px-3 text-sm text-white/60">{row.label}</td>
                       <td className="text-center py-2 px-2">
@@ -277,7 +277,7 @@ export function CanvasElement({
               )}
             </div>
             <div className="space-y-1.5">
-              {(element.options || ['Opsi A', 'Opsi B']).map((opt, i) => (
+              {(element.options || ['Opsi A', 'Opsi B']).map((opt: any, i: number) => (
                 <label key={i} className="flex items-center gap-2 text-sm text-white/60 cursor-pointer">
                   <input type="radio" name={element.id} disabled className="accent-cyan-400 w-4 h-4" />
                   {opt}
