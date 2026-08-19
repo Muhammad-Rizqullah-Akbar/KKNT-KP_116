@@ -91,8 +91,8 @@ export default function UserProfileProgressPage() {
         )
         setResponsesCount(personalResponses.length)
 
-        // If user is Mitra / Partner: Calculate Team Cadre Statistics
-        if (['mitra', 'partner', 'partnership', 'organization', 'superadmin', 'admin'].includes(userData?.role || '')) {
+        // If user is Mitra / Partner: Calculate Team Cadre Statistics strictly for linked cadres
+        if (['mitra', 'partner', 'partnership', 'organization'].includes(userData?.role || '')) {
           let cadreUids: string[] = []
           let cadreNames: string[] = []
 

@@ -7,6 +7,7 @@ import { Icon } from '@/components/ui/Icons'
 import type { ResponseDoc } from '@/lib/forms/v1_5/responseTypes'
 import { useAuth } from '@/context/AuthContext'
 import { safeFetchJson } from '@/lib/shared/safeFetch'
+import { SkeletonCard, SkeletonTable } from '@/components/ui/Skeleton'
 
 interface FormMetaItem {
   formId: string
@@ -551,10 +552,15 @@ export default function ResponsesDashboardPage() {
 
         {/* Content Workspace Canvas */}
         {isLoading ? (
-          <div className="flex items-center justify-center py-20 text-slate-400 text-xs gap-3 rounded-3xl bg-slate-900 border border-slate-800">
-            <Icon name="loader" className="w-6 h-6 text-cyan-400 animate-spin" />
-            <span>Memuat data responden dan hasil evaluasi...</span>
-          </div>
+          viewLayout === 'cards' ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <SkeletonCard key={i} />
+              ))}
+            </div>
+          ) : (
+            <SkeletonTable rows={6} cols={6} />
+          )
         ) : error ? (
           <div className="p-8 text-center text-xs text-rose-300 space-y-2 rounded-3xl bg-slate-900 border border-slate-800">
             <p className="font-semibold">{error}</p>
