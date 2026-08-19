@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext'
 import { safeFetchJson } from '@/lib/shared/safeFetch'
 import { getArticles, type ArticleData } from '@/lib/firebase/repositories/articles.repo'
 import { Icon } from '@/components/ui/Icons'
+import { SkeletonCard, SkeletonOverview } from '@/components/ui/Skeleton'
 
 interface ProfileProgressModalProps {
   isOpen: boolean
@@ -30,6 +31,7 @@ export function ProfileProgressModal({ isOpen, onClose, userOverride }: ProfileP
 
   const [articles, setArticles] = useState<ArticleData[]>([])
   const [distributions, setDistributions] = useState<any[]>([])
+  const [myResponses, setMyResponses] = useState<any[]>([])
   const [myResponsesCount, setMyResponsesCount] = useState<number>(0)
   const [totalSystemResponsesCount, setTotalSystemResponsesCount] = useState<number>(0)
   const [isLoading, setIsLoading] = useState(true)
@@ -77,41 +79,38 @@ export function ProfileProgressModal({ isOpen, onClose, userOverride }: ProfileP
         console.warn('Could not fetch articles:', artErr)
       }
 
-      // 2. Fetch Distributions
+      // 2. Fetch Distributions (STRICT OWNERSHIP ONLY)
       let myDists: any[] = []
       const distRes = await safeFetchJson('/api/v1_5/distributions')
+      const targetUid = userOverride?.uid || user?.uid || authUser?.uid
+      const targetEmail = String(userOverride?.email || userData?.email || authUser?.email || '').toLowerCase().trim()
+      const targetDisplayName = String(userOverride?.displayName || userData?.displayName || authUserData?.displayName || '').toLowerCase().trim()
+
       if (distRes.ok && distRes.data && Array.isArray(distRes.data.distributions)) {
         const allDists = distRes.data.distributions
-        const userUid = userOverride?.uid || user?.uid || authUser?.uid
-        const userDisplayName = String(userData?.displayName || authUserData?.displayName || userOverride?.displayName || '').toLowerCase().trim()
-        const userEmail = String(userData?.email || authUser?.email || userOverride?.email || '').toLowerCase().trim()
 
         myDists = allDists.filter((d: any) => {
-          if (d.createdBy && userUid && d.createdBy === userUid) return true
-          if (d.cadreId && userUid && d.cadreId === userUid) return true
-          if (d.ownerId && userUid && d.ownerId === userUid) return true
+          if (d.createdBy && targetUid && d.createdBy === targetUid) return true
+          if (d.cadreId && targetUid && d.cadreId === targetUid) return true
+          if (d.ownerId && targetUid && d.ownerId === targetUid) return true
 
           const ownerLower = String(d.ownerName || d.cadreName || '').toLowerCase().trim()
-          if (userEmail && ownerLower === userEmail) return true
-          if (userDisplayName && userDisplayName.length > 2 && ownerLower === userDisplayName) return true
+          if (targetEmail && ownerLower === targetEmail) return true
+          if (targetDisplayName && targetDisplayName.length > 2 && ownerLower === targetDisplayName) return true
 
           return false
         })
-
-        if (myDists.length === 0 && (userData?.role === 'super_admin' || userData?.role === 'admin')) {
-          myDists = allDists
-        }
       }
 
-      // Extract set of user's active distribution codes
+      // Extract set of target user's active distribution codes
       const myCodesSet = new Set<string>()
       myDists.forEach((d: any) => {
         if (d.code) myCodesSet.add(String(d.code).toLowerCase().trim())
         if (d.distributionId) myCodesSet.add(String(d.distributionId).toLowerCase().trim())
       })
-      if (userData?.cadreCode) myCodesSet.add(String(userData.cadreCode).toLowerCase().trim())
+      if ((userData as any)?.cadreCode) myCodesSet.add(String((userData as any).cadreCode).toLowerCase().trim())
 
-      // 3. Fetch Responses & Calculate per-distribution counts
+      // 3. Fetch Responses (STRICT OWNERSHIP ONLY)
       const respRes = await safeFetchJson('/api/v1_5/responses')
       let filteredMyResponsesCount = 0
       let totalSysCount = 0
@@ -120,7 +119,7 @@ export function ProfileProgressModal({ isOpen, onClose, userOverride }: ProfileP
         const allResponses = respRes.data.responses
         totalSysCount = allResponses.length
 
-        // Map per-distribution respondent counts
+        // Map per-distribution respondent counts for target user's distributions
         const enrichedDists = myDists.map((d: any) => {
           const codeLower = String(d.code || '').toLowerCase().trim()
           const distIdLower = String(d.distributionId || '').toLowerCase().trim()
@@ -144,8 +143,8 @@ export function ProfileProgressModal({ isOpen, onClose, userOverride }: ProfileP
 
         setDistributions(enrichedDists)
 
-        // Filter total responses belonging to this user's distribution codes or UID
-        const myResponses = allResponses.filter((r: any) => {
+        // Filter total responses strictly belonging to this target user's distribution codes or UID
+        const myResponsesList = allResponses.filter((r: any) => {
           const rCode = String(
             r.distributionCode ||
             r.code ||
@@ -156,12 +155,16 @@ export function ProfileProgressModal({ isOpen, onClose, userOverride }: ProfileP
           ).toLowerCase().trim()
 
           const isMatchedCode = rCode !== '' && myCodesSet.has(rCode)
-          const isMatchedUid = r.createdBy === user?.uid || r.cadreId === user?.uid || r.userId === user?.uid
+          const isMatchedUid =
+            (r.createdBy && targetUid && r.createdBy === targetUid) ||
+            (r.cadreId && targetUid && r.cadreId === targetUid) ||
+            (r.userId && targetUid && r.userId === targetUid)
 
           return isMatchedCode || isMatchedUid
         })
 
-        filteredMyResponsesCount = myResponses.length > 0 ? myResponses.length : (userData?.role === 'super_admin' || userData?.role === 'admin' ? totalSysCount : 0)
+        setMyResponses(myResponsesList)
+        filteredMyResponsesCount = myResponsesList.length
       } else {
         setDistributions(myDists)
       }
@@ -202,6 +205,19 @@ export function ProfileProgressModal({ isOpen, onClose, userOverride }: ProfileP
     const active = distributions.filter((d) => d.status === 'active').length
     return { total, active }
   }, [distributions])
+
+  const cadreResponseStats = useMemo(() => {
+    const scores = myResponses
+      .map((r) => r.result?.percentage)
+      .filter((s): s is number => typeof s === 'number')
+
+    const avgScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0
+    const passCount = myResponses.filter((r) => r.result?.percentage && r.result.percentage >= 75).length
+    const passRate = myResponses.length > 0 ? Math.round((passCount / myResponses.length) * 100) : 0
+    const lowScoreCount = myResponses.filter((r) => r.result?.percentage && r.result.percentage < 60).length
+
+    return { avgScore, passCount, passRate, lowScoreCount, totalResponses: myResponses.length }
+  }, [myResponses])
 
   // Save Profile Changes
   const handleSaveProfile = async (e: React.FormEvent) => {
@@ -335,41 +351,59 @@ export function ProfileProgressModal({ isOpen, onClose, userOverride }: ProfileP
         {/* Modal Body Content */}
         <div className="flex-1 overflow-y-auto space-y-4 pr-1 text-xs">
           {isLoading ? (
-            <div className="flex items-center justify-center py-16 text-slate-400 gap-3">
-              <Icon name="loader" className="w-5 h-5 text-purple-400 animate-spin" />
-              <span>Memuat data aktivitas & progress akun...</span>
+            <div className="space-y-4 py-2">
+              <SkeletonOverview />
+              <SkeletonCard />
             </div>
           ) : activeTab === 'progress' ? (
             <div className="space-y-4">
               {/* Metric Cards Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="rounded-2xl bg-slate-950 border border-slate-800 p-3.5 space-y-1">
-                  <span className="text-slate-400 text-[11px]">Artikel Published</span>
-                  <p className="text-xl font-bold font-mono text-cyan-300">{articleStats.published}</p>
-                  <span className="text-[10px] text-slate-500 font-mono">Diterbitkan ke CMS</span>
-                </div>
-
-                <div className="rounded-2xl bg-slate-950 border border-slate-800 p-3.5 space-y-1">
-                  <span className="text-slate-400 text-[11px]">Total Views Pembaca</span>
-                  <p className="text-xl font-bold font-mono text-emerald-300">{articleStats.totalViews}</p>
-                  <span className="text-[10px] text-slate-500 font-mono">Diakses oleh publik</span>
-                </div>
-
-                <div className="rounded-2xl bg-slate-950 border border-slate-800 p-3.5 space-y-1">
                   <span className="text-slate-400 text-[11px]">Kode Distribusi Saya</span>
                   <p className="text-xl font-bold font-mono text-purple-300">{distStats.active}</p>
-                  <span className="text-[10px] text-slate-500 font-mono">Aktif menyebar</span>
+                  <span className="text-[10px] text-slate-500 font-mono">Kode Aktif Menyebar</span>
                 </div>
 
                 <div className="rounded-2xl bg-slate-950 border border-slate-800 p-3.5 space-y-1">
-                  <span className="text-slate-400 text-[11px]">Responden (Kode Saya)</span>
-                  <p className="text-xl font-bold font-mono text-amber-300">
-                    {myResponsesCount} <span className="text-[11px] font-normal text-slate-500">/ {totalSystemResponsesCount} total</span>
-                  </p>
-                  <span className="text-[10px] text-emerald-400 font-mono flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                    Terjaring via link/kode Anda
+                  <span className="text-slate-400 text-[11px]">Responden Terjaring</span>
+                  <p className="text-xl font-bold font-mono text-cyan-300">{cadreResponseStats.totalResponses} Orang</p>
+                  <span className="text-[10px] text-slate-500 font-mono">Via Kode Kader Ini</span>
+                </div>
+
+                <div className="rounded-2xl bg-slate-950 border border-slate-800 p-3.5 space-y-1">
+                  <span className="text-slate-400 text-[11px]">Rata-Rata Nilai Evaluasi</span>
+                  <p className="text-xl font-bold font-mono text-emerald-400">{cadreResponseStats.avgScore}%</p>
+                  <span className="text-[10px] text-emerald-400 font-mono">Skor Lapangan</span>
+                </div>
+
+                <div className="rounded-2xl bg-slate-950 border border-slate-800 p-3.5 space-y-1">
+                  <span className="text-slate-400 text-[11px]">Tingkat Memenuhi Syarat</span>
+                  <p className="text-xl font-bold font-mono text-amber-300">{cadreResponseStats.passRate}%</p>
+                  <span className="text-[10px] text-slate-500 font-mono">{cadreResponseStats.passCount} Responden MS</span>
+                </div>
+              </div>
+
+              {/* ACTIONABLE FIELD INSIGHTS CARD */}
+              <div className="rounded-2xl bg-gradient-to-r from-violet-950/60 via-slate-950 to-slate-950 border border-violet-500/40 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-bold text-violet-300 flex items-center gap-2 font-mono text-xs uppercase tracking-wider">
+                    <Icon name="sparkles" className="w-4 h-4 text-violet-400" />
+                    <span>Analisis Insight & Rekomendasi Lapangan Kader</span>
+                  </h4>
+                  <span className="px-2.5 py-0.5 rounded text-[10px] font-mono font-bold bg-violet-500/20 text-violet-200 border border-violet-500/30">
+                    Performa: {cadreResponseStats.avgScore >= 80 ? 'Sangat Baik (Grade A)' : cadreResponseStats.avgScore >= 60 ? 'Baik (Grade B)' : 'Perlu Pembinaan (Grade C)'}
                   </span>
+                </div>
+
+                <div className="space-y-2 text-xs font-mono text-slate-300 leading-relaxed">
+                  <p>
+                    {cadreResponseStats.totalResponses === 0
+                      ? 'Belum ada tanggapan evaluasi yang terkumpul untuk kader ini. Disarankan segera menyebarkan kode distribusi ke responden sasaran.'
+                      : cadreResponseStats.lowScoreCount > 0
+                      ? `⚠️ Terdapat ${cadreResponseStats.lowScoreCount} dari ${cadreResponseStats.totalResponses} responden dengan nilai evaluasi di bawah standar (<60%). Disarankan untuk mengarahkan responden ke Artikel Edukasi Keamanan Pangan.`
+                      : `🎉 Luar biasa! ${cadreResponseStats.passCount} dari ${cadreResponseStats.totalResponses} responden memenuhi syarat keamanan pangan (${cadreResponseStats.passRate}% Pass Rate).`}
+                  </p>
                 </div>
               </div>
 

@@ -11,6 +11,7 @@ import type { FormAggregateDoc } from '@/lib/firebase/repositories/v1_5/v1_5Form
 import { formAggregateToCanonicalForm } from '@/lib/forms/v1_5/formConverters'
 import { useAuth } from '@/context/AuthContext'
 import { safeFetchJson } from '@/lib/shared/safeFetch'
+import { SkeletonCard, SkeletonTable } from '@/components/ui/Skeleton'
 
 export type DerivedLifecycleStatus = 'draft' | 'ready' | 'published' | 'active' | 'archived'
 
@@ -117,19 +118,64 @@ export default function V15FormsDashboardPage() {
     return () => clearTimeout(handler)
   }, [searchTerm])
 
-  // Single Lightweight Fetch to Load Form Metadata
+  // Concurrent Fetch to Load Form Metadata, Distributions, & Responses Integration
   const fetchForms = async () => {
     setIsLoading(true)
     setError(null)
     try {
-      const { ok, data, error: fetchErr } = await safeFetchJson('/api/v1_5/forms')
-      if (ok && data && Array.isArray(data.forms)) {
-        const v15Forms = data.forms.filter(
-          (f: any) => Boolean(f?.formId) && (Boolean(f?.activeVersionId) || Boolean(f?.aspects) || Boolean(f?.metadata))
-        )
-        setForms(v15Forms)
+      const [formsRes, distRes, respRes] = await Promise.all([
+        safeFetchJson('/api/v1_5/forms'),
+        safeFetchJson('/api/v1_5/distributions'),
+        safeFetchJson('/api/v1_5/responses'),
+      ])
+
+      if (formsRes.ok && formsRes.data && Array.isArray(formsRes.data.forms)) {
+        const allDists: any[] = distRes.ok && distRes.data && Array.isArray(distRes.data.distributions) ? distRes.data.distributions : []
+        const allResps: any[] = respRes.ok && respRes.data && Array.isArray(respRes.data.responses) ? respRes.data.responses : []
+
+        // Lookup map for distribution code / ID -> formId
+        const distCodeToFormIdMap = new Map<string, string>()
+        allDists.forEach((d: any) => {
+          const targetFormId = d.formId || d.form?.formId
+          if (targetFormId) {
+            if (d.code) distCodeToFormIdMap.set(String(d.code).toLowerCase().trim(), targetFormId)
+            if (d.distributionCode) distCodeToFormIdMap.set(String(d.distributionCode).toLowerCase().trim(), targetFormId)
+            if (d.distributionId) distCodeToFormIdMap.set(String(d.distributionId).toLowerCase().trim(), targetFormId)
+          }
+        })
+
+        const enrichedForms = formsRes.data.forms
+          .filter((f: any) => Boolean(f?.formId) && (Boolean(f?.activeVersionId) || Boolean(f?.aspects) || Boolean(f?.metadata)))
+          .map((f: any) => {
+            const formIdStr = String(f.formId || f.id || '').trim()
+
+            // Count active distributions for this form
+            const activeDistributionCount = allDists.filter(
+              (d: any) => String(d.formId || d.form?.formId || '').trim() === formIdStr
+            ).length
+
+            // Count responses for this form
+            const responseCount = allResps.filter((r: any) => {
+              const rFormId = String(r.formId || r.metadata?.formId || '').trim()
+              if (rFormId && rFormId === formIdStr) return true
+
+              const code = String(r.distributionCode || r.code || r.metadata?.distributionCode || '').toLowerCase().trim()
+              if (code && distCodeToFormIdMap.has(code)) {
+                return distCodeToFormIdMap.get(code) === formIdStr
+              }
+              return false
+            }).length
+
+            return {
+              ...f,
+              activeDistributionCount,
+              responseCount,
+            }
+          })
+
+        setForms(enrichedForms)
       } else {
-        setError(fetchErr || 'Gagal memuat daftar formulir.')
+        setError(formsRes.error || 'Gagal memuat daftar formulir.')
       }
     } catch (err: any) {
       setError(err.message || 'Gagal terhubung ke server.')
@@ -546,9 +592,10 @@ export default function V15FormsDashboardPage() {
 
         {/* LOADING STATE */}
         {isLoading ? (
-          <div className="py-20 text-center space-y-3">
-            <Icon name="spinner" className="w-8 h-8 text-emerald-400 animate-spin mx-auto" />
-            <p className="text-xs text-slate-400">Memuat metadata lifecycle formulir...</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <SkeletonCard key={i} />
+            ))}
           </div>
         ) : filteredForms.length === 0 ? (
           /* EMPTY STATE */

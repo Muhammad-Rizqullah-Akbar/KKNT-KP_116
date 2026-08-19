@@ -58,7 +58,7 @@ export function Sidebar({ userRole }: SidebarProps) {
           section: 'Utama',
           items: [
             { href: '/dashboard/overview', icon: 'dashboard', label: 'Dashboard Saya' },
-            { href: '/dashboard/analytics', icon: 'barChart', label: 'Laporan & Analytics Saya', badge: 'Pribadi' },
+            { href: '/dashboard/monitoring', icon: 'barChart', label: 'Monitoring Saya', badge: 'Performance' },
           ],
         },
         {
@@ -75,34 +75,36 @@ export function Sidebar({ userRole }: SidebarProps) {
           section: 'Utama',
           items: [
             { href: '/dashboard/overview', icon: 'dashboard', label: 'Dashboard' },
-            { href: '/dashboard/analytics', icon: 'barChart', label: 'Laporan & Analisis' },
           ],
         },
         {
-          section: 'Versi 1.5 (Terbaru)',
+          section: 'Kelola & Pantau',
           items: [
-            { href: '/dashboard/forms/v1-5-builder', icon: 'sparkles', label: 'Form Builder V1.5', badge: 'V1.5' },
-            { href: '/dashboard/forms/v1-5-list', icon: 'clipboardList', label: 'Daftar Formulir V1.5', badge: 'V1.5' },
-            { href: '/dashboard/distributions', icon: 'send', label: 'Distribusi & Kode', badge: 'V1.5' },
-            { href: '/dashboard/partnership/list', icon: 'building', label: 'Kelola Mitra & Instansi', badge: 'Mitra' },
-            { href: '/dashboard/partnership/monitoring', icon: 'trendingUp', label: 'Monitoring Progress Kader', badge: 'Mitra' },
-            { href: '/dashboard/partnership/cadres', icon: 'users', label: 'Kelola Kader Lapangan', badge: 'Kader' },
-            { href: '/dashboard/responses', icon: 'checkCircle', label: 'Hasil Penilaian', badge: 'V1.5' },
+            { href: '/dashboard/partnership', icon: 'building', label: 'Kemitraan', badge: 'Operasional' },
+            { href: '/dashboard/monitoring', icon: 'trendingUp', label: 'Monitoring', badge: 'Analytics' },
+            { href: '/dashboard/widgets', icon: 'pieChart', label: 'Widget Grafik', badge: 'Grafik' },
           ],
         },
         {
-          section: 'Versi 1.0 (Lama)',
+          section: 'Assessment / Form',
+          items: [
+            { href: '/dashboard/forms/v1-5-list', icon: 'clipboardList', label: 'Daftar Formulir', badge: 'Form' },
+            { href: '/dashboard/distributions', icon: 'send', label: 'Distribusi & Kode', badge: 'Kode' },
+            { href: '/dashboard/responses', icon: 'checkCircle', label: 'Hasil Penilaian', badge: 'Hasil' },
+          ],
+        },
+        {
+          section: 'Edukasi',
+          items: [
+            { href: '/dashboard/articles', icon: 'bookOpen', label: 'Materi Edukasi', badge: 'CMS' },
+          ],
+        },
+        {
+          section: 'Versi 1.0 (Lama / Benchmark)',
           items: [
             { href: '/dashboard/form-builder', icon: 'filePlus', label: 'Form Builder V1.0', badge: 'V1.0' },
             { href: '/dashboard/forms', icon: 'clipboardList', label: 'Daftar Formulir V1.0', badge: 'V1.0' },
-            { href: '/dashboard/respondents', icon: 'users', label: 'Data Responden', badge: 'V1.0' },
-          ],
-        },
-        {
-          section: 'CMS & Edukasi',
-          items: [
-            { href: '/dashboard/articles', icon: 'bookOpen', label: 'Materi Edukasi', badge: 'CMS' },
-            { href: '/dashboard/widgets', icon: 'pieChart', label: 'Widget Grafik', badge: 'CMS' },
+            { href: '/dashboard/respondents', icon: 'users', label: 'Data Responden V1.0', badge: 'V1.0' },
           ],
         },
         {
