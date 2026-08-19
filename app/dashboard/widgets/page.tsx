@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useMemo, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Topbar } from '@/components/dashboard/Topbar'
 import { Icon, type IconName } from '@/components/ui/Icons'
 import { Button } from '@/components/shared/Button'
@@ -49,7 +50,19 @@ export interface WidgetItem {
 }
 
 export default function WidgetsPage() {
-  const { user } = useAuth()
+  const { user, userData, userRole, loading: authLoading } = useAuth()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (!authLoading) {
+      const effectiveRole = userRole || userData?.role
+      if (effectiveRole === 'partnership') {
+        router.replace('/dashboard/partnership')
+      } else if (effectiveRole === 'cadre') {
+        router.replace('/dashboard/monitoring')
+      }
+    }
+  }, [authLoading, userRole, userData, router])
 
   // Data States
   const [widgets, setWidgets] = useState<WidgetItem[]>([])

@@ -636,7 +636,16 @@ function AdminOverviewDashboard() {
 }
 
 export default function OverviewPage() {
-  const { userData, loading } = useAuth()
+  const { userData, loading, userRole } = useAuth()
+  const router = typeof window !== 'undefined' ? require('next/navigation').useRouter() : null
+
+  useEffect(() => {
+    if (!loading) {
+      if (userRole === 'partnership' || userData?.role === 'partnership') {
+        router?.replace('/dashboard/partnership')
+      }
+    }
+  }, [loading, userRole, userData, router])
 
   if (loading) {
     return (
@@ -647,6 +656,10 @@ export default function OverviewPage() {
         </div>
       </div>
     )
+  }
+
+  if (userRole === 'partnership' || userData?.role === 'partnership') {
+    return null
   }
 
   if (userData?.role === 'cadre') {

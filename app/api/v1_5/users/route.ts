@@ -12,10 +12,17 @@ export async function GET(request: NextRequest) {
       ...(d.data || {}),
     }))
 
-    // If request is from partnership role, only return cadres created by this partnership
+    // If request is from partnership role, only return own profile and cadres created by/linked to this partnership
     if (authContext.role === 'partnership') {
+      const currentUser = users.find((u: any) => u.uid === authContext.uid)
+      const userOrg = (currentUser?.organization || currentUser?.partnershipName || currentUser?.displayName || '').toLowerCase().trim()
+
       users = users.filter(
-        (u: any) => u.createdBy === authContext.uid || u.partnershipId === authContext.uid
+        (u: any) =>
+          u.uid === authContext.uid ||
+          u.createdBy === authContext.uid ||
+          u.partnershipId === authContext.uid ||
+          (userOrg && u.organization && u.organization.toLowerCase().trim() === userOrg)
       )
     }
 

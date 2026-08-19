@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
+import { useAuth } from '@/context/AuthContext'
 import { Topbar } from '@/components/dashboard/Topbar'
 import { Icon } from '@/components/ui/Icons'
 import { 
@@ -72,6 +74,20 @@ type GalleryItem = {
 }
 
 export default function SettingsPage() {
+  const { userRole, userData, loading: authLoading } = useAuth()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (!authLoading) {
+      const effectiveRole = userRole || userData?.role
+      if (effectiveRole === 'partnership') {
+        router.replace('/dashboard/partnership')
+      } else if (effectiveRole === 'cadre') {
+        router.replace('/dashboard/monitoring')
+      }
+    }
+  }, [authLoading, userRole, userData, router])
+
   // ============ STATE UTAMA ============
   const [activeTab, setActiveTab] = useState<'hero' | 'partnership' | 'gallery'>('hero')
   const [loading, setLoading] = useState(true)

@@ -51,8 +51,9 @@ type DistributionSummary = {
 export default function MonitoringDomainPage() {
   const { user, userData } = useAuth()
   const router = useRouter()
-  const isSuperAdminOrAdmin = userData?.role === 'super_admin' || userData?.role === 'admin'
+  const isSuperAdminOrAdmin = userData?.role === 'super_admin' || userData?.role === 'admin' || userData?.role === 'internal_bpom'
   const isCadre = userData?.role === 'cadre'
+  const isPartnershipRole = userData?.role === 'partnership'
 
   const [activeTab, setActiveTab] = useState<'overview' | 'cadres' | 'mitra' | 'trends' | 'alerts'>('overview')
 
@@ -103,7 +104,17 @@ export default function MonitoringDomainPage() {
 
   // 1. GRANULAR PER-CADRE CONTRIBUTION METRICS
   const cadreMetrics = useMemo(() => {
-    const cadresList = users.filter((u) => u.role === 'cadre')
+    const myOrg = (userData?.organization || userData?.displayName || '').toLowerCase().trim()
+    const cadresList = users.filter((u) => {
+      if (u.role !== 'cadre') return false
+      if (isPartnershipRole) {
+        const isMatchId = u.partnershipId === user?.uid
+        const isMatchOrg = myOrg && u.organization && u.organization.toLowerCase().trim() === myOrg
+        const isMatchPartName = myOrg && u.partnershipName && u.partnershipName.toLowerCase().trim() === myOrg
+        return isMatchId || isMatchOrg || isMatchPartName
+      }
+      return true
+    })
 
     return cadresList.map((cadre) => {
       // Find distributions created by this cadre
@@ -160,11 +171,13 @@ export default function MonitoringDomainPage() {
         organizationName: cadre.organization || cadre.partnershipName || 'Mandiri',
       }
     })
-  }, [users, distributions, responses])
+  }, [users, distributions, responses, isPartnershipRole, user, userData])
 
   // 2. GRANULAR PER-MITRA CONTRIBUTION METRICS
   const mitraMetrics = useMemo(() => {
-    const partnersList = users.filter((u) => u.role === 'partnership')
+    const partnersList = isPartnershipRole
+      ? users.filter((u) => u.uid === user?.uid || u.role === 'partnership')
+      : users.filter((u) => u.role === 'partnership')
 
     return partnersList.map((mitra) => {
       const linkedCadres = users.filter(
@@ -210,14 +223,18 @@ export default function MonitoringDomainPage() {
         status: linkedCadres.length > 0 ? (mitraResponses.length >= 5 ? 'Sangat Produktif' : 'Aktif') : 'Perlu Penugasan Kader',
       }
     })
-  }, [users, distributions, responses])
+  }, [users, distributions, responses, isPartnershipRole, user])
 
   // 3. EXECUTIVE KPI OVERVIEW METRICS
   const stats = useMemo(() => {
-    const totalMitra = users.filter((u) => u.role === 'partnership').length
-    const totalCadres = users.filter((u) => u.role === 'cadre').length
-    const totalDists = distributions.length
-    const totalResponses = responses.length
+    const totalMitra = isPartnershipRole ? 1 : users.filter((u) => u.role === 'partnership').length
+    const totalCadres = cadreMetrics.length
+    const totalDists = isPartnershipRole
+      ? cadreMetrics.reduce((sum, c) => sum + c.distCount, 0)
+      : distributions.length
+    const totalResponses = isPartnershipRole
+      ? cadreMetrics.reduce((sum, c) => sum + c.respCount, 0)
+      : responses.length
 
     const activeCadresCount = cadreMetrics.filter((c) => c.respCount > 0).length
     const highPerfCadresCount = cadreMetrics.filter((c) => c.status === 'high').length
@@ -226,7 +243,7 @@ export default function MonitoringDomainPage() {
     const avgScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0
 
     return { totalMitra, totalCadres, totalDists, totalResponses, activeCadresCount, highPerfCadresCount, avgScore }
-  }, [users, distributions, responses, cadreMetrics])
+  }, [users, distributions, responses, cadreMetrics, isPartnershipRole])
 
   // 4. GRANULAR PER-CADRE & PER-MITRA ACTIONABLE ALERTS
   const perCadreAlerts = useMemo(() => {
@@ -427,7 +444,14 @@ export default function MonitoringDomainPage() {
 
   return (
     <div className="min-h-screen bg-[#080812] text-slate-100 font-sans flex flex-col">
-      <Topbar title="Domain Monitoring Command Center" subtitle="Super Admin Level Analysis: Per-Cadre & Per-Mitra Contribution Engine" />
+      <Topbar
+        title={isPartnershipRole ? 'Domain Monitoring Kemitraan' : 'Domain Monitoring Command Center'}
+        subtitle={
+          isPartnershipRole
+            ? 'Analisis Real-Time Performa Kader Lapangan & Aktivitas Mitra Anda'
+            : 'Super Admin Level Analysis: Per-Cadre & Per-Mitra Contribution Engine'
+        }
+      />
 
       <main className="flex-1 p-4 md:p-6 space-y-6 max-w-7xl mx-auto w-full">
         {/* DOMAIN HEADER & NAVIGATION TABS */}
@@ -436,11 +460,13 @@ export default function MonitoringDomainPage() {
             <div className="flex items-center gap-2">
               <h1 className="text-xl font-bold font-display text-white tracking-wide">Domain Monitoring</h1>
               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-violet-500/20 text-violet-300 border border-violet-500/30">
-                SUPER ADMIN LEVEL ANALYTICS
+                {isPartnershipRole ? 'MONITORING MITRA' : 'SUPER ADMIN LEVEL ANALYTICS'}
               </span>
             </div>
             <p className="text-xs text-slate-400">
-              Pusat komando analisis kontribusi mendalam per-Kader Lapangan dan per-Mitra Instansi.
+              {isPartnershipRole
+                ? 'Pantau aktivitas dan performa evaluasi keamanan pangan kader binaan Anda.'
+                : 'Pusat komando analisis kontribusi mendalam per-Kader Lapangan dan per-Mitra Instansi.'}
             </p>
           </div>
 
@@ -467,7 +493,7 @@ export default function MonitoringDomainPage() {
               }`}
             >
               <Icon name="users" className="w-3.5 h-3.5" />
-              Analisis Per Kader ({cadreMetrics.length})
+              {isPartnershipRole ? `Kader Saya (${cadreMetrics.length})` : `Analisis Per Kader (${cadreMetrics.length})`}
             </button>
 
             <button
@@ -479,7 +505,7 @@ export default function MonitoringDomainPage() {
               }`}
             >
               <Icon name="building" className="w-3.5 h-3.5" />
-              Analisis Per Mitra ({mitraMetrics.length})
+              {isPartnershipRole ? 'Profil Mitra' : `Analisis Per Mitra (${mitraMetrics.length})`}
             </button>
 
             <button
@@ -491,7 +517,7 @@ export default function MonitoringDomainPage() {
               }`}
             >
               <Icon name="alertCircle" className="w-3.5 h-3.5" />
-              Alert Per Kader ({perCadreAlerts.filter((a) => a.type !== 'info').length})
+              Alert Performa ({perCadreAlerts.filter((a) => a.type !== 'info').length})
             </button>
           </div>
         </div>
@@ -513,18 +539,20 @@ export default function MonitoringDomainPage() {
 
               {activeTab === 'cadres' && (
                 <>
-                  <select
-                    value={mitraFilter}
-                    onChange={(e) => setMitraFilter(e.target.value)}
-                    className="bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-300 px-3 py-2 focus:outline-none focus:border-violet-500/50"
-                  >
-                    <option value="all">Semua Mitra Instansi</option>
-                    {mitraMetrics.map((m) => (
-                      <option key={m.mitra.uid} value={m.mitra.displayName}>
-                        {m.mitra.displayName}
-                      </option>
-                    ))}
-                  </select>
+                  {!isPartnershipRole && (
+                    <select
+                      value={mitraFilter}
+                      onChange={(e) => setMitraFilter(e.target.value)}
+                      className="bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-300 px-3 py-2 focus:outline-none focus:border-violet-500/50"
+                    >
+                      <option value="all">Semua Mitra Instansi</option>
+                      {mitraMetrics.map((m) => (
+                        <option key={m.mitra.uid} value={m.mitra.displayName}>
+                          {m.mitra.displayName}
+                        </option>
+                      ))}
+                    </select>
+                  )}
 
                   <select
                     value={statusFilter}

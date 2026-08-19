@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { safeFetchJson } from '@/lib/shared/safeFetch'
 import { Icon, type IconName } from '@/components/ui/Icons'
@@ -62,7 +63,23 @@ const ROLE_OPTIONS: { id: UserRole; label: string; icon: IconName; colorClass: s
 ]
 
 export default function UserManagementPage() {
-  const { userRole, user, userData } = useAuth()
+  const { userRole, user, userData, loading: authLoading } = useAuth()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (!authLoading) {
+      const effectiveRole = userRole || userData?.role
+      if (effectiveRole !== 'super_admin') {
+        if (effectiveRole === 'partnership') {
+          router.replace('/dashboard/partnership')
+        } else if (effectiveRole === 'cadre') {
+          router.replace('/dashboard/monitoring')
+        } else {
+          router.replace('/dashboard/overview')
+        }
+      }
+    }
+  }, [authLoading, userRole, userData, router])
 
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)

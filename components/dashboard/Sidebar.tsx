@@ -49,81 +49,104 @@ export function Sidebar({ userRole }: SidebarProps) {
   }
 
   const LOGO_SRC = '/logo.png'
-  const isSuperAdmin = userRole === 'super_admin' || userData?.role === 'super_admin'
-  const isCadre = userData?.role === 'cadre'
+  const effectiveRole = userRole || userData?.role || null
+  const isSuperAdmin = effectiveRole === 'super_admin'
+  const isPartnership = effectiveRole === 'partnership'
+  const isCadre = effectiveRole === 'cadre'
 
-  const menuSections: MenuSection[] = isCadre
-    ? [
-        {
-          section: 'Utama',
-          items: [
-            { href: '/dashboard/overview', icon: 'dashboard', label: 'Dashboard Saya' },
-            { href: '/dashboard/monitoring', icon: 'barChart', label: 'Monitoring Saya', badge: 'Performance' },
-          ],
-        },
-        {
-          section: 'Aktivitas Lapangan',
-          items: [
-            { href: '/dashboard/distributions', icon: 'send', label: 'Distribusi Kode Saya', badge: 'Kode' },
-            { href: '/dashboard/responses', icon: 'checkCircle', label: 'Hasil Penilaian Saya', badge: 'Evaluasi' },
-            { href: '/dashboard/articles', icon: 'bookOpen', label: 'Materi Edukasi', badge: 'CMS' },
-          ],
-        },
-      ]
-    : [
-        {
-          section: 'Utama',
-          items: [
-            { href: '/dashboard/overview', icon: 'dashboard', label: 'Dashboard' },
-          ],
-        },
-        {
-          section: 'Kelola & Pantau',
-          items: [
-            { href: '/dashboard/partnership', icon: 'building', label: 'Kemitraan', badge: 'Operasional' },
-            { href: '/dashboard/monitoring', icon: 'trendingUp', label: 'Monitoring', badge: 'Analytics' },
-            { href: '/dashboard/widgets', icon: 'pieChart', label: 'Widget Grafik', badge: 'Grafik' },
-          ],
-        },
-        {
-          section: 'Assessment / Form',
-          items: [
-            { href: '/dashboard/forms/v1-5-list', icon: 'clipboardList', label: 'Daftar Formulir', badge: 'Form' },
-            { href: '/dashboard/distributions', icon: 'send', label: 'Distribusi & Kode', badge: 'Kode' },
-            { href: '/dashboard/responses', icon: 'checkCircle', label: 'Hasil Penilaian', badge: 'Hasil' },
-          ],
-        },
-        {
-          section: 'Edukasi',
-          items: [
-            { href: '/dashboard/articles', icon: 'bookOpen', label: 'Materi Edukasi', badge: 'CMS' },
-          ],
-        },
-        {
-          section: 'Versi 1.0 (Lama / Benchmark)',
-          items: [
-            { href: '/dashboard/form-builder', icon: 'filePlus', label: 'Form Builder V1.0', badge: 'V1.0' },
-            { href: '/dashboard/forms', icon: 'clipboardList', label: 'Daftar Formulir V1.0', badge: 'V1.0' },
-            { href: '/dashboard/respondents', icon: 'users', label: 'Data Responden V1.0', badge: 'V1.0' },
-          ],
-        },
-        {
-          section: 'Sistem',
-          items: [
-            { href: '/dashboard/settings', icon: 'settings', label: 'Pengaturan' },
-            ...(isSuperAdmin
-              ? [
-                  {
-                    href: '/dashboard/settings/users',
-                    icon: 'userCog' as IconName,
-                    label: 'Manajemen User',
-                    badge: 'Admin',
-                  },
-                ]
-              : []),
-          ],
-        },
-      ]
+  // Dynamic Home Route depending on user role
+  const homeHref = isPartnership
+    ? '/dashboard/partnership'
+    : isCadre
+    ? '/dashboard/monitoring'
+    : '/dashboard/overview'
+
+  // Role-specific Sidebar Menus
+  const partnershipMenus: MenuSection[] = [
+    {
+      section: 'Kemitraan & Operasional',
+      items: [
+        { href: '/dashboard/partnership', icon: 'building', label: 'Kemitraan', badge: 'Operasional' },
+        { href: '/dashboard/monitoring', icon: 'trendingUp', label: 'Monitoring', badge: 'Analytics' },
+        { href: '/dashboard/distributions', icon: 'send', label: 'Distribusi dan Kode', badge: 'Kode' },
+        { href: '/dashboard/responses', icon: 'checkCircle', label: 'Hasil Penilaian', badge: 'Hasil' },
+        { href: '/dashboard/articles', icon: 'bookOpen', label: 'Materi Edukasi', badge: 'CMS' },
+      ],
+    },
+  ]
+
+  const cadreMenus: MenuSection[] = [
+    {
+      section: 'Aktivitas Lapangan',
+      items: [
+        { href: '/dashboard/monitoring', icon: 'barChart', label: 'Monitoring Saya', badge: 'Performance' },
+        { href: '/dashboard/distributions', icon: 'send', label: 'Distribusi Kode Saya', badge: 'Kode' },
+        { href: '/dashboard/responses', icon: 'checkCircle', label: 'Hasil Penilaian Saya', badge: 'Evaluasi' },
+        { href: '/dashboard/articles', icon: 'bookOpen', label: 'Materi Edukasi', badge: 'CMS' },
+      ],
+    },
+  ]
+
+  const adminMenus: MenuSection[] = [
+    {
+      section: 'Utama',
+      items: [
+        { href: '/dashboard/overview', icon: 'dashboard', label: 'Dashboard' },
+      ],
+    },
+    {
+      section: 'Kelola & Pantau',
+      items: [
+        { href: '/dashboard/partnership', icon: 'building', label: 'Kemitraan', badge: 'Operasional' },
+        { href: '/dashboard/monitoring', icon: 'trendingUp', label: 'Monitoring', badge: 'Analytics' },
+        { href: '/dashboard/widgets', icon: 'pieChart', label: 'Widget Grafik', badge: 'Grafik' },
+      ],
+    },
+    {
+      section: 'Assessment / Form',
+      items: [
+        { href: '/dashboard/forms/v1-5-list', icon: 'clipboardList', label: 'Daftar Formulir', badge: 'Form' },
+        { href: '/dashboard/distributions', icon: 'send', label: 'Distribusi & Kode', badge: 'Kode' },
+        { href: '/dashboard/responses', icon: 'checkCircle', label: 'Hasil Penilaian', badge: 'Hasil' },
+      ],
+    },
+    {
+      section: 'Edukasi',
+      items: [
+        { href: '/dashboard/articles', icon: 'bookOpen', label: 'Materi Edukasi', badge: 'CMS' },
+      ],
+    },
+    {
+      section: 'Versi 1.0 (Lama / Benchmark)',
+      items: [
+        { href: '/dashboard/form-builder', icon: 'filePlus', label: 'Form Builder V1.0', badge: 'V1.0' },
+        { href: '/dashboard/forms', icon: 'clipboardList', label: 'Daftar Formulir V1.0', badge: 'V1.0' },
+        { href: '/dashboard/respondents', icon: 'users', label: 'Data Responden V1.0', badge: 'V1.0' },
+      ],
+    },
+    {
+      section: 'Sistem',
+      items: [
+        { href: '/dashboard/settings', icon: 'settings', label: 'Pengaturan' },
+        ...(isSuperAdmin
+          ? [
+              {
+                href: '/dashboard/settings/users',
+                icon: 'userCog' as IconName,
+                label: 'Manajemen User',
+                badge: 'Admin',
+              },
+            ]
+          : []),
+      ],
+    },
+  ]
+
+  const menuSections: MenuSection[] = isPartnership
+    ? partnershipMenus
+    : isCadre
+    ? cadreMenus
+    : adminMenus
 
   return (
     <>
@@ -148,7 +171,7 @@ export function Sidebar({ userRole }: SidebarProps) {
       >
         {/* ============ LOGO UTAMA SIDEBAR ============ */}
         <div className="p-3.5 border-b border-white/[0.06] flex-shrink-0 bg-white/[0.01] flex items-center justify-between gap-2">
-          <Link href="/dashboard/overview" className="flex items-center gap-3 group min-w-0">
+          <Link href={homeHref} className="flex items-center gap-3 group min-w-0">
             <div className="relative w-9 h-9 rounded-xl overflow-hidden flex items-center justify-center flex-shrink-0 bg-cyan-500/10 border border-cyan-500/20 group-hover:border-cyan-500/40 transition-colors">
               <Image
                 src={LOGO_SRC}
@@ -244,7 +267,17 @@ export function Sidebar({ userRole }: SidebarProps) {
                   </p>
                   <p className="text-[10px] text-white/40 truncate flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                    {userRole === 'super_admin' || userData?.role === 'super_admin' ? 'Super Admin' : userRole === 'admin' || userData?.role === 'admin' ? 'Admin' : 'User'}
+                    {effectiveRole === 'super_admin'
+                      ? 'Super Admin'
+                      : effectiveRole === 'admin'
+                      ? 'Admin Systems'
+                      : effectiveRole === 'internal_bpom'
+                      ? 'Internal BPOM'
+                      : effectiveRole === 'partnership'
+                      ? 'Mitra / Instansi'
+                      : effectiveRole === 'cadre'
+                      ? 'Kader Lapangan'
+                      : 'Pengguna'}
                   </p>
                 </div>
                 <Icon name="chevronRight" className="w-4 h-4 text-white/20 group-hover:text-white/60 transition-colors" />

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Topbar } from '@/components/dashboard/Topbar'
 import { Icon } from '@/components/ui/Icons'
 import { PreviewModal } from '@/components/form-builder/PreviewModal'
@@ -17,7 +18,19 @@ import {
 import { useAuth } from '@/context/AuthContext'
 
 export default function LegacyFormsPage() {
-  const { user } = useAuth()
+  const { user, userData, userRole, loading } = useAuth()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (!loading) {
+      const effectiveRole = userRole || userData?.role
+      if (effectiveRole === 'partnership') {
+        router.replace('/dashboard/partnership')
+      } else if (effectiveRole === 'cadre') {
+        router.replace('/dashboard/monitoring')
+      }
+    }
+  }, [loading, userRole, userData, router])
 
   const [forms, setForms] = useState<LegacyFormData[]>([])
   const [groups, setGroups] = useState<FormGroup[]>([])
