@@ -130,7 +130,11 @@ const categoryGradients: Record<string, string> = {
   Data: 'from-sky-600/25 via-blue-700/20 to-indigo-800/25'
 }
 
+import { SmoothScrollProvider } from '@/components/providers/SmoothScrollProvider'
+
 export default function HomePage() {
+  // ... rest of page code
+
   // ✅ PENTING: Inisialisasi state partnershipData dan heroData dari CMS Firestore
   const [heroData, setHeroData] = useState<any>(null)
   const [partnershipData, setPartnershipData] = useState<any>(defaultPartnershipData)
@@ -267,66 +271,71 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#06060E] scroll-smooth">
-      {/* Toast Notification */}
-      {showToast && (
-        <div
-          className={`fixed bottom-6 right-6 z-[100] px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 animate-slideUp ${
-            toastType === 'success'
-              ? 'bg-emerald-500/20 border border-emerald-500/30'
-              : 'bg-rose-500/20 border border-rose-500/30'
-          }`}
-        >
-          <Icon
-            name={toastType === 'success' ? 'checkCircle' : 'alertCircle'}
-            className={`w-5 h-5 ${toastType === 'success' ? 'text-emerald-400' : 'text-rose-400'}`}
-          />
-          <p className="text-sm text-white">{toastMessage}</p>
-        </div>
-      )}
+    <SmoothScrollProvider>
+      <div className="min-h-screen bg-[#06060E]">
+        {/* Toast Notification */}
+        {showToast && (
+          <div
+            className={`fixed bottom-6 right-6 z-[100] px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 animate-slideUp ${
+              toastType === 'success'
+                ? 'bg-emerald-500/20 border border-emerald-500/30'
+                : 'bg-rose-500/20 border border-rose-500/30'
+            }`}
+          >
+            <Icon
+              name={toastType === 'success' ? 'checkCircle' : 'alertCircle'}
+              className={`w-5 h-5 ${toastType === 'success' ? 'text-emerald-400' : 'text-rose-400'}`}
+            />
+            <p className="text-sm text-white">{toastMessage}</p>
+          </div>
+        )}
 
-      {/* Navbar */}
-      <Navbar transparent={true} onOpenCodeModal={() => setIsCodeModalOpen(true)} />
+        {/* Navbar */}
+        <Navbar transparent={true} onOpenCodeModal={() => setIsCodeModalOpen(true)} />
 
-      {/* Hero Section */}
-      <HeroSection heroData={heroData} onOpenCodeModal={() => setIsCodeModalOpen(true)} />
+        {/* Hero Section */}
+        <HeroSection heroData={heroData} onOpenCodeModal={() => setIsCodeModalOpen(true)} />
 
-      {/* Program Section (Sudah aman & menggunakan state partnershipData) */}
-      <ProgramSection data={partnershipData} />
+        {/* Breathing space — gives room for scroll reveal animations */}
+        <div className="h-20 sm:h-28 lg:h-36" aria-hidden="true" />
 
-      {/* Edukasi Section */}
-      <EdukasiSection
-        articles={articles}
-        isLoading={isArticlesLoading}
-        categoryBadgeColors={categoryBadgeColors}
-        onOpenArticleModal={openArticleModal}
-      />
+        {/* Program Section (Sudah aman & menggunakan state partnershipData) */}
+        <ProgramSection data={partnershipData} />
 
-      {/* Gallery Section */}
-      <GallerySection galleryData={galleryData} />
+        {/* Edukasi Section */}
+        <EdukasiSection
+          articles={articles}
+          isLoading={isArticlesLoading}
+          categoryBadgeColors={categoryBadgeColors}
+          onOpenArticleModal={openArticleModal}
+        />
 
-      {/* Footer */}
-      <Footer />
+        {/* Gallery Section */}
+        <GallerySection galleryData={galleryData} />
 
-      {/* Code Modal */}
-      <CodeModal
-        isOpen={isCodeModalOpen}
-        onClose={() => {
-          setIsCodeModalOpen(false)
-          setCodeError(null)
-        }}
-        onSubmit={handleCodeSubmit}
-        isLoading={isLoading}
-        error={codeError}
-      />
+        {/* Footer */}
+        <Footer />
 
-      {/* Article Modal */}
-      <ArticleModal
-        article={selectedArticle}
-        isOpen={isArticleModalOpen}
-        onClose={closeArticleModal}
-        categoryBadgeColors={categoryBadgeColors}
-      />
-    </div>
+        {/* Code Modal */}
+        <CodeModal
+          isOpen={isCodeModalOpen}
+          onClose={() => {
+            setIsCodeModalOpen(false)
+            setCodeError(null)
+          }}
+          onSubmit={handleCodeSubmit}
+          isLoading={isLoading}
+          error={codeError}
+        />
+
+        {/* Article Modal */}
+        <ArticleModal
+          article={selectedArticle}
+          isOpen={isArticleModalOpen}
+          onClose={closeArticleModal}
+          categoryBadgeColors={categoryBadgeColors}
+        />
+      </div>
+    </SmoothScrollProvider>
   )
 }

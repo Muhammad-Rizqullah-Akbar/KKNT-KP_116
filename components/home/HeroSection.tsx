@@ -3,6 +3,7 @@
 
 import Image from 'next/image'
 import { Icon } from '@/components/ui/Icons'
+import { WordReveal } from '@/components/ui/WordReveal'
 
 interface HeroSectionProps {
   onOpenCodeModal: () => void
@@ -55,34 +56,58 @@ export function HeroSection({ onOpenCodeModal, heroData }: HeroSectionProps) {
       <div className="relative z-20 w-full max-w-4xl mx-auto flex flex-col items-center text-center">
         
         {/* Badge Kemitraan Menyatu */}
-        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#06060E]/70 border border-white/20 mb-6 shadow-lg backdrop-blur-xs">
+        <div
+          className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#06060E]/70 border border-white/20 mb-6 shadow-lg backdrop-blur-xs animate-section-fade-in"
+          style={{ animationDelay: '0.1s' }}
+        >
           <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
           <span className="text-[10px] sm:text-xs font-bold tracking-widest uppercase text-cyan-300 drop-shadow">
             {heroData?.badgeText || 'Universitas Hasanuddin x BPOM RI'}
           </span>
         </div>
 
-        {/* Judul Utama */}
+        {/* Judul Utama — Word-by-Word Fade-In */}
         <h1 className="font-display text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-black tracking-tight leading-[1.1] mb-6 text-white">
-          <span className="block text-white drop-shadow-[0_4px_12px_rgba(0,0,0,0.95)]">
-            {heroData?.titlePrefix || 'Mencetak Kader'}
+          <span className="block drop-shadow-[0_4px_12px_rgba(0,0,0,0.95)]">
+            <WordReveal
+              text={heroData?.titlePrefix || 'Mencetak Kader'}
+              wordClassName="text-white"
+              baseDelay={0.3}
+              stagger={0.08}
+            />
           </span>
-          <span className="block bg-gradient-to-r from-cyan-300 via-teal-200 to-cyan-300 bg-clip-text text-transparent drop-shadow-[0_0_35px_rgba(6,182,212,0.6)]">
-            {heroData?.titleGradient || 'Keamanan Pangan'}
+          <span className="block">
+            <WordReveal
+              text={heroData?.titleGradient || 'Keamanan Pangan'}
+              wordClassName="bg-gradient-to-r from-cyan-300 via-teal-200 to-cyan-300 bg-clip-text text-transparent drop-shadow-[0_0_35px_rgba(6,182,212,0.6)]"
+              baseDelay={0.55}
+              stagger={0.08}
+            />
           </span>
-          <span className="block text-white/95 text-2xl sm:text-4xl md:text-5xl font-bold mt-2 drop-shadow-[0_4px_12px_rgba(0,0,0,0.95)]">
-            {heroData?.titleSuffix || 'Wilayah Indonesia'}
+          <span className="block text-2xl sm:text-4xl md:text-5xl font-bold mt-2 drop-shadow-[0_4px_12px_rgba(0,0,0,0.95)]">
+            <WordReveal
+              text={heroData?.titleSuffix || 'Wilayah Indonesia'}
+              wordClassName="text-white/95"
+              baseDelay={0.8}
+              stagger={0.08}
+            />
           </span>
         </h1>
 
-        {/* Deskripsi Singkat */}
-        <p className="text-sm sm:text-lg md:text-xl text-white/95 max-w-2xl mx-auto mb-10 font-normal leading-relaxed drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)] px-2">
-          {heroData?.description ||
-            'Ekosistem terpadu yang menciptakan masyarakat sadar akan keamanan pangan melalui kolaborasi mahasiswa, teknologi, dan mitra strategis.'}
-        </p>
+        {/* Deskripsi Singkat — Word-by-Word Fade-In */}
+        <div className="text-sm sm:text-lg md:text-xl text-white/95 max-w-2xl mx-auto mb-10 font-normal leading-relaxed drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)] px-2">
+          <WordReveal
+            text={heroData?.description || 'Ekosistem terpadu yang menciptakan masyarakat sadar akan keamanan pangan melalui kolaborasi mahasiswa, teknologi, dan mitra strategis.'}
+            baseDelay={1.1}
+            stagger={0.035}
+          />
+        </div>
 
-        {/* Tombol Utama */}
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 w-full sm:w-auto">
+        {/* Tombol Utama — Section Fade-In */}
+        <div
+          className="flex flex-col sm:flex-row items-center justify-center gap-4 w-full sm:w-auto animate-section-fade-in"
+          style={{ animationDelay: '1.8s' }}
+        >
           <button
             onClick={onOpenCodeModal}
             className="group relative w-full sm:w-auto inline-flex items-center justify-center gap-3 px-8 py-3.5 sm:py-4 rounded-xl font-bold text-xs sm:text-sm text-white bg-gradient-to-r from-cyan-500 via-teal-500 to-cyan-500 hover:from-cyan-400 hover:to-teal-400 shadow-[0_4px_25px_rgba(0,0,0,0.6)] hover:shadow-[0_0_35px_rgba(6,182,212,0.6)] transition-all duration-300 hover:-translate-y-0.5 active:scale-98 cursor-pointer overflow-hidden border border-cyan-300/40"
@@ -94,21 +119,30 @@ export function HeroSection({ onOpenCodeModal, heroData }: HeroSectionProps) {
           </button>
         </div>
 
-        {/* Metrik Indikator */}
+        {/* Metrik Indikator — Staggered Section Fade-In */}
         <div className="mt-12 sm:mt-16 pt-6 border-t border-white/20 grid grid-cols-3 gap-4 sm:gap-12 w-full max-w-lg mx-auto text-center">
-          <div className="flex flex-col items-center">
+          <div
+            className="flex flex-col items-center animate-section-fade-in"
+            style={{ animationDelay: '2.1s' }}
+          >
             <p className="text-2xl sm:text-4xl font-black font-display text-cyan-300 drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)]">
               {heroData?.statParticipants || '70+'}
             </p>
             <p className="text-[10px] sm:text-xs text-white/90 font-medium drop-shadow-[0_1px_4px_rgba(0,0,0,0.95)]">Mahasiswa / Kader</p>
           </div>
-          <div className="flex flex-col items-center">
+          <div
+            className="flex flex-col items-center animate-section-fade-in"
+            style={{ animationDelay: '2.3s' }}
+          >
             <p className="text-2xl sm:text-4xl font-black font-display text-emerald-300 drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)]">
               {heroData?.statVillages || '10'}
             </p>
             <p className="text-[10px] sm:text-xs text-white/90 font-medium drop-shadow-[0_1px_4px_rgba(0,0,0,0.95)]">Desa Binaan</p>
           </div>
-          <div className="flex flex-col items-center">
+          <div
+            className="flex flex-col items-center animate-section-fade-in"
+            style={{ animationDelay: '2.5s' }}
+          >
             <p className="text-2xl sm:text-4xl font-black font-display text-blue-300 drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)]">
               {heroData?.statPartnerLabel || 'BPOM'}
             </p>
