@@ -580,3 +580,42 @@ html.lenis body {
 .lenis.lenis-smooth iframe {
   pointer-events: none;
 }
+
+/* ===== NATIVE SCROLL-DRIVEN ANIMATIONS (ENTRY & EXIT REVEAL) ===== */
+@media (prefers-reduced-motion: no-preference) {
+  @supports ((animation-timeline: view()) and (animation-range: entry)) {
+    @keyframes futuristic-card-entry {
+      from {
+        opacity: 0;
+        transform: translateY(50px) scale(0.92) rotateX(8deg);
+        filter: blur(6px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1) rotateX(0deg);
+        filter: blur(0px);
+      }
+    }
+
+    @keyframes futuristic-card-exit {
+      from {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        filter: blur(0px);
+      }
+      to {
+        opacity: 0;
+        transform: translateY(-35px) scale(0.94);
+        filter: blur(4px);
+      }
+    }
+
+    .futuristic-scroll-card {
+      animation:
+        futuristic-card-entry auto linear backwards,
+        futuristic-card-exit auto linear forwards;
+      animation-timeline: view();
+      animation-range: entry 5% cover 25%, exit 75% cover 95%;
+    }
+  }
+}
