@@ -10,6 +10,7 @@ import {
   getArticles, 
   type ArticleData 
 } from '@/lib/firebase/repositories/articles.repo'
+import { FuturisticArticleCard } from '@/components/articles/FuturisticArticleCard'
 
 // ============ KONSTANTA KATEGORI & LOGO ============
 const LOGO_SRC = '/logo.png'
@@ -253,69 +254,8 @@ export default function ArticlesPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {paginatedArticles.map((article) => (
-              <Link
-                key={article.id}
-                href={`/articles/${article.slug}`}
-                className="group cursor-pointer relative rounded-2xl bg-white/[0.02] backdrop-blur-2xl border border-white/[0.05] hover:border-cyan-500/30 transition-all duration-500 hover:-translate-y-2 hover:bg-white/[0.04] overflow-hidden flex flex-col justify-between"
-              >
-                <div>
-                  {/* Hero Image / Featured Image */}
-                  <div className="relative h-48 w-full overflow-hidden bg-[#080812]">
-                    {article.featuredImage ? (
-                      <img 
-                        src={article.featuredImage} 
-                        alt={article.title} 
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
-                      />
-                    ) : (
-                      <div className={`w-full h-full bg-gradient-to-br ${categoryGradients[article.category] || 'from-emerald-700/40 to-cyan-800/40'} flex items-center justify-center`}>
-                        <Icon name={(categoryIcons[article.category] as any) || 'fileText'} className="w-16 h-16 text-white/20 group-hover:text-white/40 transition-colors" />
-                      </div>
-                    )}
-
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#06060E] via-transparent to-transparent opacity-80" />
-                    
-                    {/* Badge Category */}
-                    <div className={`absolute top-3 right-3 px-2.5 py-1 rounded-full backdrop-blur-md border text-xs font-medium ${categoryBadgeColors[article.category] || 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20'}`}>
-                      {article.category}
-                    </div>
-
-                    {/* Views Count */}
-                    <div className="absolute bottom-3 left-3 px-2.5 py-1 rounded-full bg-black/50 backdrop-blur-md border border-white/10 text-[10px] text-white/70 flex items-center gap-1">
-                      <Icon name="eye" className="w-3 h-3 text-cyan-400" /> {formatViews(article.views || 0)}
-                    </div>
-                  </div>
-
-                  {/* Body Content */}
-                  <div className="p-5 space-y-2.5">
-                    <div className="flex items-center gap-2 text-xs text-white/40">
-                      <span className="flex items-center gap-1"><Icon name="calendar" className="w-3.5 h-3.5" /> {formatDate(article.date)}</span>
-                      <span>•</span>
-                      <span className="flex items-center gap-1"><Icon name="clock" className="w-3.5 h-3.5" /> {article.readTime || 5} min</span>
-                    </div>
-
-                    <h3 className="font-display text-lg font-bold text-white group-hover:text-cyan-300 transition-colors duration-300 leading-snug line-clamp-2">
-                      {article.title}
-                    </h3>
-
-                    <p className="text-white/45 text-xs sm:text-sm leading-relaxed line-clamp-2">
-                      {article.excerpt}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Footer Action */}
-                <div className="px-5 pb-5 pt-2 flex items-center justify-between border-t border-white/[0.04] mt-2">
-                  <span className="text-xs text-white/30 truncate max-w-[150px]">
-                    {article.author}
-                  </span>
-                  <div className="flex items-center gap-1 text-xs text-cyan-400 font-medium group-hover:translate-x-1 transition-transform">
-                    <span>Baca</span>
-                    <Icon name="arrowRight" className="w-3.5 h-3.5" />
-                  </div>
-                </div>
-              </Link>
+            {paginatedArticles.map((article, idx) => (
+              <FuturisticArticleCard key={article.id || idx} article={article} index={idx} />
             ))}
           </div>
         )}
