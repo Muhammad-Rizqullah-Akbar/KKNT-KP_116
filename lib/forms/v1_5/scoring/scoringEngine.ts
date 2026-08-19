@@ -30,6 +30,70 @@ export function expandScaleLabel(label: any): string {
 }
 
 /**
+ * Safely resolves the answer value for a question from the submitted answers map.
+ * Supports modern V1.5 (questionId), legacy prompt text, legacy question labels, and index-based keys.
+ */
+export function resolveQuestionAnswer(
+  question: BuilderQuestion,
+  answers: Record<string, any>,
+  indexInForm?: number
+): any {
+  if (!answers || typeof answers !== 'object') return undefined
+
+  // 1. Direct V1.5 questionId lookup (Highest priority)
+  if (answers[question.questionId] !== undefined) {
+    return answers[question.questionId]
+  }
+
+  const prompt = question.prompt || (question as any).question || (question as any).label || (question as any).title || ''
+  const cleanPromptStr = typeof prompt === 'string' ? prompt.trim() : ''
+
+  // 2. Exact Prompt / Label text lookup
+  if (cleanPromptStr && answers[cleanPromptStr] !== undefined) {
+    return answers[cleanPromptStr]
+  }
+
+  // 3. Lowercase & normalized prompt text lookup
+  if (cleanPromptStr) {
+    const cleanLower = cleanPromptStr.toLowerCase().replace(/[^a-z0-9]/g, '')
+    if (cleanLower) {
+      for (const [key, val] of Object.entries(answers)) {
+        const keyClean = key.toLowerCase().replace(/[^a-z0-9]/g, '')
+        if (keyClean === cleanLower) {
+          return val
+        }
+      }
+    }
+  }
+
+  // 4. Index-based fallback (e.g., answers["0"], answers["q_0"], answers["q1"])
+  if (typeof indexInForm === 'number') {
+    const indexKeys = [
+      String(indexInForm),
+      `q_${indexInForm}`,
+      `q${indexInForm}`,
+      `q_${indexInForm + 1}`,
+      `q${indexInForm + 1}`,
+      `question_${indexInForm}`,
+      `question_${indexInForm + 1}`,
+    ]
+    for (const key of indexKeys) {
+      if (answers[key] !== undefined) {
+        return answers[key]
+      }
+    }
+  }
+
+  // 5. Legacy ID fallback if question has an id property different from questionId
+  const legacyId = (question as any).id
+  if (legacyId && answers[legacyId] !== undefined) {
+    return answers[legacyId]
+  }
+
+  return undefined
+}
+
+/**
  * Calculates score for a single question based on canonical V1.5 question definition and submitted answer.
  */
 export function calculateQuestionScore(
@@ -52,6 +116,7 @@ export function calculateQuestionScore(
       maximumScore: 0,
       percentage: 0,
       includedInTotal: false,
+      selectedValue: answerValue,
     }
   }
 
@@ -108,8 +173,10 @@ export function calculateQuestionScore(
       maximumScore: maxScore,
       percentage: maxScore > 0 ? Math.round((awardedScore / maxScore) * 100) : 0,
       includedInTotal: true,
+      selectedValue: selectedOptObj?.label || selectedOptId || answerValue,
       details: {
         selectedOptionId: selectedOptId,
+        selectedLabel: selectedOptObj?.label || selectedOptId,
         correctOptionIds,
         isCorrect,
       },
@@ -161,6 +228,11 @@ export function calculateQuestionScore(
       }
     })
 
+    const selectedLabels = selectedOptionIds.map((itemVal) => {
+      const optObj = options.find((o: any) => o.optionId === itemVal || o.id === itemVal || o.label === itemVal)
+      return optObj?.label || itemVal
+    })
+
     return {
       questionId: question.questionId,
       aspectId,
@@ -170,6 +242,7 @@ export function calculateQuestionScore(
       maximumScore: maxScore,
       percentage: maxScore > 0 ? Math.round((score / maxScore) * 100) : 0,
       includedInTotal: true,
+      selectedValue: selectedLabels,
       details: {
         selectedOptionIds,
         correctOptionIds,
@@ -289,8 +362,17 @@ export function calculateQuestionScore(
           if (!isNaN(numVal) && numVal >= 1 && numVal <= indScales.length) {
             matchedScale = indScales[numVal - 1]
           } else {
-            // Unconditional fallback for answered indicator row to ensure non-zero score
-            matchedScale = indScales[indScales.length - 1]
+            const likertLevelMap: Record<string, number> = {
+              'sts': 1, 'sangat tidak setuju': 1, 'stms': 1, 'sangat tidak memenuhi syarat': 1, 'sangat kurang': 1, 'sk': 1, '1': 1,
+              'ts': 2, 'tidak setuju': 2, 'tms': 2, 'tidak memenuhi syarat': 2, 'kurang': 2, 'k': 2, '2': 2,
+              'n': 3, 'netral': 3, 'cukup': 3, 'c': 3, '3': 3,
+              's': 4, 'setuju': 4, 'ms': 4, 'memenuhi syarat': 4, 'baik': 4, 'b': 4, '4': 4,
+              'ss': 5, 'sangat setuju': 5, 'sms': 5, 'sangat memenuhi syarat': 5, 'sangat baik': 5, 'sb': 5, '5': 5,
+            }
+            const lvl = likertLevelMap[cleanSelected] || likertLevelMap[expSelected] || likertLevelMap[strVal]
+            if (lvl && lvl >= 1 && lvl <= indScales.length) {
+              matchedScale = indScales[lvl - 1]
+            }
           }
         }
 
@@ -348,6 +430,7 @@ export function calculateQuestionScore(
       maximumScore: totalMaxScore,
       percentage: totalMaxScore > 0 ? Math.round((totalRawScore / totalMaxScore) * 100) : 0,
       includedInTotal: true,
+      selectedValue: tableAnswers,
       details: {
         indicatorCount: indicators.length,
         indicators: indicatorDetails,
@@ -370,6 +453,7 @@ export function calculateQuestionScore(
       maximumScore: ratingMax,
       percentage: ratingMax > 0 ? Math.round((score / ratingMax) * 100) : 0,
       includedInTotal: true,
+      selectedValue: answerValue,
       details: {
         ratingValue: numVal,
         ratingMax,
@@ -387,6 +471,7 @@ export function calculateQuestionScore(
     maximumScore: 0,
     percentage: 0,
     includedInTotal: false,
+    selectedValue: answerValue,
   }
 }
 
@@ -401,8 +486,20 @@ export function calculateAspectScores(
 ): AspectScoreResult[] {
   const aspectResults: AspectScoreResult[] = []
 
+  const effectiveAspects =
+    Array.isArray(aspects) && aspects.length > 0
+      ? aspects
+      : [
+          {
+            aspectId: 'default',
+            title: 'Evaluasi Kuesioner',
+            weightPercentage: 100,
+            isScored: true,
+          },
+        ]
+
   const questionsByAspect = new Map<string, BuilderQuestion[]>()
-  aspects.forEach((asp) => questionsByAspect.set(asp.aspectId, []))
+  effectiveAspects.forEach((asp) => questionsByAspect.set(asp.aspectId, []))
 
   questions.forEach((q) => {
     const rawAspId =
@@ -418,7 +515,7 @@ export function calculateAspectScores(
       return
     }
 
-    const matchedAsp = aspects.find(
+    const matchedAsp = effectiveAspects.find(
       (a, aIdx) =>
         a.aspectId === rawAspId ||
         a.title === rawAspId ||
@@ -430,15 +527,15 @@ export function calculateAspectScores(
 
     if (matchedAsp) {
       questionsByAspect.get(matchedAsp.aspectId)!.push(q)
-    } else if (aspects.length > 0) {
-      questionsByAspect.get(aspects[0].aspectId)!.push(q)
+    } else if (effectiveAspects.length > 0) {
+      questionsByAspect.get(effectiveAspects[0].aspectId)!.push(q)
     }
   })
 
   // Equal weight distribution fallback
-  const autoWeight = aspects.length > 0 ? Math.floor(100 / aspects.length) : 100
+  const autoWeight = effectiveAspects.length > 0 ? Math.floor(100 / effectiveAspects.length) : 100
 
-  aspects.forEach((asp, idx) => {
+  effectiveAspects.forEach((asp, idx) => {
     const aspQuestions = questionsByAspect.get(asp.aspectId) || []
     const questionResults: QuestionScoreResult[] = []
 
@@ -449,7 +546,9 @@ export function calculateAspectScores(
     const isScored = asp.isScored !== false
 
     aspQuestions.forEach((q) => {
-      const qAns = answers[q.questionId] !== undefined ? answers[q.questionId] : answers
+      const qIdx = questions.indexOf(q)
+      const resolvedAns = resolveQuestionAnswer(q, answers, qIdx)
+      const qAns = resolvedAns !== undefined ? resolvedAns : answers
       const qRes = isScored
         ? calculateQuestionScore(q, qAns)
         : {

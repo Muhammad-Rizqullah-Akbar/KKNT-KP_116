@@ -16,6 +16,7 @@ export interface QuestionScoreResult {
   maximumScore: number
   percentage: number
   includedInTotal: boolean
+  selectedValue?: any
   details?: {
     selectedOptionIds?: string[]
     correctOptionIds?: string[]
