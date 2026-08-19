@@ -14,6 +14,8 @@ import {
 import { storage } from '@/lib/firebaseClient'
 import { uploadOptimizedArticleImage } from '@/lib/firebase/storage'
 import { ref, uploadBytes, getDownloadURL, listAll } from 'firebase/storage'
+import { SmartUploadArticleModal } from '@/components/dashboard/articles/SmartUploadArticleModal'
+import { exportArticleToJson } from '@/lib/cms/smartArticleParser'
 
 // ============ TIPE DATA & KONSTANTA ============
 type GalleryImage = { id: string; url?: string; caption: string; gradient: string }
@@ -116,7 +118,8 @@ export default function ArticlesAdminPage() {
     uploadedUrl?: string
   }
 
-  // JSON Import & Tutorial Modal States
+  // Smart Upload & Text Parser Modal State
+  const [isSmartUploadOpen, setIsSmartUploadOpen] = useState(false)
   const [isJsonImportOpen, setIsJsonImportOpen] = useState(false)
   const [isJsonTutorialOpen, setIsJsonTutorialOpen] = useState(false)
   const [isImageMatcherOpen, setIsImageMatcherOpen] = useState(false)
@@ -521,6 +524,50 @@ export default function ArticlesAdminPage() {
     }
   }
 
+  // Handle applied article from Smart Upload & Text Parser Modal
+  const handleApplyImportedArticle = (payload: any, uploadedUrls?: string[]) => {
+    setFormData({
+      title: payload.title || '',
+      category: payload.category || 'Keamanan Pangan',
+      author: payload.author || userData?.displayName || 'Penulis KKPD-KP',
+      authorBio: payload.authorBio || 'Kader Edukator Keamanan Pangan',
+      status: payload.status || 'Draft',
+      readTime: payload.readTime || 5,
+      featuredImage: payload.featuredImage || '',
+      excerpt: payload.excerpt || '',
+      tags: payload.tags || '',
+      embeddedDistributionCode: (payload.embeddedDistributionCode || '').trim().toUpperCase(),
+      gallery: payload.gallery || [],
+      blocks: payload.blocks || [],
+    })
+
+    setIsEditing(false)
+    setSelectedArticle(null)
+    setIsPreviewOpen(true)
+    document.body.style.overflow = 'hidden'
+  }
+
+  // Handle Export Article to JSON File
+  const handleExportArticleJson = (article: Article) => {
+    try {
+      const jsonStr = exportArticleToJson({
+        ...article,
+        blocks: htmlToBlocks(article.content),
+      })
+      const blob = new Blob([jsonStr], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${(article.slug || 'artikel_edukasi').replace(/[^a-z0-9]/gi, '_')}.json`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (err: any) {
+      alert('Gagal mengekspor artikel: ' + err.message)
+    }
+  }
+
   const handleApplyMatchedImages = async () => {
     setLoading(true)
     try {
@@ -836,26 +883,20 @@ export default function ArticlesAdminPage() {
               {statusOptions.map(opt => <option key={opt} value={opt} className="bg-[#080812]">{opt}</option>)}
             </select>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2.5 flex-wrap">
             <button
-              onClick={() => setIsJsonImportOpen(true)}
-              className="px-4 py-2.5 rounded-xl bg-purple-950/60 border border-purple-500/30 hover:bg-purple-900/60 text-purple-300 text-sm font-semibold flex items-center gap-2 transition-all shadow-md"
-              title="Import Artikel dari File / String JSON"
+              onClick={() => setIsSmartUploadOpen(true)}
+              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-950/80 to-slate-900 border border-cyan-500/40 hover:border-cyan-400 text-cyan-300 text-sm font-bold flex items-center gap-2 transition-all shadow-lg shadow-cyan-950/40 hover:bg-slate-800"
+              title="Unggah draf materi dari teks atau file (.txt, .md, .json) secara otomatis rapi"
             >
-              <Icon name="upload" className="w-4 h-4 text-purple-400" />
-              <span>Import JSON</span>
+              <Icon name="upload" className="w-4 h-4 text-cyan-400" />
+              <span>Unggah / Draf Instan</span>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-200 border border-cyan-500/30">
+                Pintar
+              </span>
             </button>
 
-            <button
-              onClick={() => setIsJsonTutorialOpen(true)}
-              className="px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 text-sm font-semibold flex items-center gap-2 transition-all"
-              title="Petunjuk & Format Struktur JSON Artikel"
-            >
-              <Icon name="info" className="w-4 h-4 text-cyan-400" />
-              <span>Tutorial JSON</span>
-            </button>
-
-            <button onClick={handleCreate} className="px-5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-sm font-semibold text-white shadow-lg flex items-center gap-2 transition-all">
+            <button onClick={handleCreate} className="px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-sm font-bold text-slate-950 shadow-lg shadow-cyan-500/20 flex items-center gap-2 transition-all font-mono">
               <Icon name="plus" className="w-4 h-4" /> Buat Artikel Baru
             </button>
           </div>
@@ -877,15 +918,12 @@ export default function ArticlesAdminPage() {
                   <th className="text-left px-6 py-4 text-xs text-white/35 uppercase tracking-wider font-medium">Aksi</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-white/[0.03]">
                 {paginatedArticles.map((article) => (
-                  <tr key={article.id} className="border-b border-white/[0.03] hover:bg-white/[0.02]">
+                  <tr key={article.id} className="hover:bg-white/[0.02] transition-colors">
+                    <td className="px-6 py-4 font-medium text-white max-w-xs truncate">{article.title}</td>
                     <td className="px-6 py-4">
-                      <p className="text-white font-medium truncate w-64">{article.title}</p>
-                      <p className="text-xs text-white/35">{article.author}</p>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2.5 py-1 rounded-full border text-xs ${categoryColors[article.category] || 'text-white'}`}>
+                      <span className="px-2.5 py-1 rounded-full bg-white/[0.03] border border-white/[0.06] text-xs text-cyan-400">
                         {article.category}
                       </span>
                     </td>
@@ -897,12 +935,15 @@ export default function ArticlesAdminPage() {
                     <td className="px-6 py-4 text-white/60">{formatViews(article.views)}</td>
                     <td className="px-6 py-4 text-white/40 text-xs">{formatDate(article.date)}</td>
                     <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5">
                         <button onClick={() => handleEdit(article)} className="p-2 rounded-lg hover:bg-white/[0.05]" title="Edit Form">
                           <Icon name="pencil" className="w-4 h-4 text-white/50 hover:text-cyan-400" />
                         </button>
                         <button onClick={() => { setSelectedArticle(article); setFormData({ title: article.title, category: article.category, author: article.author, authorBio: article.authorBio, status: article.status, readTime: article.readTime, featuredImage: article.featuredImage, excerpt: article.excerpt, tags: article.tags ? article.tags.join(', ') : '', embeddedDistributionCode: (article as any).embeddedDistributionCode || '', gallery: article.gallery || [], blocks: htmlToBlocks(article.content) }); setIsPreviewOpen(true); document.body.style.overflow = 'hidden'; }} className="p-2 rounded-lg hover:bg-white/[0.05]" title="Live Editor Preview">
                           <Icon name="eye" className="w-4 h-4 text-white/50 hover:text-sky-400" />
+                        </button>
+                        <button onClick={() => handleExportArticleJson(article)} className="p-2 rounded-lg hover:bg-white/[0.05]" title="Unduh File Draf (.json)">
+                          <Icon name="download" className="w-4 h-4 text-white/50 hover:text-emerald-400" />
                         </button>
                         <button onClick={() => handleDelete(article.id!)} className="p-2 rounded-lg hover:bg-red-500/10" title="Hapus">
                           <Icon name="trash" className="w-4 h-4 text-white/50 hover:text-red-400" />
@@ -1880,191 +1921,13 @@ export default function ArticlesAdminPage() {
         </div>
       )}
 
-      {/* ============ 📥 JSON IMPORT MODAL ============ */}
-      {isJsonImportOpen && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md" onClick={() => setIsJsonImportOpen(false)}>
-          <div className="relative w-full max-w-2xl bg-slate-950 border border-slate-800 rounded-3xl shadow-2xl p-6 space-y-5" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-2xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-400">
-                  <Icon name="upload" className="w-5 h-5 text-purple-400" />
-                </div>
-                <div>
-                  <h3 className="text-base font-extrabold text-white">Import Artikel Format JSON</h3>
-                  <p className="text-xs text-slate-400">Upload file .json atau tempelkan teks struktur JSON artikel</p>
-                </div>
-              </div>
-              <button onClick={() => setIsJsonImportOpen(false)} className="p-2 rounded-xl bg-slate-900 text-slate-400 hover:text-white">
-                <Icon name="x" className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Drop File or Paste */}
-            <div className="space-y-4">
-              <div>
-                <label className="text-xs text-slate-400 font-bold uppercase mb-1.5 block">1. Pilih File .json dari Komputer</label>
-                <input
-                  type="file"
-                  accept=".json,application/json"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0]
-                    if (file) {
-                      const reader = new FileReader()
-                      reader.onload = (evt) => {
-                        const content = evt.target?.result as string
-                        if (content) {
-                          setRawJsonText(content)
-                          handleImportJson(content)
-                        }
-                      }
-                      reader.readAsText(file)
-                    }
-                  }}
-                  className="w-full text-xs text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-purple-950 file:text-purple-300 hover:file:bg-purple-900 border border-slate-800 rounded-2xl p-2 bg-slate-900"
-                />
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs text-slate-400 font-bold uppercase">2. Atau Tempelkan Teks JSON</label>
-                  <button onClick={() => setIsJsonTutorialOpen(true)} className="text-[11px] text-cyan-400 hover:underline">
-                    Lihat Contoh Format JSON →
-                  </button>
-                </div>
-                <textarea
-                  rows={6}
-                  value={rawJsonText}
-                  onChange={(e) => setRawJsonText(e.target.value)}
-                  placeholder={`{\n  "title": "Judul Artikel",\n  "category": "Teknologi",\n  "embeddedDistributionCode": "KKPDQ6M",\n  "blocks": [...]\n}`}
-                  className="w-full p-4 rounded-2xl bg-slate-900 border border-slate-800 text-xs font-mono text-cyan-300 focus:outline-none focus:border-purple-500"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs text-emerald-400 font-bold uppercase mb-1.5 flex items-center gap-1.5">
-                  <Icon name="image" className="w-3.5 h-3.5 text-emerald-400" />
-                  3. (Solusi Foto Lokal) Lampirkan Gambar (.jpg / .png) untuk Diunggah Otomatis ke Storage
-                </label>
-                <input
-                  type="file"
-                  multiple
-                  accept="image/*"
-                  onChange={(e) => {
-                    if (e.target.files) {
-                      setAttachedLocalFiles(Array.from(e.target.files))
-                    }
-                  }}
-                  className="w-full text-xs text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-emerald-950 file:text-emerald-300 hover:file:bg-emerald-900 border border-slate-800 rounded-2xl p-2 bg-slate-900"
-                />
-                {attachedLocalFiles.length > 0 && (
-                  <p className="text-[11px] text-emerald-300 font-mono mt-1">
-                    ✓ {attachedLocalFiles.length} foto lokal siap diunggah otomatis ke Firebase Storage saat impor.
-                  </p>
-                )}
-              </div>
-
-              {jsonError && (
-                <div className="p-3.5 rounded-xl bg-rose-950/60 border border-rose-500/40 text-xs text-rose-200 font-mono">
-                  ❌ {jsonError}
-                </div>
-              )}
-            </div>
-
-            <div className="flex items-center justify-end gap-3 border-t border-slate-800 pt-4">
-              <button onClick={() => setIsJsonImportOpen(false)} className="px-4 py-2 rounded-xl text-xs text-slate-400 hover:text-white">
-                Batal
-              </button>
-              <button
-                onClick={() => handleImportJson(rawJsonText)}
-                disabled={!rawJsonText.trim()}
-                className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white text-xs font-extrabold shadow-lg shadow-purple-600/20"
-              >
-                Import Sekarang
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ============ 💡 JSON TUTORIAL & TEMPLATE MODAL ============ */}
-      {isJsonTutorialOpen && (
-        <div className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md" onClick={() => setIsJsonTutorialOpen(false)}>
-          <div className="relative w-full max-w-3xl bg-slate-950 border border-slate-800 rounded-3xl shadow-2xl p-6 space-y-5 max-h-[85vh] overflow-y-auto custom-scrollbar" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-2xl bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
-                  <Icon name="info" className="w-5 h-5 text-cyan-400" />
-                </div>
-                <div>
-                  <h3 className="text-base font-extrabold text-white">Tutorial & Struktur Format JSON Artikel</h3>
-                  <p className="text-xs text-slate-400">Panduan mudah membuat dan mengimpor materi edukasi berbasis JSON</p>
-                </div>
-              </div>
-              <button onClick={() => setIsJsonTutorialOpen(false)} className="p-2 rounded-xl bg-slate-900 text-slate-400 hover:text-white">
-                <Icon name="x" className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Content Tutorial Steps */}
-            <div className="space-y-5 text-xs text-slate-300 font-sans">
-              <div className="p-4 rounded-2xl bg-cyan-950/30 border border-cyan-500/30 space-y-2">
-                <h4 className="font-extrabold text-cyan-300 text-sm">💡 Cara Kerja Import JSON Artikel</h4>
-                <p className="text-slate-300 leading-relaxed">
-                  Fitur ini memungkinkan Anda atau Kader mengimpor materi artikel edukasi secara otomatis dalam sekali klik tanpa perlu mengetik ulang dari awal. Format JSON akan secara otomatis disusun secara elegan di kanvas editor visual publik.
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <h4 className="font-extrabold text-white text-xs uppercase tracking-wider">Struktur Skema JSON Resmi:</h4>
-                <div className="relative rounded-2xl bg-slate-900 border border-slate-800 p-4 font-mono text-[11px] text-cyan-300 overflow-x-auto">
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(JSON.stringify(sampleJsonTemplate, null, 2))
-                      alert('Format skema JSON berhasil disalin ke clipboard!')
-                    }}
-                    className="absolute top-3 right-3 px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-[10px] font-sans font-bold border border-slate-700"
-                  >
-                    📋 Salin JSON
-                  </button>
-                  <pre>{JSON.stringify(sampleJsonTemplate, null, 2)}</pre>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 space-y-1">
-                  <span className="font-mono text-cyan-400 font-bold">embeddedDistributionCode</span>
-                  <p className="text-[11px] text-slate-400">Kode Akses Distribusi Kader (misal: <code className="text-cyan-300">KKPDQ6M</code>). Otomatis membuat tombol kuesioner interaktif.</p>
-                </div>
-                <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 space-y-1">
-                  <span className="font-mono text-purple-400 font-bold">blocks (Tipe Elemen)</span>
-                  <p className="text-[11px] text-slate-400">Dukungan jenis elemen: <code className="text-purple-300 font-bold">"h2"</code> (Sub-Judul), <code className="text-purple-300 font-bold">"p"</code> (Paragraf), <code className="text-purple-300 font-bold">"quote"</code>, <code className="text-purple-300 font-bold">"image"</code>.</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between border-t border-slate-800 pt-4">
-              <button
-                onClick={downloadJsonTemplate}
-                className="px-4 py-2.5 rounded-xl bg-emerald-600/30 hover:bg-emerald-600/50 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center gap-2 transition-all"
-              >
-                <Icon name="download" className="w-4 h-4 text-emerald-400" />
-                <span>Download File Template (.json)</span>
-              </button>
-
-              <button
-                onClick={() => {
-                  setIsJsonTutorialOpen(false)
-                  setRawJsonText(JSON.stringify(sampleJsonTemplate, null, 2))
-                  setIsJsonImportOpen(true)
-                }}
-                className="px-5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-extrabold shadow-lg shadow-cyan-600/20"
-              >
-                Gunakan Template Ini →
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* ============ 📥 SMART UPLOAD & PARSER MODAL ============ */}
+      <SmartUploadArticleModal
+        isOpen={isSmartUploadOpen}
+        onClose={() => setIsSmartUploadOpen(false)}
+        onApplyArticle={handleApplyImportedArticle}
+        currentUserName={userData?.displayName || user?.email || 'Penulis KKPD-KP'}
+      />
     </div>
   )
 }
