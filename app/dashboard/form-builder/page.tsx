@@ -3,6 +3,7 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { Topbar } from '@/components/dashboard/Topbar'
 import { FormToolbar } from '@/components/form-builder/FormToolbar'
@@ -58,7 +59,20 @@ const DEFAULT_SCORING: FormScoring = {
 }
 
 export default function FormBuilderPage() {
-  const { user } = useAuth()
+  const { user, userData, userRole, loading } = useAuth()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (!loading) {
+      const effectiveRole = userRole || userData?.role
+      if (effectiveRole === 'partnership') {
+        router.replace('/dashboard/partnership')
+      } else if (effectiveRole === 'cadre') {
+        router.replace('/dashboard/monitoring')
+      }
+    }
+  }, [loading, userRole, userData, router])
+
   const [isLoading, setIsLoading] = useState(false)
   const [formId, setFormId] = useState<string | null>(null)
   const [formTitle, setFormTitle] = useState('Formulir Baru')

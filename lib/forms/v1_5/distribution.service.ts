@@ -223,7 +223,7 @@ async function verifyDistributionAccess(
 
   if (authContext.role === 'partnership') {
     const isOwnDoc = existing.createdBy === authContext.uid || existing.ownerId === authContext.uid
-    const isSubordinateCadreDoc = Boolean(userPartnershipId) && existing.partnershipId === userPartnershipId
+    const isSubordinateCadreDoc = existing.partnershipId === authContext.uid || (Boolean(userPartnershipId) && existing.partnershipId === userPartnershipId)
     if (isOwnDoc || isSubordinateCadreDoc) return
     throw new Error('Otorisasi Ditolak: Anda tidak memiliki izin untuk mengelola distribusi milik mitra lain.')
   }
@@ -372,10 +372,25 @@ export async function listDistributionsWorkflow(
   }
 
   if (authContext.role === 'partnership') {
+    let partnershipOrg = ''
+    try {
+      const userDoc = await safeGetDoc('users', authContext.uid)
+      if (userDoc?.data) {
+        partnershipOrg = (userDoc.data.organization || userDoc.data.displayName || '').toLowerCase().trim()
+      }
+    } catch (e) {
+      console.warn('Could not resolve user partnership data:', e)
+    }
+
     return allDocs.filter((d) => {
       const isOwnDoc = d.createdBy === authContext.uid || d.ownerId === authContext.uid
-      const isSubordinateCadreDoc = Boolean(userPartnershipId) && d.partnershipId === userPartnershipId
-      return isOwnDoc || isSubordinateCadreDoc
+      const isSubordinateCadreDoc = d.partnershipId === authContext.uid || (Boolean(userPartnershipId) && d.partnershipId === userPartnershipId)
+      const isOrgMatch = Boolean(partnershipOrg) && (
+        (d.ownerName && d.ownerName.toLowerCase().trim() === partnershipOrg) ||
+        ((d as any).organization && (d as any).organization.toLowerCase().trim() === partnershipOrg) ||
+        ((d as any).partnershipName && (d as any).partnershipName.toLowerCase().trim() === partnershipOrg)
+      )
+      return isOwnDoc || isSubordinateCadreDoc || isOrgMatch
     })
   }
 

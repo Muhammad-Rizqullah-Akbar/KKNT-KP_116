@@ -1,72 +1,32 @@
 'use client'
 
-import { Topbar } from '@/components/dashboard/Topbar'
-import { StatCard } from '@/components/dashboard/StatCard'
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { useAuth } from '@/context/AuthContext'
 import { Icon } from '@/components/ui/Icons'
 
-const stats = [
-  {
-    label: 'Total Formulir',
-    value: '12',
-    icon: 'fileText' as const,
-    change: { value: '2', type: 'increase' as const },
-  },
-  {
-    label: 'Formulir Aktif',
-    value: '8',
-    icon: 'checkCircle' as const,
-    iconColor: 'text-emerald-400',
-  },
-  {
-    label: 'Total Pengisian',
-    value: '347',
-    icon: 'users' as const,
-    iconColor: 'text-violet-400',
-    change: { value: '14%', type: 'increase' as const },
-  },
-  {
-    label: 'Rata-rata Skor',
-    value: '74.8',
-    icon: 'barChart' as const,
-    iconColor: 'text-amber-400',
-    subtitle: 'Dari 347 responden',
-  },
-]
-
 export default function DashboardPage() {
+  const { userRole, userData, loading } = useAuth()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (!loading) {
+      const effectiveRole = userRole || userData?.role
+      if (effectiveRole === 'partnership') {
+        router.replace('/dashboard/partnership')
+      } else if (effectiveRole === 'cadre') {
+        router.replace('/dashboard/monitoring')
+      } else {
+        router.replace('/dashboard/overview')
+      }
+    }
+  }, [loading, userRole, userData, router])
+
   return (
-    <div className="flex flex-col min-h-screen">
-      <Topbar title="Dashboard" subtitle="Ringkasan data dan visualisasi" />
-
-      <div className="flex-1 p-6 space-y-8">
-        {/* Stats */}
-        <section className="animate-fadeIn">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {stats.map((stat) => (
-              <StatCard key={stat.label} {...stat} />
-            ))}
-          </div>
-        </section>
-
-        {/* Widget Placeholder */}
-        <section className="animate-fadeIn">
-          <h2 className="font-display text-xl font-semibold mb-4 flex items-center gap-2 text-white">
-            <Icon name="barChart" className="w-5 h-5 text-cyan-400" />
-            Ringkasan Grafik
-          </h2>
-          <div className="rounded-2xl bg-[#080812] border border-white/[0.05] p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {[1, 2, 3, 4].map((i) => (
-                <div
-                  key={i}
-                  className="rounded-xl bg-white/[0.02] border border-white/[0.05] p-4 min-h-[160px] flex items-center justify-center"
-                >
-                  <p className="text-white/20 text-sm">Widget {i}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
+    <div className="flex min-h-screen items-center justify-center bg-[#06060E] text-white">
+      <div className="flex flex-col items-center gap-3 p-6 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
+        <Icon name="spinner" className="w-8 h-8 text-cyan-400 animate-spin" />
+        <p className="text-xs text-white/50">Mengarahkan ke dashboard Anda...</p>
       </div>
     </div>
   )

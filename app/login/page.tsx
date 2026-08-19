@@ -18,9 +18,15 @@ export default function LoginPage() {
   // ========== REDIRECT JIKA SUDAH LOGIN ==========
   useEffect(() => {
     if (isAuthenticated) {
-      router.push('/dashboard/overview')
+      if (userRole === 'partnership') {
+        router.push('/dashboard/partnership')
+      } else if (userRole === 'cadre') {
+        router.push('/dashboard/monitoring')
+      } else {
+        router.push('/dashboard/overview')
+      }
     }
-  }, [isAuthenticated, router])
+  }, [isAuthenticated, userRole, router])
 
   // ========== HANDLE EMAIL LOGIN ==========
   const handleSubmit = async (e: React.FormEvent) => {
@@ -30,7 +36,6 @@ export default function LoginPage() {
 
     try {
       await login(email, password)
-      router.push('/dashboard/overview')
     } catch (err: any) {
       setError(err.message || 'Login gagal. Silakan periksa kembali email dan password Anda.')
     } finally {

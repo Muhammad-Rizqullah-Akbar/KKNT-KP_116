@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { useAuth } from '@/context/AuthContext'
 import { Topbar } from '@/components/dashboard/Topbar'
 import { Icon } from '@/components/ui/Icons'
 import {
@@ -65,6 +67,20 @@ const cleanString = (str: string) => {
 }
 
 export default function RespondentsPage() {
+  const { user, userData, userRole, loading: authLoading } = useAuth()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (!authLoading) {
+      const effectiveRole = userRole || userData?.role
+      if (effectiveRole === 'partnership') {
+        router.replace('/dashboard/partnership')
+      } else if (effectiveRole === 'cadre') {
+        router.replace('/dashboard/monitoring')
+      }
+    }
+  }, [authLoading, userRole, userData, router])
+
   // ---------- STATE ----------
   const [respondents, setRespondents] = useState<Respondent[]>([])
   const [forms, setForms] = useState<FormData[]>([])

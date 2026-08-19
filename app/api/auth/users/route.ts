@@ -40,9 +40,36 @@ export async function GET(request: NextRequest) {
       updatedAt: doc.data.updatedAt || new Date().toISOString(),
     }))
 
-    // If caller is a Partnership account, filter cadres owned by this partnership UID
-    if (authContext.role === 'partnership' && partnershipOnly) {
-      users = users.filter((u) => u.partnershipId === authContext.uid || u.role === 'cadre')
+    // If caller is a Partnership account, strictly filter to own profile + owned cadres
+    if (authContext.role === 'partnership') {
+      const currentUser = users.find((u) => u.uid === authContext.uid)
+      const userOrg = (currentUser?.organization || currentUser?.partnershipName || currentUser?.displayName || '').toLowerCase().trim()
+
+      users = users.filter((u) => {
+        // 1. Can see their own profile
+        if (u.uid === authContext.uid) return true
+        // 2. Can only see cadres linked to this partnership
+        if (u.role === 'cadre') {
+          if (u.partnershipId === authContext.uid) return true
+          if (userOrg && u.organization && u.organization.toLowerCase().trim() === userOrg) return true
+          if (userOrg && u.partnershipName && u.partnershipName.toLowerCase().trim() === userOrg) return true
+        }
+        // Cannot see other mitras, admins, or other partnerships' cadres
+        return false
+      })
+    } else if (authContext.role === 'cadre') {
+      // Cadre can only see their own profile and peers from the same partnership
+      const currentCadre = users.find((u) => u.uid === authContext.uid)
+      const cadrePartId = currentCadre?.partnershipId
+      const cadreOrg = (currentCadre?.organization || '').toLowerCase().trim()
+      users = users.filter((u) => {
+        if (u.uid === authContext.uid) return true
+        if (u.role === 'cadre') {
+          if (cadrePartId && u.partnershipId === cadrePartId) return true
+          if (cadreOrg && u.organization && u.organization.toLowerCase().trim() === cadreOrg) return true
+        }
+        return false
+      })
     }
 
     return NextResponse.json({ success: true, users })

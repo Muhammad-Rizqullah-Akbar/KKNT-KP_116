@@ -41,7 +41,8 @@ export default function PartnershipDomainPage() {
   const initialTab = (searchParams.get('tab') as 'mitra' | 'cadres' | 'activities') || 'mitra'
   const [activeTab, setActiveTab] = useState<'mitra' | 'cadres' | 'activities'>(initialTab)
 
-  const isSuperAdminOrAdmin = userData?.role === 'super_admin' || userData?.role === 'admin'
+  const isSuperAdminOrAdmin = userData?.role === 'super_admin' || userData?.role === 'admin' || userData?.role === 'internal_bpom'
+  const isPartnershipRole = userData?.role === 'partnership'
 
   const [allUsers, setAllUsers] = useState<UserProfile[]>([])
   const [distributions, setDistributions] = useState<any[]>([])
@@ -196,8 +197,22 @@ export default function PartnershipDomainPage() {
     }
   }
 
-  // Filter Mitra list
+  // Filter Mitra list (If role is partnership, ONLY return the current logged-in mitra)
   const partnersList = useMemo(() => {
+    if (isPartnershipRole) {
+      const me = allUsers.find((u) => u.uid === user?.uid) || (userData ? {
+        uid: user?.uid || '',
+        email: user?.email || '',
+        displayName: userData.displayName || 'Akun Mitra Saya',
+        role: 'partnership',
+        organization: (userData as any).organization || userData.displayName,
+        partnershipType: (userData as any).partnershipType || 'Sekolah',
+        phone: (userData as any).phone || '-',
+      } : null)
+
+      return me ? [me] : []
+    }
+
     const mitraMap = new Map<string, UserProfile>()
 
     // 1. Explicit partnership role users
@@ -227,7 +242,7 @@ export default function PartnershipDomainPage() {
       })
 
     return Array.from(mitraMap.values())
-  }, [allUsers])
+  }, [allUsers, isPartnershipRole, user, userData])
 
   // Get Cadres for a specific Mitra
   const getCadresForMitra = (mitra: UserProfile) => {
@@ -254,13 +269,20 @@ export default function PartnershipDomainPage() {
     })
   }, [partnersList, searchTerm, typeFilter])
 
-  // Filtered Cadres (Global Cadre View)
+  // Filtered Cadres (Mitra can ONLY see cadres linked to their own partnership)
   const filteredCadres = useMemo(() => {
+    const myOrg = (userData?.organization || userData?.displayName || '').toLowerCase().trim()
+
     return allUsers.filter((u) => {
       if (u.role !== 'cadre') return false
 
-      // Admin sees all cadres; Partnership role sees cadres owned by them
-      if (!isSuperAdminOrAdmin && u.partnershipId !== user?.uid && u.uid !== user?.uid) {
+      // Partnership role strictly sees only cadres owned by their partnership
+      if (isPartnershipRole) {
+        const isMatchId = u.partnershipId === user?.uid
+        const isMatchOrg = myOrg && u.organization && u.organization.toLowerCase().trim() === myOrg
+        const isMatchPartName = myOrg && u.partnershipName && u.partnershipName.toLowerCase().trim() === myOrg
+        if (!isMatchId && !isMatchOrg && !isMatchPartName) return false
+      } else if (!isSuperAdminOrAdmin && u.partnershipId !== user?.uid && u.uid !== user?.uid) {
         return false
       }
 
@@ -279,7 +301,7 @@ export default function PartnershipDomainPage() {
 
       return matchesSearch && matchesType && matchesMitra
     })
-  }, [allUsers, searchTerm, typeFilter, selectedMitraFilter, isSuperAdminOrAdmin, user])
+  }, [allUsers, searchTerm, typeFilter, selectedMitraFilter, isSuperAdminOrAdmin, isPartnershipRole, user, userData])
 
   // Pagination Math
   const activeListLength = activeTab === 'mitra' ? filteredMitra.length : filteredCadres.length
@@ -296,7 +318,19 @@ export default function PartnershipDomainPage() {
 
   // Open Create Cadre Modal within Mitra Context
   const openCreateCadreModal = (mitra?: UserProfile) => {
-    if (mitra) {
+    if (isPartnershipRole) {
+      const myMitra = partnersList[0] || (userData ? {
+        uid: user?.uid || '',
+        email: user?.email || '',
+        displayName: userData.displayName || 'Mitra Saya',
+        role: 'partnership',
+        organization: (userData as any).organization || userData.displayName,
+        partnershipType: (userData as any).partnershipType || 'Sekolah',
+      } : null)
+      setCadreContextMitra(myMitra)
+      setCadreOrganization((userData as any)?.organization || userData?.displayName || '')
+      setCadrePartnershipType((userData as any)?.partnershipType || 'Sekolah')
+    } else if (mitra) {
       setCadreContextMitra(mitra)
       setCadreOrganization(mitra.organization || mitra.displayName)
       setCadrePartnershipType(mitra.partnershipType || 'Sekolah')
@@ -427,7 +461,7 @@ export default function PartnershipDomainPage() {
               }`}
             >
               <Icon name="building" className="w-3.5 h-3.5" />
-              Mitra ({partnersList.length})
+              {isPartnershipRole ? 'Profil Mitra Saya' : `Mitra (${partnersList.length})`}
             </button>
 
             <button
@@ -439,7 +473,7 @@ export default function PartnershipDomainPage() {
               }`}
             >
               <Icon name="users" className="w-3.5 h-3.5" />
-              Kader ({allUsers.filter((u) => u.role === 'cadre').length})
+              {isPartnershipRole ? `Kader Saya (${filteredCadres.length})` : `Kader (${allUsers.filter((u) => u.role === 'cadre').length})`}
             </button>
 
             <button
@@ -485,8 +519,8 @@ export default function PartnershipDomainPage() {
                 ))}
               </select>
 
-              {/* Cadre Tab Extra Filter: Filter by Mitra */}
-              {activeTab === 'cadres' && (
+              {/* Cadre Tab Extra Filter: Filter by Mitra (Admin only) */}
+              {activeTab === 'cadres' && !isPartnershipRole && (
                 <select
                   value={selectedMitraFilter}
                   onChange={(e) => setSelectedMitraFilter(e.target.value)}
