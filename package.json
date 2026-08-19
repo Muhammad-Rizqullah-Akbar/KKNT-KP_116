@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test __tests__/scoringEngine.test.ts __tests__/security.test.ts"
+    "test": "node --import tsx --test __tests__/scoringEngine.test.ts __tests__/security.test.ts __tests__/partnershipScoping.test.ts __tests__/smartArticleParser.test.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
