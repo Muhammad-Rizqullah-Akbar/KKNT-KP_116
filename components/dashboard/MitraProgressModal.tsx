@@ -200,9 +200,6 @@ export function MitraProgressModal({ mitra, isOpen, onClose }: MitraProgressModa
                 <span className="px-2.5 py-0.5 rounded-md bg-purple-950 text-purple-300 border border-purple-500/30 text-[11px] font-extrabold">
                   {mitra.partnershipType || 'Sekolah'}
                 </span>
-                <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold">
-                  ✓ Mitra BPOM Terverifikasi
-                </span>
               </div>
               <p className="text-xs text-slate-400 font-mono">
                 Email: {mitra.email} • HP/WA: <span className="text-cyan-300 font-bold">{mitra.phone || '08123456789'}</span> • Terdaftar: {mitra.createdAt ? new Date(mitra.createdAt).toLocaleDateString('id-ID') : '-'}
@@ -297,7 +294,6 @@ export function MitraProgressModal({ mitra, isOpen, onClose }: MitraProgressModa
                         <tr className="border-b border-slate-800 bg-slate-900/80 text-slate-400 font-mono uppercase text-[10px]">
                           <th className="px-4 py-3">Nama Kader</th>
                           <th className="px-4 py-3">Email Login</th>
-                          <th className="px-4 py-3">Status Keaktifan</th>
                           <th className="px-4 py-3">No. HP / WA</th>
                           <th className="px-4 py-3 text-right">Tanggal Terdaftar</th>
                         </tr>
@@ -318,12 +314,6 @@ export function MitraProgressModal({ mitra, isOpen, onClose }: MitraProgressModa
                             </td>
 
                             <td className="px-4 py-3 font-mono text-slate-300">{c.email}</td>
-
-                            <td className="px-4 py-3">
-                              <span className="px-2.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold">
-                                ✓ Kader Aktif Menyebar
-                              </span>
-                            </td>
 
                             <td className="px-4 py-3 font-mono text-slate-400">{c.phone || '-'}</td>
 
@@ -359,8 +349,9 @@ export function MitraProgressModal({ mitra, isOpen, onClose }: MitraProgressModa
                           <span className="font-mono text-cyan-400 font-extrabold text-xs px-2.5 py-0.5 rounded bg-cyan-950 border border-cyan-500/30">
                             {d.code}
                           </span>
-                          <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-500/30">
-                            📊 {d.respondentCount || 0} Responden Terjaring
+                          <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                            <Icon name="barChart" className="w-3 h-3 text-emerald-400" />
+                            {d.respondentCount || 0} Responden Terjaring
                           </span>
                         </div>
                         <p className="font-bold text-slate-100 text-xs">{d.title}</p>

@@ -28,8 +28,8 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="id" className={`${inter.variable} ${spaceGrotesk.variable}`}>
-      <body>
+    <html lang="id" className={`${inter.variable} ${spaceGrotesk.variable} overflow-x-hidden w-full max-w-full`}>
+      <body className="overflow-x-hidden w-full max-w-full relative">
         <AuthProvider>
           {children}
         </AuthProvider>

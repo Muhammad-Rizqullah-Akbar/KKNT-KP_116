@@ -105,6 +105,7 @@ export function Sidebar({ userRole }: SidebarProps) {
     {
       section: 'Assessment / Form',
       items: [
+        { href: '/dashboard/forms/v1-5-builder', icon: 'filePlus', label: 'Form Builder', badge: 'Builder' },
         { href: '/dashboard/forms/v1-5-list', icon: 'clipboardList', label: 'Daftar Formulir', badge: 'Form' },
         { href: '/dashboard/distributions', icon: 'send', label: 'Distribusi & Kode', badge: 'Kode' },
         { href: '/dashboard/responses', icon: 'checkCircle', label: 'Hasil Penilaian', badge: 'Hasil' },
@@ -161,7 +162,7 @@ export function Sidebar({ userRole }: SidebarProps) {
       {/* Sidebar Container */}
       <aside
         className={clsx(
-          'fixed lg:sticky top-0 z-50 lg:z-0',
+          'fixed lg:sticky top-0 self-start shrink-0 z-50 lg:z-30',
           'flex flex-col bg-[#080812] border-r border-white/[0.06]',
           'h-screen transition-all duration-300 ease-in-out',
           'lg:translate-x-0',

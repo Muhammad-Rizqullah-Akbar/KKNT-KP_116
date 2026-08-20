@@ -432,17 +432,35 @@ export default function V15FormsDashboardPage() {
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation()
-              setIsCreateModalOpen(true)
-            }}
-            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-500/20 transition-all cursor-pointer shrink-0"
-          >
-            <Icon name="plus" className="w-4 h-4" />
-            <span>+ Buat Formulir</span>
-          </button>
+          <div className="flex items-center gap-2 shrink-0 flex-wrap">
+            <Link
+              href="/dashboard/forms/v1-5-builder"
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold shadow-lg shadow-purple-500/20 transition-all shrink-0"
+            >
+              <Icon name="sparkles" className="w-4 h-4 text-purple-200" />
+              <span>Buka Form Builder V1.5 Terbaru</span>
+            </Link>
+
+            <Link
+              href="/dashboard/form-builder"
+              className="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 text-xs font-bold transition-all shrink-0"
+            >
+              <Icon name="filePlus" className="w-4 h-4 text-cyan-400" />
+              <span>Builder Legacy V1.0</span>
+            </Link>
+
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                setIsCreateModalOpen(true)
+              }}
+              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-500/20 transition-all cursor-pointer shrink-0"
+            >
+              <Icon name="plus" className="w-4 h-4" />
+              <span>+ Buat Formulir</span>
+            </button>
+          </div>
         </div>
 
         {/* LIFECYCLE NAVIGATION TABS & FILTERS */}

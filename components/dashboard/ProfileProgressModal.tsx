@@ -406,23 +406,6 @@ export function ProfileProgressModal({ isOpen, onClose, userOverride }: ProfileP
                   </p>
                 </div>
               </div>
-
-              {/* Status Otorisasi & Lencana Badges */}
-              <div className="rounded-2xl bg-gradient-to-r from-purple-950/40 via-slate-950 to-slate-950 border border-purple-500/30 p-4 space-y-2">
-                <h4 className="font-bold text-slate-200 flex items-center gap-2">
-                  <Icon name="award" className="w-4 h-4 text-purple-400" />
-                  <span>Status Keaktifan & Lencana Akun</span>
-                </h4>
-
-                <div className="flex items-center gap-2 flex-wrap pt-1">
-                  <span className="px-3 py-1 rounded-xl bg-purple-500/20 text-purple-200 border border-purple-500/30 text-xs font-semibold">
-                    🏆 Kader / Mitra Edukator Pangan
-                  </span>
-                  <span className="px-3 py-1 rounded-xl bg-emerald-500/20 text-emerald-200 border border-emerald-500/30 text-xs font-semibold">
-                    ✓ Terverifikasi Sistem BPOM V1.5
-                  </span>
-                </div>
-              </div>
             </div>
           ) : activeTab === 'articles' ? (
             <div className="space-y-3">
@@ -447,8 +430,9 @@ export function ProfileProgressModal({ isOpen, onClose, userOverride }: ProfileP
                         </span>
                         <p className="font-bold text-slate-100">{art.title}</p>
                       </div>
-                      <span className="font-mono text-emerald-400 text-[11px] font-bold">
-                        👁️ {art.views || 0} views
+                      <span className="font-mono text-emerald-400 text-[11px] font-bold flex items-center gap-1">
+                        <Icon name="eye" className="w-3.5 h-3.5 text-emerald-400" />
+                        {art.views || 0} views
                       </span>
                     </div>
                   ))}
@@ -477,8 +461,9 @@ export function ProfileProgressModal({ isOpen, onClose, userOverride }: ProfileP
                           <span className="font-mono text-cyan-400 font-bold text-xs px-2.5 py-0.5 rounded-lg bg-cyan-950 border border-cyan-500/30">
                             {d.code}
                           </span>
-                          <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold">
-                            📊 {d.respondentCount || 0} Responden Terjaring
+                          <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold flex items-center gap-1">
+                            <Icon name="barChart" className="w-3 h-3 text-emerald-400" />
+                            {d.respondentCount || 0} Responden Terjaring
                           </span>
                         </div>
                         <p className="font-bold text-slate-100 mt-1">{d.title}</p>

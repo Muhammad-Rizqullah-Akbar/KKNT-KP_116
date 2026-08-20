@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { adminAuth, adminFirestore } from '@/lib/firebaseAdmin'
+import { adminAuth } from '@/lib/firebaseAdmin'
 import { getAuthorizationContext } from '@/lib/auth/server'
 import { safeGetCollectionDocs } from '@/lib/firebase/repositories/v1_5/safeFirestore'
 
@@ -86,19 +86,63 @@ export async function DELETE(request: NextRequest) {
       role: 'super_admin' as const,
       token: {} as any,
     }
-    const uid = new URL(request.url).searchParams.get('uid')
-    if (!uid) return NextResponse.json({ success: false, message: 'UID user wajib diisi' }, { status: 400 })
 
-    try {
-      await adminAuth.deleteUser(uid)
-    } catch (err) {
-      console.warn('adminAuth deleteUser failed/bypassed:', err)
+    if (authContext.role !== 'super_admin') {
+      return NextResponse.json(
+        { success: false, message: 'Hanya Super Admin yang berhak menghapus akun pengguna.' },
+        { status: 403 }
+      )
+    }
+
+    let targetUids: string[] = []
+
+    // 1. Try reading from URL query parameter ?uid=...
+    const urlUid = new URL(request.url).searchParams.get('uid')
+    if (urlUid) {
+      targetUids.push(urlUid)
+    } else {
+      // 2. Try reading from JSON body
+      try {
+        const body = await request.json()
+        if (Array.isArray(body.uids)) {
+          targetUids = body.uids
+        } else if (body.uid) {
+          targetUids.push(body.uid)
+        }
+      } catch {
+        // Body reading fallback
+      }
+    }
+
+    // Filter out caller's own UID (Super Admin cannot delete own current account)
+    targetUids = targetUids.filter((id) => id && id !== authContext.uid)
+
+    if (targetUids.length === 0) {
+      return NextResponse.json(
+        { success: false, message: 'Wajib memilih minimal satu UID user valid yang akan dihapus.' },
+        { status: 400 }
+      )
     }
 
     const { safeDeleteDoc } = await import('@/lib/firebase/repositories/v1_5/safeFirestore')
-    await safeDeleteDoc('users', uid)
+
+    let deletedCount = 0
+    for (const uid of targetUids) {
+      try {
+        await adminAuth.deleteUser(uid)
+      } catch (err) {
+        console.warn(`adminAuth deleteUser (${uid}) failed/bypassed:`, err)
+      }
+      await safeDeleteDoc('users', uid)
+      deletedCount++
+    }
+
     cachedUserDocs = null
-    return NextResponse.json({ success: true, message: 'User berhasil dihapus' })
+    return NextResponse.json({
+      success: true,
+      message: `Berhasil menghapus ${deletedCount} akun pengguna.`,
+      deletedCount,
+    })
   } catch (error: any) {
     console.error('Delete user error:', error)
     return NextResponse.json({ success: false, message: error.message || 'Gagal menghapus user.' }, { status: 500 })
