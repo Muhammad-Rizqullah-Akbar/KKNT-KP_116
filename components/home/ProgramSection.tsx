@@ -75,11 +75,13 @@ export function ProgramSection({ data }: ProgramSectionProps) {
           },
         })
 
+        const isMobileScreen = window.innerWidth < 768
+
         // Card Entry
         tl.fromTo(
           kknCard,
-          { opacity: 0.3, x: -75, scale: 0.88, filter: 'blur(10px)' },
-          { opacity: 1, x: 0, scale: 1, filter: 'blur(0px)', ease: 'power2.out', duration: 1 }
+          { opacity: 0.3, x: isMobileScreen ? 0 : -75, y: isMobileScreen ? 25 : 0, scale: 0.88, filter: 'blur(10px)' },
+          { opacity: 1, x: 0, y: 0, scale: 1, filter: 'blur(0px)', ease: 'power2.out', duration: 1 }
         )
 
         // Icon & Flagship Badge Pop-up
@@ -155,11 +157,13 @@ export function ProgramSection({ data }: ProgramSectionProps) {
           },
         })
 
+        const isMobileScreen = window.innerWidth < 768
+
         // Card Entry
         tl.fromTo(
           bpomCard,
-          { opacity: 0.3, x: 75, scale: 0.88, filter: 'blur(10px)' },
-          { opacity: 1, x: 0, scale: 1, filter: 'blur(0px)', ease: 'power2.out', duration: 1 }
+          { opacity: 0.3, x: isMobileScreen ? 0 : 75, y: isMobileScreen ? 25 : 0, scale: 0.88, filter: 'blur(10px)' },
+          { opacity: 1, x: 0, y: 0, scale: 1, filter: 'blur(0px)', ease: 'power2.out', duration: 1 }
         )
 
         // Icon Box Pop-up

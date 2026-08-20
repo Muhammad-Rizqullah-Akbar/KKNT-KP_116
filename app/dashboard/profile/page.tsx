@@ -225,9 +225,6 @@ export default function UserProfileProgressPage() {
                 <span className="px-2.5 py-0.5 rounded-md bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[11px] font-extrabold">
                   {roleLabel}
                 </span>
-                <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold">
-                  ✓ Terverifikasi BPOM
-                </span>
               </div>
 
               <p className="text-xs text-slate-400 font-mono">
@@ -312,9 +309,6 @@ export default function UserProfileProgressPage() {
                   <p className="text-xs text-slate-400 font-sans mt-0.5">
                     {teamResponsesCount} respon terkumpul via {cadresCount} Kader Binaan + {responsesCount} respon langsung Mitra.
                   </p>
-                </div>
-                <div className="px-3 py-1.5 rounded-xl bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 text-xs font-mono font-bold">
-                  ⚡ Keaktifan Mitra Disupport oleh Cadre Team
                 </div>
               </div>
             </div>
@@ -517,13 +511,13 @@ export default function UserProfileProgressPage() {
                     onChange={(e) => setEditPartnershipType(e.target.value)}
                     className="w-full bg-slate-950 border border-slate-700 text-slate-100 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-purple-400 cursor-pointer"
                   >
-                    <option value="Sekolah">🏫 Sekolah / Kampus</option>
-                    <option value="Kelurahan / Desa">🏛️ Kelurahan / Kantor Desa</option>
-                    <option value="Pasar">🏪 Pasar Tradisional / Modern</option>
-                    <option value="Puskesmas / Posyandu">🏥 Puskesmas / Posyandu</option>
-                    <option value="Komunitas / Ormas">👥 Komunitas / Ormas / PKK</option>
-                    <option value="Instansi Pemerintah">🏢 Instansi Pemerintah / BPOM</option>
-                    <option value="Lainnya">📌 Lainnya</option>
+                    <option value="Sekolah">Sekolah / Kampus</option>
+                    <option value="Kelurahan / Desa">Kelurahan / Kantor Desa</option>
+                    <option value="Pasar">Pasar Tradisional / Modern</option>
+                    <option value="Puskesmas / Posyandu">Puskesmas / Posyandu</option>
+                    <option value="Komunitas / Ormas">Komunitas / Ormas / PKK</option>
+                    <option value="Instansi Pemerintah">Instansi Pemerintah / BPOM</option>
+                    <option value="Lainnya">Lainnya</option>
                   </select>
                 </div>
 

@@ -6,7 +6,6 @@ import { useAuth } from '@/context/AuthContext'
 import { safeFetchJson } from '@/lib/shared/safeFetch'
 import { Icon, type IconName } from '@/components/ui/Icons'
 import { Topbar } from '@/components/dashboard/Topbar'
-import { Button } from '@/components/shared/Button'
 
 type UserRole = 'super_admin' | 'admin' | 'internal_bpom' | 'cadre' | 'partnership' | null
 
@@ -22,6 +21,8 @@ type User = {
   photoURL?: string
   createdAt?: string
   updatedAt?: string
+  isChildOfMitra?: boolean
+  parentMitraName?: string
 }
 
 const ROLE_OPTIONS: { id: UserRole; label: string; icon: IconName; colorClass: string; desc: string }[] = [
@@ -92,6 +93,10 @@ export default function UserManagementPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
 
+  // Checkbox Selection for Bulk Actions
+  const [selectedUids, setSelectedUids] = useState<string[]>([])
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false)
+
   // Register State
   const [registerEmail, setRegisterEmail] = useState('')
   const [registerPassword, setRegisterPassword] = useState('')
@@ -102,142 +107,14 @@ export default function UserManagementPage() {
   const [registerPartnershipId, setRegisterPartnershipId] = useState('')
   const [isRegistering, setIsRegistering] = useState(false)
 
-  // Edit / Delete State
-  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  // Edit / Delete Modal State
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [showEditModal, setShowEditModal] = useState(false)
-  const [editRole, setEditRole] = useState<UserRole>(null)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [editRole, setEditRole] = useState<UserRole>('admin')
   const [editOrganization, setEditOrganization] = useState('')
   const [editPhone, setEditPhone] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
-
-  // Inspection Analytics Modal State
-  const [inspectingUser, setInspectingUser] = useState<User | null>(null)
-  const [inspectData, setInspectData] = useState<{
-    articles: any[]
-    distributions: any[]
-    totalViews: number
-    responsesCount: number
-    isLoading: boolean
-  }>({
-    articles: [],
-    distributions: [],
-    totalViews: 0,
-    responsesCount: 0,
-    isLoading: false,
-  })
-
-  // Handler for Super Admin inspecting a user's analytics progress
-  const handleInspectUserProgress = async (userToInspect: User) => {
-    setInspectingUser(userToInspect)
-    setInspectData({
-      articles: [],
-      distributions: [],
-      totalViews: 0,
-      responsesCount: 0,
-      isLoading: true,
-    })
-
-    try {
-      // 1. Fetch CMS Articles strictly for author
-      const { getArticles } = await import('@/lib/firebase/repositories/articles.repo')
-      const allArticles = await getArticles()
-      const targetUid = userToInspect.uid
-      const targetEmail = (userToInspect.email || '').toLowerCase().trim()
-      const targetName = (userToInspect.displayName || '').toLowerCase().trim()
-
-      const userArticles = allArticles.filter((a) => {
-        if ((a as any).authorId && targetUid && (a as any).authorId === targetUid) return true
-        if ((a as any).createdBy && targetUid && (a as any).createdBy === targetUid) return true
-
-        const authorLower = (a.author || '').toLowerCase().trim()
-        if (targetEmail && authorLower === targetEmail) return true
-        if (targetName && targetName.length > 2 && authorLower === targetName) return true
-
-        return false
-      })
-      const views = userArticles.reduce((acc, a) => acc + (a.views || 0), 0)
-
-      // 2. Fetch Distributions for user
-      const distRes = await safeFetchJson('/api/v1_5/distributions')
-      let userDists: any[] = []
-      if (distRes.ok && distRes.data && Array.isArray(distRes.data.distributions)) {
-        userDists = distRes.data.distributions.filter(
-          (d: any) =>
-            d.createdBy === userToInspect.uid ||
-            d.cadreId === userToInspect.uid ||
-            (userToInspect.displayName && (d.ownerName || d.cadreName || '').toLowerCase().includes(userToInspect.displayName.toLowerCase())) ||
-            (userToInspect.organization && (d.ownerName || d.cadreName || '').toLowerCase().includes(userToInspect.organization.toLowerCase()))
-        )
-      }
-
-      // Extract target user's distribution codes
-      const targetCodesSet = new Set<string>()
-      userDists.forEach((d: any) => {
-        if (d.code) targetCodesSet.add(String(d.code).toLowerCase().trim())
-        if (d.distributionId) targetCodesSet.add(String(d.distributionId).toLowerCase().trim())
-      })
-
-      // 3. Fetch Responses & Filter specifically for target user's distribution codes or UID
-      const respRes = await safeFetchJson('/api/v1_5/responses')
-      let filteredCount = 0
-
-      if (respRes.ok && respRes.data && Array.isArray(respRes.data.responses)) {
-        const allResponses = respRes.data.responses
-
-        // Enrich userDists with specific per-code respondent counts
-        userDists = userDists.map((d: any) => {
-          const codeLower = String(d.code || '').toLowerCase().trim()
-          const distIdLower = String(d.distributionId || '').toLowerCase().trim()
-
-          const count = allResponses.filter((r: any) => {
-            const rCode = String(
-              r.distributionCode ||
-              r.code ||
-              r.metadata?.distributionCode ||
-              r.metadata?.cadreCode ||
-              r.cadreCode ||
-              ''
-            ).toLowerCase().trim()
-
-            const rDistId = String(r.distributionId || '').toLowerCase().trim()
-            return (codeLower && rCode === codeLower) || (distIdLower && rDistId === distIdLower)
-          }).length
-
-          return { ...d, respondentCount: count }
-        })
-
-        const userResponses = allResponses.filter((r: any) => {
-          const rCode = String(
-            r.distributionCode ||
-            r.code ||
-            r.metadata?.distributionCode ||
-            r.metadata?.cadreCode ||
-            r.cadreCode ||
-            ''
-          ).toLowerCase().trim()
-
-          const isMatchedCode = rCode !== '' && targetCodesSet.has(rCode)
-          const isMatchedUid = r.createdBy === userToInspect.uid || r.cadreId === userToInspect.uid || r.userId === userToInspect.uid
-
-          return isMatchedCode || isMatchedUid
-        })
-
-        filteredCount = userResponses.length
-      }
-
-      setInspectData({
-        articles: userArticles,
-        distributions: userDists,
-        totalViews: views,
-        responsesCount: filteredCount,
-        isLoading: false,
-      })
-    } catch (err) {
-      console.error('Error inspecting user progress:', err)
-      setInspectData((prev) => ({ ...prev, isLoading: false }))
-    }
-  }
 
   // Fetch All Users
   const fetchUsers = async () => {
@@ -267,17 +144,163 @@ export default function UserManagementPage() {
     return users.filter((u) => u.role === 'partnership')
   }, [users])
 
-  // Registered Roles stats
-  const roleStats = useMemo(() => {
-    return {
-      total: users.length,
-      superAdmin: users.filter((u) => u.role === 'super_admin').length,
-      admin: users.filter((u) => u.role === 'admin').length,
-      internalBpom: users.filter((u) => u.role === 'internal_bpom').length,
-      partnership: users.filter((u) => u.role === 'partnership').length,
-      cadre: users.filter((u) => u.role === 'cadre').length,
+  // Hierarchically Sorted Users List: super_admin -> admin -> internal_bpom -> (partnership -> cadre_mitra) -> independent_cadres
+  const filteredUsers = useMemo(() => {
+    // 1. Filter by search term & selected role
+    const matched = users.filter((u) => {
+      const term = searchTerm.toLowerCase()
+      const matchSearch =
+        (u.email || '').toLowerCase().includes(term) ||
+        (u.displayName || '').toLowerCase().includes(term) ||
+        (u.organization || '').toLowerCase().includes(term)
+
+      const matchRole = filterRole === 'all' || u.role === filterRole
+      return matchSearch && matchRole
+    })
+
+    // If specific role filter is active (not 'all'), retain simple filter
+    if (filterRole !== 'all') {
+      return matched
     }
-  }, [users])
+
+    // 2. Group into buckets
+    const superAdmins = matched.filter((u) => u.role === 'super_admin')
+    const admins = matched.filter((u) => u.role === 'admin')
+    const internalBpoms = matched.filter((u) => u.role === 'internal_bpom')
+    const partnerships = matched.filter((u) => u.role === 'partnership')
+    const cadres = matched.filter((u) => u.role === 'cadre' || !u.role)
+
+    const attachedCadreUids = new Set<string>()
+    const sortedResult: User[] = [
+      ...superAdmins,
+      ...admins,
+      ...internalBpoms,
+    ]
+
+    // 3. Place each Partnership followed immediately by its owned Cadres
+    partnerships.forEach((p) => {
+      sortedResult.push(p)
+      const pOrg = (p.organization || p.partnershipName || p.displayName || '').toLowerCase().trim()
+
+      const ownedCadres = cadres.filter((c) => {
+        if (c.partnershipId === p.uid) return true
+        const cOrg = (c.organization || c.partnershipName || '').toLowerCase().trim()
+        if (pOrg && cOrg && pOrg === cOrg) return true
+        return false
+      })
+
+      ownedCadres.forEach((c) => {
+        attachedCadreUids.add(c.uid)
+        sortedResult.push({
+          ...c,
+          isChildOfMitra: true,
+          parentMitraName: p.displayName || p.organization || 'Mitra Induk',
+        })
+      })
+    })
+
+    // 4. Add unattached independent cadres at the bottom
+    const unattachedCadres = cadres.filter((c) => !attachedCadreUids.has(c.uid))
+    sortedResult.push(...unattachedCadres)
+
+    return sortedResult
+  }, [users, searchTerm, filterRole])
+
+  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage)
+  const paginatedUsers = useMemo(() => {
+    return filteredUsers.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+  }, [filteredUsers, currentPage])
+
+  // Bulk Selection Handlers
+  const isAllPaginatedSelected = useMemo(() => {
+    const selectable = paginatedUsers.filter((u) => u.uid !== user?.uid)
+    if (selectable.length === 0) return false
+    return selectable.every((u) => selectedUids.includes(u.uid))
+  }, [paginatedUsers, selectedUids, user])
+
+  const toggleSelectAll = () => {
+    const selectableUids = paginatedUsers.filter((u) => u.uid !== user?.uid).map((u) => u.uid)
+    if (isAllPaginatedSelected) {
+      setSelectedUids((prev) => prev.filter((id) => !selectableUids.includes(id)))
+    } else {
+      setSelectedUids((prev) => Array.from(new Set([...prev, ...selectableUids])))
+    }
+  }
+
+  const toggleSelectUser = (uid: string) => {
+    if (uid === user?.uid) return
+    setSelectedUids((prev) =>
+      prev.includes(uid) ? prev.filter((id) => id !== uid) : [...prev, uid]
+    )
+  }
+
+  // Single Delete Handler
+  const handleDelete = async (userToDelete: User) => {
+    if (userToDelete.uid === user?.uid) {
+      setError('Tidak dapat menghapus akun sendiri!')
+      return
+    }
+    setSelectedUser(userToDelete)
+    setShowDeleteModal(true)
+  }
+
+  const confirmDelete = async () => {
+    if (!selectedUser) return
+    setIsSubmitting(true)
+    setError(null)
+
+    try {
+      const response = await fetch(`/api/auth/users?uid=${selectedUser.uid}`, {
+        method: 'DELETE',
+      })
+      const data = await response.json()
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Gagal menghapus user.')
+      }
+
+      setUsers((prev) => prev.filter((u) => u.uid !== selectedUser.uid))
+      setSelectedUids((prev) => prev.filter((id) => id !== selectedUser.uid))
+      setSuccessMessage(`✅ Akun ${selectedUser.email} berhasil dihapus.`)
+      setShowDeleteModal(false)
+      setSelectedUser(null)
+      setTimeout(() => setSuccessMessage(null), 3500)
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  // Bulk Delete Handler
+  const confirmBulkDelete = async () => {
+    if (selectedUids.length === 0) return
+    setIsSubmitting(true)
+    setError(null)
+
+    try {
+      const response = await fetch('/api/auth/users', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uids: selectedUids }),
+      })
+      const data = await response.json()
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Gagal menghapus daftar user terpilih.')
+      }
+
+      setUsers((prev) => prev.filter((u) => !selectedUids.includes(u.uid)))
+      setSuccessMessage(`✅ Berhasil menghapus ${data.deletedCount || selectedUids.length} akun pengguna terpilih.`)
+      setSelectedUids([])
+      setShowBulkDeleteModal(false)
+      setTimeout(() => setSuccessMessage(null), 3500)
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
 
   // Register New User Handler
   const handleRegister = async (e: React.FormEvent) => {
@@ -324,43 +347,6 @@ export default function UserManagementPage() {
     }
   }
 
-  // Delete User Handler
-  const handleDelete = async (userToDelete: User) => {
-    if (userToDelete.uid === user?.uid) {
-      setError('Tidak dapat menghapus akun sendiri!')
-      return
-    }
-    setSelectedUser(userToDelete)
-    setShowDeleteModal(true)
-  }
-
-  const confirmDelete = async () => {
-    if (!selectedUser) return
-    setIsSubmitting(true)
-    setError(null)
-
-    try {
-      const response = await fetch(`/api/auth/users?uid=${selectedUser.uid}`, {
-        method: 'DELETE',
-      })
-      const data = await response.json()
-
-      if (!response.ok || !data.success) {
-        throw new Error(data.message || 'Gagal menghapus user.')
-      }
-
-      setUsers((prev) => prev.filter((u) => u.uid !== selectedUser.uid))
-      setSuccessMessage(`Akun ${selectedUser.email} berhasil dihapus.`)
-      setShowDeleteModal(false)
-      setSelectedUser(null)
-      setTimeout(() => setSuccessMessage(null), 3000)
-    } catch (err: any) {
-      setError(err.message)
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
   // Edit Role Handler
   const handleEdit = (userToEdit: User) => {
     setSelectedUser(userToEdit)
@@ -400,35 +386,16 @@ export default function UserManagementPage() {
             : u
         )
       )
-      setSuccessMessage(`Akun ${selectedUser.email} berhasil diperbarui.`)
+      setSuccessMessage(`✅ Akun ${selectedUser.email} berhasil diperbarui.`)
       setShowEditModal(false)
       setSelectedUser(null)
-      setTimeout(() => setSuccessMessage(null), 3000)
+      setTimeout(() => setSuccessMessage(null), 3500)
     } catch (err: any) {
       setError(err.message)
     } finally {
       setIsSubmitting(false)
     }
   }
-
-  // Filtered Users List
-  const filteredUsers = useMemo(() => {
-    return users.filter((u) => {
-      const term = searchTerm.toLowerCase()
-      const matchSearch =
-        (u.email || '').toLowerCase().includes(term) ||
-        (u.displayName || '').toLowerCase().includes(term) ||
-        (u.organization || '').toLowerCase().includes(term)
-
-      const matchRole = filterRole === 'all' || u.role === filterRole
-      return matchSearch && matchRole
-    })
-  }, [users, searchTerm, filterRole])
-
-  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage)
-  const paginatedUsers = useMemo(() => {
-    return filteredUsers.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
-  }, [filteredUsers, currentPage])
 
   // Helper Badge Render
   const getRoleBadge = (role: UserRole) => {
@@ -448,56 +415,52 @@ export default function UserManagementPage() {
   }
 
   const getInitials = (name?: string, email?: string) => {
-    if (name) return name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
-    return (email || 'U').charAt(0).toUpperCase()
+    const text = name || email || 'User'
+    return text.substring(0, 2).toUpperCase()
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#070913] text-slate-100 font-sans">
+    <div className="flex flex-col min-h-screen bg-[#06060E] text-slate-100">
       <Topbar
-        title="Manajemen Pengguna & Peran (Super Admin)"
-        subtitle="Registrasi dan kelola akun Super Admin, Admin, Internal BPOM, Akun Mitra Partnership, dan Kader Desa"
+        title="Manajemen Pengguna & Hak Akses"
+        subtitle="Urutan Hierarki: Super Admin → Admin → BPOM → Mitra → (Kader Mitra). Lengkap dengan Hapus Masal."
       />
 
-      <div className="flex-1 p-4 sm:p-6 space-y-6 max-w-7xl mx-auto w-full">
-        {/* Messages */}
-        {successMessage && (
-          <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-semibold flex items-center gap-2">
-            <Icon name="checkCircle" className="w-4 h-4 text-emerald-400" />
-            <span>{successMessage}</span>
+      <div className="flex-1 p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto w-full">
+        {/* Banner Informasional Superadmin */}
+        <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <Icon name="crown" className="w-5 h-5 text-amber-400 shrink-0" />
+            <div>
+              <p className="font-bold text-sm text-amber-200">Mode Otoritas Hierarki (Super Admin)</p>
+              <p className="text-amber-400/80 mt-0.5">
+                Urutan daftar otomatis disusun berurutan: <span className="text-white font-mono font-bold">Super Admin → Admin → BPOM → Mitra → (Kader milik Mitra)</span>.
+              </p>
+            </div>
           </div>
-        )}
+          <button
+            onClick={fetchUsers}
+            className="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200 font-bold flex items-center gap-1.5 transition-all text-xs shrink-0"
+          >
+            <Icon name="refreshCw" className="w-3.5 h-3.5 text-amber-300" />
+            <span>Segarkan</span>
+          </button>
+        </div>
 
+        {/* Feedback Messages */}
         {error && (
-          <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-semibold flex items-center gap-2">
-            <Icon name="alertCircle" className="w-4 h-4 text-rose-400" />
+          <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-center gap-3 animate-fadeIn">
+            <Icon name="alertCircle" className="w-5 h-5 shrink-0" />
             <span>{error}</span>
           </div>
         )}
 
-        {/* Quick Role Stats Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-          <div className="rounded-2xl bg-slate-900 border border-slate-800 p-3.5 text-center">
-            <p className="text-xl font-bold font-mono text-cyan-400">{roleStats.total}</p>
-            <p className="text-[11px] text-slate-400 mt-0.5">Total Terdaftar</p>
+        {successMessage && (
+          <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-3 animate-fadeIn">
+            <Icon name="checkCircle" className="w-5 h-5 shrink-0 text-emerald-400" />
+            <span>{successMessage}</span>
           </div>
-          <div className="rounded-2xl bg-slate-900 border border-slate-800 p-3.5 text-center">
-            <p className="text-xl font-bold font-mono text-amber-400">{roleStats.superAdmin}</p>
-            <p className="text-[11px] text-slate-400 mt-0.5">Super Admin</p>
-          </div>
-          <div className="rounded-2xl bg-slate-900 border border-slate-800 p-3.5 text-center">
-            <p className="text-xl font-bold font-mono text-blue-400">{roleStats.internalBpom}</p>
-            <p className="text-[11px] text-slate-400 mt-0.5">Internal BPOM</p>
-          </div>
-          <div className="rounded-2xl bg-slate-900 border border-slate-800 p-3.5 text-center">
-            <p className="text-xl font-bold font-mono text-purple-400">{roleStats.partnership}</p>
-            <p className="text-[11px] text-slate-400 mt-0.5">Mitra Partnership</p>
-          </div>
-          <div className="rounded-2xl bg-slate-900 border border-slate-800 p-3.5 text-center">
-            <p className="text-xl font-bold font-mono text-emerald-400">{roleStats.cadre}</p>
-            <p className="text-[11px] text-slate-400 mt-0.5">Kader Desa</p>
-          </div>
-        </div>
+        )}
 
         {/* Registration Form */}
         <div className="rounded-3xl bg-slate-900/90 border border-slate-800 p-6 space-y-4 shadow-xl">
@@ -592,7 +555,6 @@ export default function UserManagementPage() {
               </div>
             </div>
 
-            {/* Sub-Option for Cadre: Assign to Parent Partnership Account */}
             {registerRole === 'cadre' && (
               <div>
                 <label className="block font-semibold text-cyan-300 mb-1.5">
@@ -626,8 +588,8 @@ export default function UserManagementPage() {
           </form>
         </div>
 
-        {/* Filter & Search Bar */}
-        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+        {/* Filter, Search Bar, & BULK DELETE Action Bar */}
+        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 bg-slate-900/60 p-4 rounded-2xl border border-slate-800">
           <div className="flex flex-wrap items-center gap-3">
             <div className="relative flex-1 sm:flex-initial">
               <Icon name="search" className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
@@ -636,14 +598,14 @@ export default function UserManagementPage() {
                 placeholder="Cari email / nama / instansi..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 pr-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500 w-full sm:w-64"
+                className="pl-10 pr-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500 w-full sm:w-64"
               />
             </div>
 
             <select
               value={filterRole}
               onChange={(e) => setFilterRole(e.target.value)}
-              className="px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-300 focus:outline-none focus:border-cyan-500 cursor-pointer"
+              className="px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-300 focus:outline-none focus:border-cyan-500 cursor-pointer"
             >
               <option value="all">Semua Peran ({users.length})</option>
               {ROLE_OPTIONS.map((r) => (
@@ -654,12 +616,26 @@ export default function UserManagementPage() {
             </select>
           </div>
 
-          <span className="text-xs text-slate-400 font-mono">
-            Total: {filteredUsers.length} akun terdaftar
-          </span>
+          <div className="flex items-center gap-3">
+            {/* BULK DELETE BUTTON */}
+            {selectedUids.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowBulkDeleteModal(true)}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs shadow-lg shadow-rose-600/30 flex items-center gap-2 transition-all animate-pulse"
+              >
+                <Icon name="trash" className="w-4 h-4 text-white" />
+                <span>Hapus Masal ({selectedUids.length}) Akun Terpilih</span>
+              </button>
+            )}
+
+            <span className="text-xs text-slate-400 font-mono">
+              Total: {filteredUsers.length} akun terdaftar
+            </span>
+          </div>
         </div>
 
-        {/* Users Table */}
+        {/* Users Table with Hierarchical Grouping */}
         <div className="rounded-3xl bg-slate-900 border border-slate-800 overflow-hidden shadow-md">
           {loading ? (
             <div className="flex items-center justify-center py-20 text-slate-400 text-xs gap-3">
@@ -676,6 +652,15 @@ export default function UserManagementPage() {
               <table className="w-full text-xs text-left">
                 <thead>
                   <tr className="border-b border-slate-800 bg-slate-950/70 text-slate-400 font-mono uppercase text-[10px]">
+                    <th className="px-4 py-3.5 w-10 text-center">
+                      <input
+                        type="checkbox"
+                        checked={isAllPaginatedSelected}
+                        onChange={toggleSelectAll}
+                        className="rounded border-slate-700 bg-slate-900 text-cyan-500 focus:ring-cyan-400 w-4 h-4 cursor-pointer"
+                        title="Pilih Semua Akun di Halaman Ini"
+                      />
+                    </th>
                     <th className="px-4 py-3.5">Nama & Profil</th>
                     <th className="px-4 py-3.5">Email</th>
                     <th className="px-4 py-3.5">Peran (Role)</th>
@@ -688,19 +673,49 @@ export default function UserManagementPage() {
                   {paginatedUsers.map((u) => {
                     const badge = getRoleBadge(u.role)
                     const isSelf = u.uid === user?.uid
+                    const isSelected = selectedUids.includes(u.uid)
 
                     return (
-                      <tr key={u.uid} className="hover:bg-slate-800/40 transition-colors">
+                      <tr
+                        key={u.uid}
+                        className={`transition-colors ${
+                          u.isChildOfMitra
+                            ? 'bg-purple-950/10 hover:bg-purple-950/20'
+                            : isSelected
+                            ? 'bg-rose-950/20 hover:bg-rose-950/30'
+                            : 'hover:bg-slate-800/40'
+                        }`}
+                      >
+                        <td className="px-4 py-3.5 text-center">
+                          <input
+                            type="checkbox"
+                            disabled={isSelf}
+                            checked={isSelected}
+                            onChange={() => toggleSelectUser(u.uid)}
+                            className="rounded border-slate-700 bg-slate-900 text-cyan-500 focus:ring-cyan-400 w-4 h-4 cursor-pointer disabled:opacity-30"
+                          />
+                        </td>
+
                         <td className="px-4 py-3.5">
-                          <div className="flex items-center gap-3">
+                          <div className={`flex items-center gap-3 ${u.isChildOfMitra ? 'pl-6' : ''}`}>
+                            {u.isChildOfMitra && (
+                              <Icon name="cornerDownRight" className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                            )}
                             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-violet-600 flex items-center justify-center text-xs font-extrabold text-white shrink-0">
                               {getInitials(u.displayName, u.email)}
                             </div>
                             <div>
-                              <p className="font-bold text-slate-100 text-sm">
-                                {u.displayName || 'Tanpa Nama'}
-                              </p>
-                              {isSelf && <span className="text-[10px] text-cyan-400 font-bold">(Akun Anda)</span>}
+                              <div className="flex items-center gap-2">
+                                <p className="font-bold text-slate-100 text-sm">
+                                  {u.displayName || 'Tanpa Nama'}
+                                </p>
+                                {isSelf && <span className="text-[10px] text-cyan-400 font-bold">(Akun Anda)</span>}
+                              </div>
+                              {u.isChildOfMitra && (
+                                <p className="text-[10px] font-mono text-purple-300 font-medium">
+                                  Kader milik: <span className="font-bold">{u.parentMitraName}</span>
+                                </p>
+                              )}
                             </div>
                           </div>
                         </td>
@@ -726,16 +741,6 @@ export default function UserManagementPage() {
                           <div className="flex items-center justify-end gap-2">
                             <button
                               type="button"
-                              onClick={() => handleInspectUserProgress(u)}
-                              className="px-2.5 py-1.5 rounded-xl bg-purple-950/70 hover:bg-purple-900 text-purple-200 border border-purple-500/40 text-[11px] font-bold flex items-center gap-1.5 transition-all shadow-sm"
-                              title="Inspeksi Analytics & Progress Profil User Ini"
-                            >
-                              <Icon name="barChart" className="w-3.5 h-3.5 text-purple-400" />
-                              <span className="hidden sm:inline">Analytics Progress</span>
-                            </button>
-
-                            <button
-                              type="button"
                               onClick={() => handleEdit(u)}
                               className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
                               title="Edit Role & Profil"
@@ -748,7 +753,7 @@ export default function UserManagementPage() {
                               onClick={() => handleDelete(u)}
                               disabled={isSelf}
                               className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-300 border border-slate-700 disabled:opacity-30 transition-colors"
-                              title="Hapus Akun"
+                              title="Hapus Akun User"
                             >
                               <Icon name="trash" className="w-4 h-4 text-rose-400" />
                             </button>
@@ -761,32 +766,142 @@ export default function UserManagementPage() {
               </table>
             </div>
           )}
+
+          {/* Pagination Footer */}
+          {totalPages > 1 && (
+            <div className="p-4 border-t border-slate-800 bg-slate-950/70 flex items-center justify-between text-xs text-slate-400">
+              <span>
+                Halaman {currentPage} dari {totalPages}
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  className="px-3 py-1.5 rounded-lg bg-slate-800 disabled:opacity-40 text-slate-200"
+                >
+                  Sebelumnya
+                </button>
+                <button
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  className="px-3 py-1.5 rounded-lg bg-slate-800 disabled:opacity-40 text-slate-200"
+                >
+                  Selanjutnya
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Edit Role Modal */}
-      {showEditModal && selectedUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <h3 className="text-base font-bold text-slate-100">Edit Peran & Profil User</h3>
-              <button onClick={() => setShowEditModal(false)} className="p-1.5 text-slate-400 hover:text-white rounded-lg bg-slate-800">
-                <Icon name="x" className="w-4 h-4" />
-              </button>
+      {/* SINGLE DELETE CONFIRMATION MODAL */}
+      {showDeleteModal && selectedUser && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl animate-fadeIn">
+            <div className="flex items-center gap-3 text-rose-400">
+              <div className="p-3 rounded-2xl bg-rose-500/10 border border-rose-500/20">
+                <Icon name="alertTriangle" className="w-6 h-6" />
+              </div>
+              <div>
+                <h4 className="font-bold text-lg text-slate-100">Konfirmasi Hapus Akun</h4>
+                <p className="text-xs text-slate-400">Tindakan ini tidak dapat dibatalkan</p>
+              </div>
             </div>
 
-            <div className="space-y-3 text-xs">
-              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
-                <p className="text-slate-400 font-medium">{selectedUser.displayName}</p>
-                <p className="text-cyan-400 font-mono mt-0.5">{selectedUser.email}</p>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Apakah Anda yakin ingin menghapus akun <span className="font-mono font-bold text-rose-300">{selectedUser.email}</span> ({selectedUser.displayName}) secara permanen dari database sistem KKNT-KP V1.5?
+            </p>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDeleteModal(false)
+                  setSelectedUser(null)
+                }}
+                disabled={isSubmitting}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={confirmDelete}
+                disabled={isSubmitting}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:bg-slate-800 text-white text-xs font-bold flex items-center gap-2"
+              >
+                {isSubmitting ? <Icon name="loader" className="w-4 h-4 animate-spin" /> : <Icon name="trash" className="w-4 h-4" />}
+                <span>{isSubmitting ? 'Menghapus...' : 'Ya, Hapus Akun'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* BULK DELETE CONFIRMATION MODAL */}
+      {showBulkDeleteModal && selectedUids.length > 0 && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl animate-fadeIn">
+            <div className="flex items-center gap-3 text-rose-400">
+              <div className="p-3 rounded-2xl bg-rose-500/10 border border-rose-500/20">
+                <Icon name="trash" className="w-6 h-6 text-rose-400" />
+              </div>
+              <div>
+                <h4 className="font-bold text-lg text-slate-100">Konfirmasi Hapus Masal (Bulk Delete)</h4>
+                <p className="text-xs text-slate-400">Tindakan ini tidak dapat dibatalkan</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Apakah Anda yakin ingin menghapus <span className="font-mono font-bold text-rose-300">{selectedUids.length} akun pengguna</span> yang Anda pilih secara masal dan permanen dari database sistem KKNT-KP V1.5?
+            </p>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowBulkDeleteModal(false)}
+                disabled={isSubmitting}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={confirmBulkDelete}
+                disabled={isSubmitting}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:bg-slate-800 text-white text-xs font-bold flex items-center gap-2"
+              >
+                {isSubmitting ? <Icon name="loader" className="w-4 h-4 animate-spin" /> : <Icon name="trash" className="w-4 h-4" />}
+                <span>{isSubmitting ? 'Memproses Hapus Masal...' : `Ya, Hapus (${selectedUids.length}) Akun`}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT ROLE MODAL */}
+      {showEditModal && selectedUser && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl animate-fadeIn text-xs">
+            <h4 className="font-bold text-base text-slate-100">Edit Profil & Peran User</h4>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-slate-400 font-medium mb-1">Email</label>
+                <input
+                  type="text"
+                  disabled
+                  value={selectedUser.email}
+                  className="w-full bg-slate-950 border border-slate-800 text-slate-400 rounded-xl px-3 py-2"
+                />
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-300 mb-1">Peran (Role)</label>
+                <label className="block text-slate-300 font-semibold mb-1">Role / Peran Sistem</label>
                 <select
-                  value={editRole || 'cadre'}
+                  value={editRole || 'admin'}
                   onChange={(e) => setEditRole(e.target.value as UserRole)}
-                  className="w-full bg-slate-950 border border-slate-700 text-slate-200 rounded-xl px-3 py-2.5"
+                  className="w-full bg-slate-950 border border-slate-700 text-slate-200 rounded-xl px-3 py-2"
                 >
                   {ROLE_OPTIONS.map((r) => (
                     <option key={r.id} value={r.id || ''}>
@@ -797,168 +912,46 @@ export default function UserManagementPage() {
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-300 mb-1">Instansi / Organisasi</label>
+                <label className="block text-slate-300 font-semibold mb-1">Organisasi / Instansi</label>
                 <input
                   type="text"
                   value={editOrganization}
                   onChange={(e) => setEditOrganization(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 text-slate-100 rounded-xl px-3.5 py-2.5"
+                  className="w-full bg-slate-950 border border-slate-700 text-slate-100 rounded-xl px-3 py-2"
                 />
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-300 mb-1">Nomor Telepon / WA</label>
+                <label className="block text-slate-300 font-semibold mb-1">Nomor HP</label>
                 <input
                   type="text"
                   value={editPhone}
                   onChange={(e) => setEditPhone(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 text-slate-100 rounded-xl px-3.5 py-2.5"
+                  className="w-full bg-slate-950 border border-slate-700 text-slate-100 rounded-xl px-3 py-2"
                 />
               </div>
             </div>
 
-            <div className="pt-2 flex justify-end gap-2 border-t border-slate-800">
-              <button onClick={() => setShowEditModal(false)} className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 font-semibold text-xs">
+            <div className="flex items-center justify-end gap-3 pt-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowEditModal(false)
+                  setSelectedUser(null)
+                }}
+                disabled={isSubmitting}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold"
+              >
                 Batal
               </button>
-              <button onClick={confirmEdit} disabled={isSubmitting} className="px-5 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs flex items-center gap-1.5">
-                {isSubmitting ? <Icon name="loader" className="w-4 h-4 animate-spin" /> : <Icon name="save" className="w-4 h-4" />}
-                <span>Simpan Perubahan</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Super Admin Analytics & Progress Inspection Modal */}
-      {inspectingUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="w-full max-w-3xl bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-5 max-h-[85vh] flex flex-col">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-purple-600/20 border border-purple-500/40 flex items-center justify-center text-purple-300 font-extrabold text-sm">
-                  {getInitials(inspectingUser.displayName, inspectingUser.email)}
-                </div>
-                <div>
-                  <h3 className="text-base font-extrabold text-slate-100">{inspectingUser.displayName || 'Akun User'}</h3>
-                  <span className="text-xs text-purple-300 font-mono">
-                    Role: {getRoleBadge(inspectingUser.role).label} • Instansi: {inspectingUser.organization || 'Umum'} • Email: {inspectingUser.email}
-                  </span>
-                </div>
-              </div>
-
-              <button onClick={() => setInspectingUser(null)} className="p-1.5 text-slate-400 hover:text-white rounded-lg bg-slate-800">
-                <Icon name="x" className="w-4 h-4" />
-              </button>
-            </div>
-
-            {inspectData.isLoading ? (
-              <div className="flex items-center justify-center py-20 text-slate-400 text-xs gap-3">
-                <Icon name="loader" className="w-5 h-5 text-purple-400 animate-spin" />
-                <span>Mengakumulasi statistik progress artikel & distribusi user ini...</span>
-              </div>
-            ) : (
-              <div className="flex-1 overflow-y-auto space-y-5 pr-1 text-xs">
-                {/* Metric Summary Cards */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div className="rounded-2xl bg-slate-950 border border-slate-800 p-3.5 space-y-1">
-                    <span className="text-slate-400 text-[11px]">Artikel Edukasi (CMS)</span>
-                    <p className="text-xl font-bold font-mono text-cyan-300">{inspectData.articles.length}</p>
-                    <span className="text-[10px] text-slate-500 font-mono">{inspectData.articles.filter((a) => a.status === 'Published').length} Terpublikasi</span>
-                  </div>
-
-                  <div className="rounded-2xl bg-slate-950 border border-slate-800 p-3.5 space-y-1">
-                    <span className="text-slate-400 text-[11px]">Total Views Artikel</span>
-                    <p className="text-xl font-bold font-mono text-emerald-300">{inspectData.totalViews}</p>
-                    <span className="text-[10px] text-slate-500 font-mono">Diakses oleh pembaca</span>
-                  </div>
-
-                  <div className="rounded-2xl bg-slate-950 border border-slate-800 p-3.5 space-y-1">
-                    <span className="text-slate-400 text-[11px]">Kode Distribusi V1.5</span>
-                    <p className="text-xl font-bold font-mono text-purple-300">{inspectData.distributions.length}</p>
-                    <span className="text-[10px] text-slate-500 font-mono">Kode unik aktif</span>
-                  </div>
-
-                  <div className="rounded-2xl bg-slate-950 border border-slate-800 p-3.5 space-y-1">
-                    <span className="text-slate-400 text-[11px]">Total Tanggapan</span>
-                    <p className="text-xl font-bold font-mono text-amber-300">{inspectData.responsesCount}</p>
-                    <span className="text-[10px] text-slate-500 font-mono">Responden publik</span>
-                  </div>
-                </div>
-
-                {/* Section 1: User's CMS Articles */}
-                <div className="space-y-2">
-                  <h4 className="font-extrabold text-slate-200 flex items-center gap-2">
-                    <Icon name="bookOpen" className="w-4 h-4 text-purple-400" />
-                    <span>Artikel & Materi Edukasi yang Diterbitkan ({inspectData.articles.length})</span>
-                  </h4>
-
-                  {inspectData.articles.length === 0 ? (
-                    <div className="p-4 bg-slate-950 border border-slate-800 rounded-2xl text-slate-500 text-center">
-                      Belum ada artikel edukasi yang ditulis atau diterbitkan oleh akun ini.
-                    </div>
-                  ) : (
-                    <div className="divide-y divide-slate-800 bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden">
-                      {inspectData.articles.map((art) => (
-                        <div key={art.id || art.slug} className="p-3 flex items-center justify-between">
-                          <div className="space-y-0.5 max-w-lg">
-                            <div className="flex items-center gap-2">
-                              <span className="px-2 py-0.5 rounded bg-purple-950 text-purple-300 text-[10px] font-bold">
-                                {art.category || 'CMS'}
-                              </span>
-                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${art.status === 'Published' ? 'text-emerald-400' : 'text-amber-400'}`}>
-                                {art.status}
-                              </span>
-                            </div>
-                            <p className="font-bold text-slate-100">{art.title}</p>
-                          </div>
-                          <span className="font-mono text-emerald-400 text-[11px] font-bold">
-                            👁️ {art.views || 0} views
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Section 2: User's Distributions */}
-                <div className="space-y-2">
-                  <h4 className="font-extrabold text-slate-200 flex items-center gap-2">
-                    <Icon name="send" className="w-4 h-4 text-cyan-400" />
-                    <span>Kode Distribusi Instrumen V1.5 ({inspectData.distributions.length})</span>
-                  </h4>
-
-                  {inspectData.distributions.length === 0 ? (
-                    <div className="p-4 bg-slate-950 border border-slate-800 rounded-2xl text-slate-500 text-center">
-                      Belum ada kode distribusi instrumen yang dibuat oleh akun ini.
-                    </div>
-                  ) : (
-                    <div className="divide-y divide-slate-800 bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden">
-                      {inspectData.distributions.map((d: any) => (
-                        <div key={d.distributionId} className="p-3 flex items-center justify-between">
-                          <div>
-                            <span className="font-mono text-cyan-400 font-extrabold text-xs px-2 py-0.5 rounded bg-cyan-950 border border-cyan-500/30">
-                              {d.code}
-                            </span>
-                            <p className="font-bold text-slate-100 mt-1">{d.title}</p>
-                          </div>
-                          <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 font-mono text-[10px] uppercase border border-emerald-500/30">
-                            {d.status}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            <div className="pt-3 border-t border-slate-800 flex justify-end">
               <button
-                onClick={() => setInspectingUser(null)}
-                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold"
+                type="button"
+                onClick={confirmEdit}
+                disabled={isSubmitting}
+                className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-800 text-white font-bold flex items-center gap-2"
               >
-                Tutup Inspeksi Analytics
+                {isSubmitting ? <Icon name="loader" className="w-4 h-4 animate-spin" /> : <Icon name="check" className="w-4 h-4" />}
+                <span>Simpan Perubahan</span>
               </button>
             </div>
           </div>

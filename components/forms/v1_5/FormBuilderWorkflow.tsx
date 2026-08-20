@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import type { BuilderState } from '@/lib/forms/v1_5/builderState'
 import {
   DEFAULT_ASPECTS,
@@ -39,6 +40,7 @@ export function FormBuilderWorkflow({
   onPublishVersion,
   onOpenVersionHistory,
 }: FormBuilderWorkflowProps) {
+  const router = useRouter()
   // Wizard Step State
   const [currentStep, setCurrentStep] = useState<BuilderStepId>(1)
   const [completedSteps, setCompletedSteps] = useState<BuilderStepId[]>([])
@@ -176,6 +178,15 @@ export function FormBuilderWorkflow({
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => router.push('/dashboard/forms/v1-5-list')}
+              className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-semibold border border-slate-800 flex items-center gap-1.5 transition-colors"
+            >
+              <Icon name="arrowLeft" className="w-3.5 h-3.5 text-cyan-400" />
+              <span className="hidden sm:inline">Daftar Form V1.5</span>
+            </button>
+
             {onOpenVersionHistory && (
               <button
                 type="button"
