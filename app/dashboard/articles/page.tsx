@@ -9,8 +9,11 @@ import {
   createArticle, 
   updateArticle, 
   deleteArticle, 
+  getArticleCategories,
+  createArticleCategory,
   type ArticleData 
 } from '@/lib/firebase/repositories/articles.repo'
+import { getForms } from '@/lib/firebase/repositories/forms.repo'
 import { storage } from '@/lib/firebaseClient'
 import { uploadOptimizedArticleImage } from '@/lib/firebase/storage'
 import { ref, uploadBytes, getDownloadURL, listAll } from 'firebase/storage'
@@ -146,15 +149,106 @@ export default function ArticlesAdminPage() {
     excerpt: '',
     tags: '',
     embeddedDistributionCode: '',
+    pretestCode: '',
+    posttestCode: '',
     gallery: [] as GalleryImage[],
     blocks: [] as ContentBlock[],
   })
+
+  // Debounce & Request Submission Guards
+  const [isSavingArticle, setIsSavingArticle] = useState(false)
+  const savingRef = useRef(false)
+
+  // Bulk Delete States
+  const [selectedArticleIds, setSelectedArticleIds] = useState<string[]>([])
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false)
+  const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false)
+
+  const toggleSelectArticle = (id: string) => {
+    setSelectedArticleIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    )
+  }
+
+  const toggleSelectAllCurrentPage = (currentList: Article[]) => {
+    const validIds = currentList.map((a) => a.id).filter((id): id is string => Boolean(id))
+    const allSelected = validIds.every((id) => selectedArticleIds.includes(id))
+
+    if (allSelected) {
+      setSelectedArticleIds((prev) => prev.filter((id) => !validIds.includes(id)))
+    } else {
+      setSelectedArticleIds((prev) => Array.from(new Set([...prev, ...validIds])))
+    }
+  }
+
+  const confirmBulkDelete = async () => {
+    if (selectedArticleIds.length === 0 || isBulkDeleting) return
+    setIsBulkDeleting(true)
+    try {
+      await Promise.all(selectedArticleIds.map((id) => deleteArticle(id)))
+      setSuccessMessage(`${selectedArticleIds.length} artikel berhasil dihapus secara massal!`)
+      setShowSuccess(true)
+      setSelectedArticleIds([])
+      setIsBulkDeleteModalOpen(false)
+      fetchArticlesData()
+      setTimeout(() => setShowSuccess(false), 3000)
+    } catch (err: any) {
+      console.error('Gagal menghapus secara massal:', err)
+      alert('Gagal menghapus beberapa artikel.')
+    } finally {
+      setIsBulkDeleting(false)
+    }
+  }
+
+  // Dynamic Categories State From Firestore Database
+  const [dbCategories, setDbCategories] = useState<string[]>([
+    'Keamanan Pangan',
+    'Edukasi',
+    'Regulasi',
+    'Tips & Trik',
+  ])
+  const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false)
+  const [newCatName, setNewCatName] = useState('')
+
+  const handleCreateNewCategory = async () => {
+    const trimmed = newCatName.trim()
+    if (!trimmed) return
+    try {
+      const created = await createArticleCategory(trimmed)
+      setDbCategories((prev) => Array.from(new Set([...prev, created.name])))
+      setFormData((prev) => ({ ...prev, category: created.name }))
+      setNewCatName('')
+      setIsAddCategoryOpen(false)
+    } catch (err: any) {
+      alert(err.message || 'Gagal membuat kategori baru')
+    }
+  }
+
+  // Available Forms from Database for Questionnaire Selectors
+  const [availableForms, setAvailableForms] = useState<{ id: string; code: string; title: string }[]>([])
 
   // FETCH DATA
   const fetchArticlesData = async () => {
     setLoading(true)
     try {
-      const data = await getArticles()
+      const [data, catData, formsList] = await Promise.all([
+        getArticles(),
+        getArticleCategories().catch(() => []),
+        getForms().catch(() => []),
+      ])
+
+      const fetchedForms = formsList.map((f: any) => ({
+        id: f.id || '',
+        code: f.code || f.id || '',
+        title: f.title || 'Form Kuesioner',
+      }))
+      setAvailableForms(fetchedForms)
+
+      const fetchedCatNames = catData.map((c) => c.name).filter(Boolean)
+      const articleCatNames = data.map((d) => d.category).filter(Boolean)
+      const mergedCategories = Array.from(new Set([...fetchedCatNames, ...articleCatNames, 'Keamanan Pangan', 'Edukasi']))
+      setDbCategories(mergedCategories)
+
       let formattedData = data.map((doc: any) => ({
         id: doc.id,
         authorUid: doc.authorUid || doc.authorId || doc.createdBy || '',
@@ -162,7 +256,7 @@ export default function ArticlesAdminPage() {
         slug: doc.slug || '',
         author: doc.author || '',
         authorBio: doc.authorBio || '',
-        category: doc.category || 'Teknologi',
+        category: doc.category || (mergedCategories[0] || 'Keamanan Pangan'),
         status: doc.status || 'Draft',
         views: doc.views || 0,
         date: doc.date || doc.createdAt || new Date().toISOString(),
@@ -172,6 +266,9 @@ export default function ArticlesAdminPage() {
         featuredImage: doc.featuredImage || '',
         tags: Array.isArray(doc.tags) ? doc.tags : [],
         gallery: Array.isArray(doc.gallery) ? doc.gallery : [],
+        embeddedDistributionCode: doc.embeddedDistributionCode || '',
+        pretestCode: doc.pretestCode || '',
+        posttestCode: doc.posttestCode || doc.embeddedDistributionCode || '',
       }))
 
       // Strictly filter to author's own articles if user has cadre role
@@ -504,6 +601,8 @@ export default function ArticlesAdminPage() {
         excerpt: parsed.excerpt || '',
         tags: Array.isArray(parsed.tags) ? parsed.tags.join(', ') : parsed.tags || '',
         embeddedDistributionCode: (parsed.embeddedDistributionCode || '').trim().toUpperCase(),
+        pretestCode: (parsed.pretestCode || '').trim().toUpperCase(),
+        posttestCode: (parsed.posttestCode || parsed.embeddedDistributionCode || '').trim().toUpperCase(),
         gallery,
         blocks,
       })
@@ -537,6 +636,8 @@ export default function ArticlesAdminPage() {
       excerpt: payload.excerpt || '',
       tags: payload.tags || '',
       embeddedDistributionCode: (payload.embeddedDistributionCode || '').trim().toUpperCase(),
+      pretestCode: (payload.pretestCode || '').trim().toUpperCase(),
+      posttestCode: (payload.posttestCode || payload.embeddedDistributionCode || '').trim().toUpperCase(),
       gallery: payload.gallery || [],
       blocks: payload.blocks || [],
     })
@@ -631,7 +732,7 @@ export default function ArticlesAdminPage() {
     setSelectedArticle(null)
     setFormData({
       title: 'Judul Artikel Edukasi Baru', category: 'Teknologi', author: userData?.displayName || user?.email || 'Kader Edukator', authorBio: (userData as any)?.organization || 'Kader Edukator BPOM', status: 'Draft',
-      readTime: 5, featuredImage: '', excerpt: 'Tuliskan ringkasan singkat artikel edukasi di sini...', tags: '#Pangan, #Edukasi', embeddedDistributionCode: '', gallery: [],
+      readTime: 5, featuredImage: '', excerpt: 'Tuliskan ringkasan singkat artikel edukasi di sini...', tags: '#Pangan, #Edukasi', embeddedDistributionCode: '', pretestCode: '', posttestCode: '', gallery: [],
       blocks: [
         { id: 'b1', type: 'h2', value: '1. Pendahuluan Keamanan Pangan' },
         { id: 'b2', type: 'p', value: 'Tulis paragraf awal artikel edukasi Anda secara langsung di sini...' }
@@ -654,6 +755,8 @@ export default function ArticlesAdminPage() {
       excerpt: article.excerpt || '',
       tags: article.tags ? article.tags.join(', ') : '',
       embeddedDistributionCode: (article as any).embeddedDistributionCode || '',
+      pretestCode: (article as any).pretestCode || '',
+      posttestCode: (article as any).posttestCode || (article as any).embeddedDistributionCode || '',
       gallery: article.gallery || [],
       blocks: htmlToBlocks(article.content),
     })
@@ -661,8 +764,12 @@ export default function ArticlesAdminPage() {
   }
 
   const handleSave = async (statusOverride?: 'Draft' | 'Published') => {
+    if (savingRef.current || isSavingArticle) return
     if (!formData.title.trim()) { alert('Judul artikel harus diisi!'); return }
     if (!formData.category) { alert('Kategori harus dipilih!'); return }
+
+    savingRef.current = true
+    setIsSavingArticle(true)
 
     const finalStatus = statusOverride || formData.status
     const compiledContent = compileBlocksToHtml(formData.blocks)
@@ -683,7 +790,9 @@ export default function ArticlesAdminPage() {
         excerpt: formData.excerpt,
         content: compiledContent,
         tags: formData.tags.split(',').map(t => t.trim()).filter(t => t),
-        embeddedDistributionCode: formData.embeddedDistributionCode?.trim() || '',
+        embeddedDistributionCode: formData.posttestCode?.trim() || formData.embeddedDistributionCode?.trim() || '',
+        pretestCode: formData.pretestCode?.trim() || '',
+        posttestCode: formData.posttestCode?.trim() || formData.embeddedDistributionCode?.trim() || '',
         gallery: formData.gallery,
         date: new Date().toISOString().split('T')[0],
       }
@@ -704,6 +813,9 @@ export default function ArticlesAdminPage() {
     } catch (error) {
       console.error('Gagal menyimpan:', error)
       alert('Gagal menyimpan ke database')
+    } finally {
+      savingRef.current = false
+      setIsSavingArticle(false)
     }
   }
 
@@ -876,8 +988,9 @@ export default function ArticlesAdminPage() {
               onChange={(e) => setSearchTerm(e.target.value)}
               className="px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-white focus:outline-none w-64"
             />
-            <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-white/70 focus:outline-none">
-              {categoryOptions.map(opt => <option key={opt} value={opt} className="bg-[#080812]">{opt}</option>)}
+            <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-white/70 focus:outline-none cursor-pointer">
+              <option value="Semua Kategori" className="bg-[#080812]">Semua Kategori</option>
+              {dbCategories.map(cat => <option key={cat} value={cat} className="bg-[#080812]">{cat}</option>)}
             </select>
             <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-white/70 focus:outline-none">
               {statusOptions.map(opt => <option key={opt} value={opt} className="bg-[#080812]">{opt}</option>)}
@@ -902,6 +1015,41 @@ export default function ArticlesAdminPage() {
           </div>
         </div>
 
+        {/* BULK ACTION BAR */}
+        {selectedArticleIds.length > 0 && (
+          <div className="p-4 rounded-2xl bg-gradient-to-r from-rose-950/80 via-slate-900 to-rose-950/80 border border-rose-500/40 flex items-center justify-between gap-4 font-mono shadow-xl animate-fadeIn">
+            <div className="flex items-center gap-3">
+              <span className="w-8 h-8 rounded-xl bg-rose-500/20 text-rose-300 border border-rose-500/30 flex items-center justify-center font-bold text-xs">
+                {selectedArticleIds.length}
+              </span>
+              <div>
+                <span className="font-bold text-sm text-slate-100">{selectedArticleIds.length} Artikel Dipilih</span>
+                <p className="text-xs text-slate-400">Pilihan massal untuk menghapus beberapa artikel sekaligus dari database.</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsBulkDeleteModalOpen(true)}
+                disabled={isBulkDeleting}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-rose-600/30 transition-all disabled:opacity-50 cursor-pointer"
+              >
+                <Icon name="trash" className="w-4 h-4" />
+                <span>Hapus Massal ({selectedArticleIds.length})</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSelectedArticleIds([])}
+                className="px-3.5 py-2 rounded-xl bg-slate-950 hover:bg-slate-900 text-slate-300 border border-slate-800 font-bold text-xs transition-colors"
+              >
+                Batal Pilihan
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* TABEL DATA */}
         <div className="rounded-2xl bg-[#080812] border border-white/[0.05] overflow-hidden">
           {loading ? (
@@ -910,6 +1058,17 @@ export default function ArticlesAdminPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-white/[0.05] bg-white/[0.01]">
+                  <th className="px-4 py-4 w-10 text-center">
+                    <input
+                      type="checkbox"
+                      checked={
+                        paginatedArticles.length > 0 &&
+                        paginatedArticles.every((a) => a.id && selectedArticleIds.includes(a.id))
+                      }
+                      onChange={() => toggleSelectAllCurrentPage(paginatedArticles)}
+                      className="rounded border-slate-700 bg-slate-900 text-cyan-500 focus:ring-cyan-400 w-4 h-4 cursor-pointer"
+                    />
+                  </th>
                   <th className="text-left px-6 py-4 text-xs text-white/35 uppercase tracking-wider font-medium">Judul Artikel</th>
                   <th className="text-left px-6 py-4 text-xs text-white/35 uppercase tracking-wider font-medium">Kategori</th>
                   <th className="text-left px-6 py-4 text-xs text-white/35 uppercase tracking-wider font-medium">Status</th>
@@ -921,6 +1080,16 @@ export default function ArticlesAdminPage() {
               <tbody className="divide-y divide-white/[0.03]">
                 {paginatedArticles.map((article) => (
                   <tr key={article.id} className="hover:bg-white/[0.02] transition-colors">
+                    <td className="px-4 py-4 text-center">
+                      {article.id && (
+                        <input
+                          type="checkbox"
+                          checked={selectedArticleIds.includes(article.id)}
+                          onChange={() => toggleSelectArticle(article.id!)}
+                          className="rounded border-slate-700 bg-slate-900 text-cyan-500 focus:ring-cyan-400 w-4 h-4 cursor-pointer"
+                        />
+                      )}
+                    </td>
                     <td className="px-6 py-4 font-medium text-white max-w-xs truncate">{article.title}</td>
                     <td className="px-6 py-4">
                       <span className="px-2.5 py-1 rounded-full bg-white/[0.03] border border-white/[0.06] text-xs text-cyan-400">
@@ -939,7 +1108,7 @@ export default function ArticlesAdminPage() {
                         <button onClick={() => handleEdit(article)} className="p-2 rounded-lg hover:bg-white/[0.05]" title="Edit Form">
                           <Icon name="pencil" className="w-4 h-4 text-white/50 hover:text-cyan-400" />
                         </button>
-                        <button onClick={() => { setSelectedArticle(article); setFormData({ title: article.title, category: article.category, author: article.author, authorBio: article.authorBio, status: article.status, readTime: article.readTime, featuredImage: article.featuredImage, excerpt: article.excerpt, tags: article.tags ? article.tags.join(', ') : '', embeddedDistributionCode: (article as any).embeddedDistributionCode || '', gallery: article.gallery || [], blocks: htmlToBlocks(article.content) }); setIsPreviewOpen(true); document.body.style.overflow = 'hidden'; }} className="p-2 rounded-lg hover:bg-white/[0.05]" title="Live Editor Preview">
+                        <button onClick={() => { setSelectedArticle(article); setFormData({ title: article.title, category: article.category, author: article.author, authorBio: article.authorBio, status: article.status, readTime: article.readTime, featuredImage: article.featuredImage, excerpt: article.excerpt, tags: article.tags ? article.tags.join(', ') : '', embeddedDistributionCode: (article as any).embeddedDistributionCode || '', pretestCode: (article as any).pretestCode || '', posttestCode: (article as any).posttestCode || (article as any).embeddedDistributionCode || '', gallery: article.gallery || [], blocks: htmlToBlocks(article.content) }); setIsPreviewOpen(true); document.body.style.overflow = 'hidden'; }} className="p-2 rounded-lg hover:bg-white/[0.05]" title="Live Editor Preview">
                           <Icon name="eye" className="w-4 h-4 text-white/50 hover:text-sky-400" />
                         </button>
                         <button onClick={() => handleExportArticleJson(article)} className="p-2 rounded-lg hover:bg-white/[0.05]" title="Unduh File Draf (.json)">
@@ -957,6 +1126,47 @@ export default function ArticlesAdminPage() {
           )}
         </div>
       </div>
+
+      {/* ============ MODAL BULK DELETE CONFIRMATION ============ */}
+      {isBulkDeleteModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-[#0e0e1a] border border-rose-500/40 rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl text-xs font-mono animate-slideUp">
+            <div className="flex items-center gap-3 border-b border-slate-800 pb-3">
+              <div className="w-10 h-10 rounded-2xl bg-rose-500/20 text-rose-400 border border-rose-500/30 flex items-center justify-center font-bold shrink-0">
+                <Icon name="trash" className="w-5 h-5 text-rose-400" />
+              </div>
+              <div>
+                <h3 className="font-bold text-base text-slate-100 font-sans">Konfirmasi Hapus Massal</h3>
+                <p className="text-[11px] text-slate-400">Penghapusan {selectedArticleIds.length} artikel terpilih.</p>
+              </div>
+            </div>
+
+            <p className="text-slate-300 font-sans text-xs leading-relaxed">
+              Apakah Anda yakin ingin menghapus <strong className="text-rose-400 font-bold">{selectedArticleIds.length} artikel</strong> yang dipilih secara permanen dari Firestore database?
+            </p>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                disabled={isBulkDeleting}
+                onClick={() => setIsBulkDeleteModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 font-bold text-xs"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                disabled={isBulkDeleting}
+                onClick={confirmBulkDelete}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-rose-600/30 disabled:opacity-50 cursor-pointer"
+              >
+                {isBulkDeleting ? <Icon name="spinner" className="w-4 h-4 animate-spin text-white" /> : <Icon name="trash" className="w-4 h-4" />}
+                <span>{isBulkDeleting ? 'Menghapus Massal...' : 'Ya, Hapus Massal'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ============ MODAL FORM EDIT (RICH 3-TAB BUILDER) ============ */}
       {isModalOpen && (
@@ -1111,16 +1321,54 @@ export default function ArticlesAdminPage() {
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
-                      <label className="text-xs font-bold text-white/70 uppercase tracking-wider block mb-1.5">Kategori</label>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="text-xs font-bold text-white/70 uppercase tracking-wider block">Kategori</label>
+                        <button
+                          type="button"
+                          onClick={() => setIsAddCategoryOpen(!isAddCategoryOpen)}
+                          className="text-[10px] text-cyan-400 hover:text-cyan-300 font-bold font-mono flex items-center gap-1"
+                        >
+                          <Icon name="plus" className="w-3 h-3" />
+                          <span>+ Kategori Baru</span>
+                        </button>
+                      </div>
+
+                      {isAddCategoryOpen && (
+                        <div className="flex items-center gap-1.5 mb-2 animate-fadeIn">
+                          <input
+                            type="text"
+                            value={newCatName}
+                            onChange={(e) => setNewCatName(e.target.value)}
+                            placeholder="Nama Kategori Baru..."
+                            className="flex-1 px-3 py-1.5 rounded-xl bg-slate-950 border border-cyan-500/40 text-cyan-200 text-xs focus:outline-none font-mono"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleCreateNewCategory}
+                            className="px-3 py-1.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs font-mono"
+                          >
+                            Simpan
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setIsAddCategoryOpen(false)}
+                            className="p-1.5 text-slate-400 hover:text-white"
+                          >
+                            <Icon name="x" className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )}
+
                       <select
                         value={formData.category}
-                        onChange={e => setFormData({...formData, category: e.target.value})}
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.08] text-xs text-white/80 focus:outline-none focus:border-cyan-400"
+                        onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.08] text-xs text-white/80 focus:outline-none focus:border-cyan-400 cursor-pointer"
                       >
-                        <option value="Teknologi" className="bg-[#0e0e1a]">Teknologi</option>
-                        <option value="Bisnis" className="bg-[#0e0e1a]">Bisnis</option>
-                        <option value="Karir" className="bg-[#0e0e1a]">Karir</option>
-                        <option value="Data" className="bg-[#0e0e1a]">Data</option>
+                        {dbCategories.map((catName) => (
+                          <option key={catName} value={catName} className="bg-[#0e0e1a]">
+                            {catName}
+                          </option>
+                        ))}
                       </select>
                     </div>
 
@@ -1426,49 +1674,95 @@ export default function ArticlesAdminPage() {
                 >
                   <Icon name="eye" className="w-4 h-4" /> Live Editor Preview
                 </button>
-
-                <button onClick={() => handleSave('Draft')} className="px-4 py-2.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] text-xs font-bold text-white/80 flex items-center gap-1.5">
-                  <Icon name="save" className="w-4 h-4" /> Simpan Draft
-                </button>
-
-                <button onClick={() => handleSave('Published')} className="px-5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-xs font-bold text-white shadow-lg shadow-cyan-600/30 flex items-center gap-1.5">
-                  <Icon name="send" className="w-4 h-4" /> Publish Sekarang
-                </button>
-              </div>
-
-              <div className="space-y-2 p-4 rounded-2xl bg-cyan-950/20 border border-cyan-500/30">
-                <label className="text-xs text-cyan-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
-                  <Icon name="key" className="w-3.5 h-3.5 text-cyan-400" />
-                  Sematkan Kode Distribusi Kuesioner (Opsional)
-                </label>
-                <input
-                  type="text"
-                  value={formData.embeddedDistributionCode}
-                  onChange={(e) => setFormData({ ...formData, embeddedDistributionCode: e.target.value.toUpperCase() })}
-                  placeholder="Contoh: KKPDQ6M atau DIST-KADER-01"
-                  className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-cyan-500/30 text-cyan-300 font-mono focus:outline-none focus:border-cyan-400 text-sm"
-                />
-                <p className="text-[11px] text-white/40 font-sans">
-                  Pembaca artikel akan secara otomatis disajikan tombol khusus untuk mengisi kuesioner resmi melalui Kode Distribusi milik Anda.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between px-6 py-4 border-t border-white/[0.06]">
-              <button onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 rounded-xl text-sm text-white/50 hover:bg-white/[0.03]">Batal</button>
-              <div className="flex items-center gap-3">
                 <button
                   type="button"
-                  onClick={() => { setIsModalOpen(false); setIsPreviewOpen(true); }}
-                  className="px-4 py-2.5 rounded-xl bg-purple-950/60 border border-purple-500/40 text-purple-300 text-xs font-bold flex items-center gap-2 hover:bg-purple-900/60 transition-all"
-                  title="Tampilkan Pratinjau Kanvas Editor Visual Layar Penuh"
+                  disabled={isSavingArticle}
+                  onClick={() => handleSave('Draft')}
+                  className="px-4 py-2.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] text-xs font-bold text-white/80 flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
                 >
-                  <Icon name="eye" className="w-4 h-4 text-purple-400" />
-                  <span>Pratinjau Kanvas Publik</span>
+                  {isSavingArticle ? <Icon name="spinner" className="w-4 h-4 animate-spin text-cyan-400" /> : <Icon name="save" className="w-4 h-4" />}
+                  <span>{isSavingArticle ? 'Menyimpan...' : 'Simpan Draft'}</span>
                 </button>
 
-                <button onClick={() => { handleSave('Draft') }} className="px-5 py-2.5 rounded-xl bg-white/[0.03] text-sm text-white/70 hover:text-white flex items-center gap-2"><Icon name="save" className="w-4 h-4" /> Simpan Draft</button>
-                <button onClick={() => { handleSave('Published') }} className="px-5 py-2.5 rounded-xl bg-cyan-600 text-sm font-medium text-white flex items-center gap-2"><Icon name="send" className="w-4 h-4" /> Publish</button>
+                <button
+                  type="button"
+                  disabled={isSavingArticle}
+                  onClick={() => handleSave('Published')}
+                  className="px-5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-xs font-bold text-white shadow-lg shadow-cyan-600/30 flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                >
+                  {isSavingArticle ? <Icon name="spinner" className="w-4 h-4 animate-spin text-white" /> : <Icon name="send" className="w-4 h-4" />}
+                  <span>{isSavingArticle ? 'Mempublikasikan...' : 'Publish Sekarang'}</span>
+                </button>
+              </div>
+
+              <div className="space-y-3 p-4 rounded-2xl bg-cyan-950/20 border border-cyan-500/30 font-mono text-xs">
+                <label className="text-xs text-cyan-400 font-bold uppercase tracking-wider flex items-center gap-1.5 font-mono">
+                  <Icon name="key" className="w-3.5 h-3.5 text-cyan-400" />
+                  Sematkan Kuesioner Evaluasi (Pretest & Posttest)
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* PRETEST SELECTOR & INPUT */}
+                  <div className="space-y-1.5">
+                    <span className="text-[10px] font-bold text-cyan-300 block">Form Kuesioner Pretest (Atas Artikel):</span>
+                    {availableForms.length > 0 && (
+                      <select
+                        value={availableForms.find((f) => f.code === formData.pretestCode || f.id === formData.pretestCode)?.code || ''}
+                        onChange={(e) => {
+                          if (e.target.value) setFormData({ ...formData, pretestCode: e.target.value.toUpperCase() })
+                        }}
+                        className="w-full px-3 py-1.5 rounded-xl bg-slate-950 border border-cyan-500/30 text-cyan-300 text-xs focus:outline-none mb-1 cursor-pointer font-sans"
+                      >
+                        <option value="">-- Pilih Form Kuesioner Database --</option>
+                        {availableForms.map((f) => (
+                          <option key={`pre_${f.id}`} value={f.code} className="bg-[#0e0e1a]">
+                            {f.title} ({f.code})
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    <input
+                      type="text"
+                      value={formData.pretestCode}
+                      onChange={(e) => setFormData({ ...formData, pretestCode: e.target.value.toUpperCase() })}
+                      placeholder="Kode / ID Form Pretest (mis: KKPD7X9 atau PRE-01)"
+                      className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-cyan-500/30 text-cyan-300 font-mono focus:outline-none focus:border-cyan-400 text-xs"
+                    />
+                  </div>
+
+                  {/* POSTTEST SELECTOR & INPUT */}
+                  <div className="space-y-1.5">
+                    <span className="text-[10px] font-bold text-purple-300 block">Form Kuesioner Posttest (Bawah Artikel):</span>
+                    {availableForms.length > 0 && (
+                      <select
+                        value={availableForms.find((f) => f.code === formData.posttestCode || f.id === formData.posttestCode)?.code || ''}
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            const val = e.target.value.toUpperCase()
+                            setFormData({ ...formData, posttestCode: val, embeddedDistributionCode: val })
+                          }
+                        }}
+                        className="w-full px-3 py-1.5 rounded-xl bg-slate-950 border border-purple-500/30 text-purple-300 text-xs focus:outline-none mb-1 cursor-pointer font-sans"
+                      >
+                        <option value="">-- Pilih Form Kuesioner Database --</option>
+                        {availableForms.map((f) => (
+                          <option key={`post_${f.id}`} value={f.code} className="bg-[#0e0e1a]">
+                            {f.title} ({f.code})
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    <input
+                      type="text"
+                      value={formData.posttestCode}
+                      onChange={(e) => setFormData({ ...formData, posttestCode: e.target.value.toUpperCase(), embeddedDistributionCode: e.target.value.toUpperCase() })}
+                      placeholder="Kode / ID Form Posttest (mis: KKPD8Y2 atau POST-01)"
+                      className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-purple-500/30 text-purple-300 font-mono focus:outline-none focus:border-purple-400 text-xs"
+                    />
+                  </div>
+                </div>
+                <p className="text-[10px] text-white/40 font-sans">
+                  Pilih formulir kuesioner resmi dari database Firestore atau ketik kode kuesioner secara manual.
+                </p>
               </div>
             </div>
           </div>
@@ -1499,18 +1793,19 @@ export default function ArticlesAdminPage() {
                     <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-2">
                       <span className="text-xs font-semibold text-white uppercase tracking-wider">Navigasi Sub-Judul</span>
                       <button onClick={() => setIsTocPopoverOpen(false)} className="p-1 text-white/40 hover:text-white">
-                        <Icon name="x" className="w-3.5 h-3.5" />
+                        <Icon name="x" className="w-4 h-4" />
                       </button>
                     </div>
+
                     {previewHeadings.length === 0 ? (
-                      <p className="text-xs text-white/30 italic py-2">Belum ada Sub-Judul (H2). Tambahkan di toolbar atas.</p>
+                      <p className="text-xs text-white/40 py-2">Belum ada H2 Sub-Judul pada artikel ini.</p>
                     ) : (
-                      <div className="max-h-60 overflow-y-auto custom-scrollbar space-y-1">
+                      <div className="space-y-1 max-h-60 overflow-y-auto">
                         {previewHeadings.map((h, i) => (
                           <button
-                            key={h.id}
+                            key={h.blockId}
                             onClick={() => scrollToHeadingBlock(h.blockId)}
-                            className="w-full text-left text-xs text-white/70 hover:text-cyan-400 hover:bg-cyan-500/10 p-2 rounded-lg transition-all truncate"
+                            className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-white/70 hover:text-cyan-300 hover:bg-cyan-500/10 truncate font-mono block"
                           >
                             {i + 1}. {h.text}
                           </button>
@@ -1521,23 +1816,36 @@ export default function ArticlesAdminPage() {
                 )}
               </div>
 
-              {/* Device Viewport Switcher */}
-              <div className="flex items-center gap-1 bg-white/[0.03] border border-white/[0.06] rounded-xl p-1">
-                <button onClick={() => setPreviewDevice('desktop')} className={`px-2.5 py-1 rounded-lg text-xs font-medium ${previewDevice === 'desktop' ? 'bg-cyan-500/20 text-cyan-400' : 'text-white/50'}`}>Desktop</button>
-                <button onClick={() => setPreviewDevice('tablet')} className={`px-2.5 py-1 rounded-lg text-xs font-medium ${previewDevice === 'tablet' ? 'bg-cyan-500/20 text-cyan-400' : 'text-white/50'}`}>Tablet</button>
-                <button onClick={() => setPreviewDevice('mobile')} className={`px-2.5 py-1 rounded-lg text-xs font-medium ${previewDevice === 'mobile' ? 'bg-cyan-500/20 text-cyan-400' : 'text-white/50'}`}>Mobile</button>
+              {/* DEVICE SWITCHER BUTTONS */}
+              <div className="flex items-center gap-1 bg-white/[0.05] p-1 rounded-xl">
+                <button
+                  onClick={() => setPreviewDevice('desktop')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 ${
+                    previewDevice === 'desktop' ? 'bg-cyan-500/20 text-cyan-400' : 'text-white/50 hover:text-white'
+                  }`}
+                >
+                  <Icon name="monitor" className="w-3.5 h-3.5" /> Desktop
+                </button>
+                <button
+                  onClick={() => setPreviewDevice('tablet')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 ${
+                    previewDevice === 'tablet' ? 'bg-cyan-500/20 text-cyan-400' : 'text-white/50 hover:text-white'
+                  }`}
+                >
+                  <Icon name="tablet" className="w-3.5 h-3.5" /> Tablet
+                </button>
+                <button
+                  onClick={() => setPreviewDevice('mobile')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 ${
+                    previewDevice === 'mobile' ? 'bg-cyan-500/20 text-cyan-400' : 'text-white/50 hover:text-white'
+                  }`}
+                >
+                  <Icon name="smartphone" className="w-3.5 h-3.5" /> Mobile
+                </button>
               </div>
 
-              {/* Quick Add Elements */}
-              <div className="hidden md:flex items-center gap-1 border-l border-white/10 pl-3">
-                <button onClick={() => addBlock('p')} className="px-2 py-1 rounded bg-white/[0.05] text-[11px] text-white hover:bg-white/10">+ Paragraf</button>
-                <button onClick={() => addBlock('h2')} className="px-2 py-1 rounded bg-cyan-500/10 text-[11px] text-cyan-400 hover:bg-cyan-500/20">+ Sub-Judul</button>
-                <button onClick={() => addBlock('quote')} className="px-2 py-1 rounded bg-violet-500/10 text-[11px] text-violet-400 hover:bg-violet-500/20">+ Quote</button>
-                <button onClick={() => addBlock('image')} className="px-2 py-1 rounded bg-amber-500/10 text-[11px] text-amber-400 hover:bg-amber-500/20">+ Infografis</button>
-              </div>
-
-              {/* Sematkan Kode Distribusi Input in Control Bar */}
-              <div className="hidden lg:flex items-center gap-2 border-l border-white/10 pl-3">
+              {/* KODE DISTRIBUSI DISTRIBUTOR */}
+              <div className="flex items-center gap-2 bg-cyan-950/40 border border-cyan-500/30 px-3 py-1 rounded-xl">
                 <span className="text-[10px] font-mono text-cyan-400 font-bold uppercase">Sematkan Kode:</span>
                 <input
                   type="text"
@@ -1560,8 +1868,14 @@ export default function ArticlesAdminPage() {
                 <span>Form Edit</span>
               </button>
 
-              <button onClick={() => handleSave()} className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-xs font-medium text-white flex items-center gap-1.5 shadow-lg">
-                <Icon name="send" className="w-3.5 h-3.5" /> Simpan & Publish
+              <button
+                type="button"
+                disabled={isSavingArticle}
+                onClick={() => handleSave()}
+                className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-xs font-medium text-white flex items-center gap-1.5 shadow-lg disabled:opacity-50 cursor-pointer"
+              >
+                {isSavingArticle ? <Icon name="spinner" className="w-3.5 h-3.5 animate-spin text-white" /> : <Icon name="send" className="w-3.5 h-3.5" />}
+                <span>{isSavingArticle ? 'Menyimpan...' : 'Simpan & Publish'}</span>
               </button>
               <button onClick={() => { setIsPreviewOpen(false); document.body.style.overflow = ''; }} className="p-2 rounded-xl bg-white/[0.05] text-white">
                 <Icon name="x" className="w-4 h-4" />
