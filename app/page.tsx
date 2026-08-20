@@ -179,6 +179,48 @@ export default function HomePage() {
     fetchCmsSettings()
   }, [])
 
+const defaultSampleArticles = [
+  {
+    id: 'sample-1',
+    title: 'Panduan Higiene & Sanitasi Keamanan Pangan bagi Pelaku Usaha Kuliner',
+    slug: 'panduan-higiene-sanitasi-keamanan-pangan',
+    excerpt: 'Panduan komprehensif penerapan standar kesehatan lingkungan, higienitas pengolah makanan, dan sanitasi alat pengolahan pangan.',
+    category: 'Keamanan Pangan',
+    author: 'Tim Kader BPOM',
+    date: '2026-08-20',
+    readTime: 5,
+    views: 1240,
+    image: 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=800&q=80',
+    tags: ['KeamananPangan', 'BPOM', 'Higiene'],
+  },
+  {
+    id: 'sample-2',
+    title: 'Regulasi Komposisi dan Label Bahan Tambahan Pangan (BTP) Terbaru',
+    slug: 'regulasi-komposisi-label-btp-terbaru',
+    excerpt: 'Penjelasan Peraturan BPOM mengenai batas maksimum penggunaan bahan tambahan pangan dan pencantuman informasi nilai gizi.',
+    category: 'Regulasi',
+    author: 'Humas BPOM',
+    date: '2026-08-19',
+    readTime: 7,
+    views: 890,
+    image: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=800&q=80',
+    tags: ['Regulasi', 'BTP', 'LabelPangan'],
+  },
+  {
+    id: 'sample-3',
+    title: '5 Langkah Pencegahan Kontaminasi Silang di Dapur Usaha UMKM',
+    slug: '5-langkah-pencegahan-kontaminasi-silang-umkm',
+    excerpt: 'Tips praktis memisahkan bahan mentah dan matang serta teknik pembersihan peralatan masaknya.',
+    category: 'Tips & Trik',
+    author: 'Kader KKN Tematik',
+    date: '2026-08-18',
+    readTime: 4,
+    views: 2150,
+    image: 'https://images.unsplash.com/photo-1507048331197-7d4ac70811cf?w=800&q=80',
+    tags: ['UMKM', 'KontaminasiSilang', 'DapurSehat'],
+  },
+]
+
   // ============ 2. FETCH ARTIKEL DARI FIRESTORE ============
   useEffect(() => {
     const fetchPublishedArticles = async () => {
@@ -193,31 +235,36 @@ export default function HomePage() {
             title: a.title,
             slug: a.slug,
             excerpt: a.excerpt,
-            category: a.category || 'Teknologi',
+            category: a.category || 'Keamanan Pangan',
             author: a.author,
             authorBio: a.authorBio,
             date: a.date,
             readTime: a.readTime || 5,
             views: a.views || 0,
             image: a.featuredImage || null,
-            gradient: categoryGradients[a.category] || categoryGradients['Teknologi'],
+            gradient: categoryGradients[a.category] || categoryGradients['Keamanan Pangan'],
             icon: categoryIcons[a.category] || 'cpu',
             iconColor:
-              a.category === 'Teknologi'
+              a.category === 'Keamanan Pangan'
                 ? 'text-emerald-400'
-                : a.category === 'Bisnis'
-                ? 'text-rose-400'
-                : a.category === 'Karir'
+                : a.category === 'Regulasi'
+                ? 'text-purple-400'
+                : a.category === 'Tips & Trik'
                 ? 'text-amber-400'
-                : 'text-sky-400',
+                : 'text-cyan-400',
             content: a.content,
             tags: a.tags ? a.tags.map((t) => (t.startsWith('#') ? t : `#${t}`)) : [],
             gallery: a.gallery || []
           }))
 
-        setArticles(published)
+        if (published.length > 0) {
+          setArticles(published)
+        } else {
+          setArticles(defaultSampleArticles)
+        }
       } catch (error) {
         console.error('Gagal memuat artikel:', error)
+        setArticles(defaultSampleArticles)
       } finally {
         setIsArticlesLoading(false)
       }

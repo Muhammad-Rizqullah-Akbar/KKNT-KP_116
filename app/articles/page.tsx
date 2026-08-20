@@ -8,46 +8,25 @@ import { Icon } from '@/components/ui/Icons'
 // Import Firestore Repository & Types
 import { 
   getArticles, 
+  getArticleCategories,
   type ArticleData 
 } from '@/lib/firebase/repositories/articles.repo'
 import { FuturisticArticleCard } from '@/components/articles/FuturisticArticleCard'
 
-// ============ KONSTANTA KATEGORI & LOGO ============
+// ============ KONSTANTA LOGO ============
 const LOGO_SRC = '/logo.png'
-
-const categories = ['Semua', 'Teknologi', 'Bisnis', 'Karir', 'Data']
-
-const categoryBadgeColors: Record<string, string> = {
-  Teknologi: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-  Bisnis: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
-  Karir: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-  Data: 'bg-sky-500/10 text-sky-400 border-sky-500/20',
-}
-
-const categoryIcons: Record<string, string> = {
-  Teknologi: 'cpu',
-  Bisnis: 'piggyBank',
-  Karir: 'badgeCheck',
-  Data: 'barChart',
-}
-
-const categoryGradients: Record<string, string> = {
-  Teknologi: 'from-emerald-600/30 via-teal-700/20 to-cyan-800/30',
-  Bisnis: 'from-rose-600/25 via-pink-700/20 to-orange-800/25',
-  Karir: 'from-amber-600/25 via-yellow-700/20 to-orange-800/25',
-  Data: 'from-sky-600/25 via-blue-700/20 to-indigo-800/25',
-}
 
 export default function ArticlesPage() {
   // State Data Database
   const [articles, setArticles] = useState<ArticleData[]>([])
+  const [dbCategories, setDbCategories] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
 
   // Dynamic Categories Memo
   const categories = useMemo(() => {
-    const set = new Set(articles.map((a) => a.category).filter(Boolean))
+    const set = new Set([...dbCategories, ...articles.map((a) => a.category).filter(Boolean)])
     return ['Semua', ...Array.from(set)]
-  }, [articles])
+  }, [articles, dbCategories])
 
   // State Filter, Search & Pagination
   const [searchTerm, setSearchTerm] = useState('')
@@ -61,10 +40,14 @@ export default function ArticlesPage() {
     const fetchPublishedArticles = async () => {
       setLoading(true)
       try {
-        const rawArticles = await getArticles()
+        const [rawArticles, catData] = await Promise.all([
+          getArticles(),
+          getArticleCategories().catch(() => []),
+        ])
         // Filter hanya artikel berstatus Published
         const published = rawArticles.filter(a => a.status === 'Published')
         setArticles(published)
+        setDbCategories(catData.map(c => c.name).filter(Boolean))
       } catch (error) {
         console.error('Gagal mengambil daftar artikel dari Firestore:', error)
       } finally {
