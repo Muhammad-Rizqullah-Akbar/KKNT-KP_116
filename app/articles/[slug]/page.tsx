@@ -9,6 +9,7 @@ import { Icon } from '@/components/ui/Icons'
 import { 
   getArticles, 
   updateArticle, 
+  getCategoryStyle,
   type ArticleData 
 } from '@/lib/firebase/repositories/articles.repo'
 import { auth, storage } from '@/lib/firebaseClient'
@@ -16,27 +17,7 @@ import { uploadOptimizedArticleImage } from '@/lib/firebase/storage'
 import { onAuthStateChanged } from 'firebase/auth'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 
-// ============ KONSTANTA KATEGORI ============
-const categoryColors: Record<string, string> = {
-  Teknologi: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
-  Bisnis: 'text-rose-400 bg-rose-500/10 border-rose-500/20',
-  Karir: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
-  Data: 'text-sky-400 bg-sky-500/10 border-sky-500/20',
-}
-
-const categoryGradients: Record<string, string> = {
-  Teknologi: 'from-emerald-700/40 to-cyan-800/40',
-  Bisnis: 'from-rose-700/40 to-pink-800/40',
-  Karir: 'from-amber-700/40 to-orange-800/40',
-  Data: 'from-sky-700/40 to-blue-800/40',
-}
-
-const categoryIcons: Record<string, string> = {
-  Teknologi: 'cpu',
-  Bisnis: 'piggyBank',
-  Karir: 'badgeCheck',
-  Data: 'barChart',
-}
+// ============ UTILITY ============
 
 const shuffleArray = <T,>(array: T[]): T[] => {
   const shuffled = [...array]
@@ -449,11 +430,11 @@ export default function ArticleDetailPage({ params }: { params: Promise<{ slug: 
           <div className="relative z-10">
             {/* HERO FEATURED IMAGE / BANNER */}
             <div className="relative w-full h-64 sm:h-80 lg:h-96 overflow-hidden rounded-t-3xl group/banner">
-              <div className={`absolute inset-0 bg-gradient-to-br ${categoryGradients[editedArticle.category] || categoryGradients['Teknologi']} flex items-center justify-center`}>
+              <div className={`absolute inset-0 bg-gradient-to-br ${getCategoryStyle(editedArticle.category).gradient} flex items-center justify-center`}>
                 {editedArticle.featuredImage ? (
                   <img src={editedArticle.featuredImage} alt={editedArticle.title} className="w-full h-full object-cover" />
                 ) : (
-                  <Icon name={categoryIcons[editedArticle.category] as any || 'cpu'} className="w-20 h-20 text-white/20 animate-float" />
+                  <Icon name={getCategoryStyle(editedArticle.category).icon as any || 'cpu'} className="w-20 h-20 text-white/20 animate-float" />
                 )}
               </div>
 
@@ -477,7 +458,7 @@ export default function ArticleDetailPage({ params }: { params: Promise<{ slug: 
 
               <div className="absolute inset-0 bg-gradient-to-t from-[#080812] via-[#080812]/40 to-transparent pointer-events-none" />
               <div className="absolute top-4 left-4 z-20 flex gap-2">
-                <span className={`px-3 py-1.5 rounded-full bg-black/50 backdrop-blur-sm border border-white/10 text-xs font-medium ${categoryColors[editedArticle.category]}`}>
+                <span className={`px-3 py-1.5 rounded-full bg-black/50 backdrop-blur-sm border border-white/10 text-xs font-medium ${getCategoryStyle(editedArticle.category).badge}`}>
                   {editedArticle.category}
                 </span>
               </div>
@@ -577,8 +558,42 @@ export default function ArticleDetailPage({ params }: { params: Promise<{ slug: 
             </div>
           </aside>
 
-          {/* KONTEN UTAMA ARTIKEL (EDITABLE ON PAGE) */}
+          {/* KONTEN UTAMA ARTIKEL */}
           <article className="lg:col-span-6 article-content text-white/60 leading-relaxed space-y-8 text-base sm:text-lg">
+            {/* 1. PRETEST QUESTIONNAIRE BANNER (AT THE VERY TOP - BEFORE READING ARTICLE) */}
+            {(editedArticle.pretestCode || (editedArticle as any).pretestFormId) && (
+              <div className="mb-8 p-6 rounded-3xl bg-gradient-to-br from-cyan-950/90 via-slate-900 to-slate-950 border-2 border-cyan-500/50 shadow-2xl space-y-3 font-sans">
+                <div className="flex items-center justify-between gap-3 border-b border-cyan-500/20 pb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center text-cyan-400 shrink-0 font-bold">
+                      <Icon name="fileText" className="w-5 h-5 text-cyan-400" />
+                    </div>
+                    <div>
+                      <h4 className="text-base font-extrabold text-white flex items-center gap-2">
+                        <span>📝 Kuesioner Pretest (Evaluasi Baseline Awal)</span>
+                      </h4>
+                      <p className="text-xs text-cyan-300 font-mono">Kode Akses Pretest: <strong>{editedArticle.pretestCode || (editedArticle as any).pretestFormId}</strong></p>
+                    </div>
+                  </div>
+                  <span className="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 shrink-0">
+                    TAHAP 1: PRETEST
+                  </span>
+                </div>
+                <p className="text-xs text-white/70 leading-relaxed font-sans">
+                  Sebelum membaca materi edukasi di bawah ini, mohon luangkan waktu 1-2 menit untuk mengisi kuesioner <strong>Pretest</strong> berikut untuk mengukur tingkat pemahaman awal Anda.
+                </p>
+                <a
+                  href={`/form/${editedArticle.pretestCode || (editedArticle as any).pretestFormId}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-gradient-to-r from-cyan-500 to-teal-400 hover:from-cyan-400 hover:to-teal-300 text-slate-950 text-xs font-black uppercase tracking-wider shadow-lg shadow-cyan-500/25 transition-all font-mono"
+                >
+                  <span>Mulai Isi Kuesioner Pretest →</span>
+                </a>
+              </div>
+            )}
+
+            {/* MAIN ARTICLE TEXT BODY */}
             <div 
               ref={contentRef} 
               contentEditable={isEditMode}
@@ -586,33 +601,6 @@ export default function ArticleDetailPage({ params }: { params: Promise<{ slug: 
               className={isEditMode ? 'editable-active' : ''}
               dangerouslySetInnerHTML={{ __html: editedArticle.content }} 
             />
-
-            {/* EMBEDDED KUESIONER / FORM CTA BANNER */}
-            {editedArticle.embeddedDistributionCode && (
-              <div className="my-8 p-6 rounded-3xl bg-gradient-to-br from-cyan-950/80 via-slate-900 to-purple-950/80 border-2 border-cyan-500/40 shadow-2xl space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center text-cyan-400 flex-shrink-0">
-                    <Icon name="fileText" className="w-5 h-5 text-cyan-400" />
-                  </div>
-                  <div>
-                    <h4 className="text-base font-extrabold text-white">Formulir & Kuesioner Evaluasi Resmi</h4>
-                    <p className="text-xs text-cyan-300 font-mono">Kode Akses Distribusi: <strong>{editedArticle.embeddedDistributionCode}</strong></p>
-                  </div>
-                </div>
-                <p className="text-xs text-white/70 leading-relaxed">
-                  Bantu kami mengumpulkan data evaluasi pangan secara langsung dengan mengklik tombol di bawah ini untuk mengisi kuesioner resmi.
-                </p>
-                <a
-                  href={`/form/${editedArticle.embeddedDistributionCode}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-gradient-to-r from-cyan-500 to-emerald-500 hover:from-cyan-400 hover:to-emerald-400 text-slate-950 text-xs font-black uppercase tracking-wider shadow-lg shadow-cyan-500/25 transition-all"
-                >
-                  <span>Isi Kuesioner Sekarang</span>
-                  <Icon name="arrowRight" className="w-4 h-4 text-slate-950" />
-                </a>
-              </div>
-            )}
 
             {/* TAGS */}
             {uniqueTags.length > 0 && (
@@ -650,6 +638,39 @@ export default function ArticleDetailPage({ params }: { params: Promise<{ slug: 
                 </div>
               </div>
             )}
+
+            {/* 2. POSTTEST QUESTIONNAIRE BANNER (AT THE VERY BOTTOM - AFTER READING ARTICLE & GALLERY) */}
+            {(editedArticle.posttestCode || editedArticle.embeddedDistributionCode) && (
+              <div className="mt-10 p-6 rounded-3xl bg-gradient-to-br from-purple-950/90 via-slate-900 to-slate-950 border-2 border-purple-500/50 shadow-2xl space-y-3 font-sans">
+                <div className="flex items-center justify-between gap-3 border-b border-purple-500/20 pb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-purple-300 shrink-0 font-bold">
+                      <Icon name="checkCircle" className="w-5 h-5 text-purple-300" />
+                    </div>
+                    <div>
+                      <h4 className="text-base font-extrabold text-white flex items-center gap-2">
+                        <span>🎯 Kuesioner Posttest (Evaluasi Pasca-Membaca)</span>
+                      </h4>
+                      <p className="text-xs text-purple-300 font-mono">Kode Akses Posttest: <strong>{editedArticle.posttestCode || editedArticle.embeddedDistributionCode}</strong></p>
+                    </div>
+                  </div>
+                  <span className="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30 shrink-0">
+                    TAHAP 2: POSTTEST
+                  </span>
+                </div>
+                <p className="text-xs text-white/70 leading-relaxed font-sans">
+                  Selamat! Anda telah selesai membaca materi edukasi ini. Silakan klik tombol di bawah ini untuk mengisi kuesioner <strong>Posttest</strong> guna mengukur peningkatan pemahaman Anda.
+                </p>
+                <a
+                  href={`/form/${editedArticle.posttestCode || editedArticle.embeddedDistributionCode}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-gradient-to-r from-purple-500 to-emerald-400 hover:from-purple-400 hover:to-emerald-300 text-slate-950 text-xs font-black uppercase tracking-wider shadow-lg shadow-purple-500/25 transition-all font-mono"
+                >
+                  <span>Mulai Isi Kuesioner Posttest →</span>
+                </a>
+              </div>
+            )}
           </article>
 
           {/* SIDEBAR REKOMENDASI TERKAIT */}
@@ -664,7 +685,7 @@ export default function ArticleDetailPage({ params }: { params: Promise<{ slug: 
                 ) : (
                   relatedArticles.map((ra) => (
                     <Link key={ra.id} href={`/articles/${ra.slug}`} className="block group p-3 rounded-xl hover:bg-white/[0.03] transition-colors border border-transparent hover:border-white/[0.05]">
-                      <p className={`text-xs ${categoryColors[ra.category]?.split(' ')[0] || 'text-cyan-400'} mb-1`}>{ra.category}</p>
+                      <p className={`text-xs ${getCategoryStyle(ra.category).badge} inline-block px-2 py-0.5 rounded-full mb-1`}>{ra.category}</p>
                       <h5 className="text-sm font-medium text-white group-hover:text-cyan-300 transition-colors">{ra.title}</h5>
                       <p className="text-xs text-white/35 mt-1">{formatDate(ra.date)} • {ra.readTime} min</p>
                     </Link>

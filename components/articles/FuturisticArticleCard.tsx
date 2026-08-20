@@ -3,50 +3,11 @@
 import React, { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { Icon } from '@/components/ui/Icons'
-import type { ArticleData } from '@/lib/firebase/repositories/articles.repo'
+import { getCategoryStyle, type ArticleData } from '@/lib/firebase/repositories/articles.repo'
 
 interface FuturisticArticleCardProps {
   article: ArticleData
   index: number
-}
-
-const CATEGORY_STYLES: Record<string, { badge: string; glow: string; border: string; icon: string }> = {
-  'Keamanan Pangan': {
-    badge: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30',
-    glow: 'from-emerald-500/20 to-teal-500/10',
-    border: 'group-hover:border-emerald-500/50',
-    icon: 'shieldCheck',
-  },
-  Teknologi: {
-    badge: 'bg-cyan-500/10 text-cyan-300 border-cyan-500/30',
-    glow: 'from-cyan-500/20 to-blue-500/10',
-    border: 'group-hover:border-cyan-500/50',
-    icon: 'cpu',
-  },
-  Regulasi: {
-    badge: 'bg-purple-500/10 text-purple-300 border-purple-500/30',
-    glow: 'from-purple-500/20 to-indigo-500/10',
-    border: 'group-hover:border-purple-500/50',
-    icon: 'fileText',
-  },
-  'Tips & Trik': {
-    badge: 'bg-amber-500/10 text-amber-300 border-amber-500/30',
-    glow: 'from-amber-500/20 to-orange-500/10',
-    border: 'group-hover:border-amber-500/50',
-    icon: 'sparkles',
-  },
-  Berita: {
-    badge: 'bg-rose-500/10 text-rose-300 border-rose-500/30',
-    glow: 'from-rose-500/20 to-pink-500/10',
-    border: 'group-hover:border-rose-500/50',
-    icon: 'bell',
-  },
-  Edukasi: {
-    badge: 'bg-sky-500/10 text-sky-300 border-sky-500/30',
-    glow: 'from-sky-500/20 to-teal-500/10',
-    border: 'group-hover:border-sky-500/50',
-    icon: 'bookOpen',
-  },
 }
 
 export function FuturisticArticleCard({ article, index }: FuturisticArticleCardProps) {
@@ -103,7 +64,7 @@ export function FuturisticArticleCard({ article, index }: FuturisticArticleCardP
     setRotY(0)
   }
 
-  const categoryStyle = CATEGORY_STYLES[article.category] || CATEGORY_STYLES['Edukasi']
+  const categoryStyle = getCategoryStyle(article.category)
   const formattedViews = article.views >= 1000 ? `${(article.views / 1000).toFixed(1)}K` : (article.views || 0).toString()
   const formattedDate = article.date
     ? new Date(article.date).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -121,7 +82,7 @@ export function FuturisticArticleCard({ article, index }: FuturisticArticleCardP
           : 'perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)',
         transition: isHovered ? 'transform 0.15s ease-out' : 'transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1)',
       }}
-      className={`group relative rounded-3xl bg-slate-950/70 border border-slate-800/80 ${categoryStyle.border} shadow-2xl transition-all duration-500 overflow-hidden flex flex-col justify-between futuristic-scroll-card ${
+      className={`group relative rounded-3xl bg-slate-950/70 border border-slate-800/80 group-hover:border-cyan-500/50 shadow-2xl transition-all duration-500 overflow-hidden flex flex-col justify-between futuristic-scroll-card ${
         isVisible ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-10 scale-95'
       }`}
     >
@@ -153,7 +114,7 @@ export function FuturisticArticleCard({ article, index }: FuturisticArticleCardP
               />
             ) : (
               <div
-                className={`w-full h-full bg-gradient-to-br ${categoryStyle.glow} flex items-center justify-center relative overflow-hidden`}
+                className={`w-full h-full bg-gradient-to-br ${categoryStyle.gradient} flex items-center justify-center relative overflow-hidden`}
               >
                 <div className="absolute inset-0 bg-[radial-gradient(#38bdf8_1px,transparent_1px)] [background-size:16px_16px] opacity-20" />
                 <Icon
@@ -180,7 +141,7 @@ export function FuturisticArticleCard({ article, index }: FuturisticArticleCardP
               </span>
             </div>
 
-            {/* Bottom Bar: Distribution Code & Views Counter */}
+            {/* Bottom Bar: Views & Read Time */}
             <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between z-10 text-[11px] font-mono">
               <div className="flex items-center gap-2">
                 <span className="px-2 py-0.5 rounded bg-slate-950/80 backdrop-blur-md border border-slate-800 text-slate-400 flex items-center gap-1">
@@ -193,17 +154,10 @@ export function FuturisticArticleCard({ article, index }: FuturisticArticleCardP
                   ~{article.readTime || 5} min
                 </span>
               </div>
-
-              {article.embeddedDistributionCode && (
-                <span className="px-2 py-0.5 rounded bg-purple-950/80 backdrop-blur-md border border-purple-500/40 text-purple-300 font-bold flex items-center gap-1 shadow-lg">
-                  <Icon name="sparkles" className="w-3 h-3 text-purple-400" />
-                  {article.embeddedDistributionCode}
-                </span>
-              )}
             </div>
           </div>
 
-          {/* BODY CONTENT */}
+          {/* BODY CONTENT (CONCISE SUMMARY ONLY) */}
           <div className="p-5 space-y-3">
             <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
               <span className="flex items-center gap-1.5">
@@ -237,15 +191,15 @@ export function FuturisticArticleCard({ article, index }: FuturisticArticleCardP
           </div>
         </div>
 
-        {/* FOOTER ACTION BUTTON */}
-        <div className="px-5 py-3.5 bg-slate-950/80 border-t border-slate-800/60 flex items-center justify-between group-hover:bg-cyan-950/20 transition-colors">
-          <span className="text-[11px] font-mono text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-            Akses Materi
+        {/* SINGLE REDIRECTION ACTION BUTTON TO DETAIL PAGE WITH SLUG */}
+        <div className="px-5 py-3.5 bg-slate-950/90 border-t border-slate-800/80 flex items-center justify-between group-hover:bg-cyan-950/30 transition-colors font-mono">
+          <span className="text-[11px] text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+            Ringkasan Edukasi
           </span>
 
-          <div className="flex items-center gap-1.5 text-xs font-extrabold font-mono text-cyan-400 group-hover:translate-x-1 transition-transform">
-            <span>BACA ARTIKEL</span>
+          <div className="flex items-center gap-1.5 text-xs font-bold text-cyan-400 group-hover:translate-x-1 transition-transform">
+            <span>BACA DETAIL</span>
             <Icon name="arrowRight" className="w-4 h-4 text-cyan-400 group-hover:text-cyan-300" />
           </div>
         </div>
