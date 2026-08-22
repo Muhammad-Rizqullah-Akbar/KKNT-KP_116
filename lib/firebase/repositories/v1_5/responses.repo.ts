@@ -46,7 +46,6 @@ function extractRespondentInfo(rawData: any) {
       'nama_lengkap',
       'Nama Responden',
       'namaResponden',
-      'Nama Kantor / Instansi',
     ]) ||
     'Responden Publik'
 
@@ -71,7 +70,14 @@ function extractRespondentInfo(rawData: any) {
     findValue(['respondentAddress', 'alamat', 'address', 'Alamat', 'Lokasi', 'Alamat Lengkap']) ||
     ''
 
-  return { name, email, phone, address, externalId: rawData.respondentId || rawData.externalId || '' }
+  const institution =
+    rawData.respondentInstitution ||
+    rawData.institution ||
+    rawData.respondent?.institution ||
+    findValue(['institution', 'instansi', 'sekolah', 'namaSekolah', 'Nama Sekolah / Instansi', 'Nama Instansi', 'Lembaga', 'Organisasi', 'unitKerja', 'Pekerjaan', 'Jabatan']) ||
+    ''
+
+  return { name, email, phone, address, institution, externalId: rawData.respondentId || rawData.externalId || '' }
 }
 
 /**
@@ -81,7 +87,30 @@ function normalizeResponseDoc(rawData: any, docId?: string): ResponseDoc {
   const responseId = rawData.responseId || rawData.id || docId || 'resp_legacy'
   const distributionCode = rawData.distributionCode || rawData.formCode || rawData.formId || 'V1-LEGACY'
   const status = rawData.status || 'submitted'
-  const respondent = rawData.respondent && rawData.respondent.name ? rawData.respondent : extractRespondentInfo(rawData)
+  const extracted = extractRespondentInfo(rawData)
+  const respondent = {
+    name: rawData.respondent?.name || extracted.name || 'Responden Publik',
+    email: rawData.respondent?.email || extracted.email || '',
+    phone: rawData.respondent?.phone || extracted.phone || '',
+    address: rawData.respondent?.address || extracted.address || '',
+    institution: rawData.respondent?.institution || extracted.institution || '',
+    externalId: rawData.respondent?.externalId || extracted.externalId || '',
+    ...rawData.respondent,
+  }
+
+  let biodata = Array.isArray(rawData.biodata) ? rawData.biodata : []
+  if (biodata.length === 0 && rawData.answers) {
+    const items: Array<{ label: string; value: string }> = []
+    Object.entries(rawData.answers).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') {
+        const cleanK = cleanString(k)
+        if (['nama', 'email', 'nohp', 'telepon', 'alamat', 'instansi', 'sekolah', 'jabatan', 'pekerjaan', 'kelas', 'jeniskelamin', 'umur', 'usia'].some(b => cleanK.includes(b))) {
+          items.push({ label: k, value: typeof v === 'object' ? JSON.stringify(v) : String(v) })
+        }
+      }
+    })
+    if (items.length > 0) biodata = items
+  }
 
   return {
     responseId,
@@ -94,6 +123,7 @@ function normalizeResponseDoc(rawData: any, docId?: string): ResponseDoc {
     ownerId: rawData.ownerId || rawData.createdBy || 'cadre_system',
     respondent,
     answers: rawData.answers || {},
+    biodata,
     status,
     startedAt: rawData.startedAt || rawData.createdAt || new Date().toISOString(),
     updatedAt: rawData.updatedAt || rawData.submittedAt || new Date().toISOString(),
@@ -243,6 +273,8 @@ function mapAnswersToHumanReadable(rawAnswers: Record<string, any>, form: any): 
     questionMap.set(`q${idx}`, q)
     questionMap.set(`q_${idx + 1}`, q)
     questionMap.set(`q${idx + 1}`, q)
+    questionMap.set(`question_${idx}`, q)
+    questionMap.set(`question_${idx + 1}`, q)
   })
 
   for (const [key, value] of Object.entries(rawAnswers)) {
@@ -271,27 +303,36 @@ function mapAnswersToHumanReadable(rawAnswers: Record<string, any>, form: any): 
 
     let humanVal = value
     if (q) {
-      const options = q.options || q.config?.options || []
+      const options = q.options || q.presentation?.options || q.config?.options || []
       if (Array.isArray(options) && options.length > 0) {
-        if (typeof value === 'string') {
-          const matchedOpt = options.find((opt: any) =>
-            typeof opt === 'object' && opt !== null ? (opt.id === value || opt.optionId === value || opt.value === value || opt.label === value) : opt === value
-          )
-          if (matchedOpt) {
-            humanVal = typeof matchedOpt === 'object' ? (matchedOpt.label || matchedOpt.text || matchedOpt.value || value) : matchedOpt
-          }
-        } else if (Array.isArray(value)) {
-          humanVal = value.map((valItem) => {
-            if (typeof valItem === 'string') {
-              const matchedOpt = options.find((opt: any) =>
-                typeof opt === 'object' && opt !== null ? (opt.id === valItem || opt.optionId === valItem || opt.value === valItem || opt.label === valItem) : opt === valItem
-              )
-              if (matchedOpt) {
-                return typeof matchedOpt === 'object' ? (matchedOpt.label || matchedOpt.text || valItem) : matchedOpt
-              }
+        const findOptLabel = (valItem: any) => {
+          if (valItem === undefined || valItem === null || valItem === '') return valItem
+          const strItem = String(valItem).trim()
+          const cleanItem = strItem.toLowerCase().replace(/[^a-z0-9]/g, '')
+          let matched = options.find((opt: any) => {
+            if (typeof opt === 'string') return opt === strItem || (cleanItem && opt.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanItem)
+            if (opt && typeof opt === 'object') {
+              const oId = String(opt.optionId || opt.id || opt.value || opt.val || '')
+              const oLbl = String(opt.label || opt.text || opt.title || '')
+              return oId === strItem || oLbl === strItem || (cleanItem && (oId.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanItem || oLbl.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanItem))
             }
-            return valItem
+            return false
           })
+          if (!matched && !isNaN(Number(valItem))) {
+            const numIdx = Number(valItem)
+            if (numIdx >= 0 && numIdx < options.length) matched = options[numIdx]
+            else if (numIdx >= 1 && numIdx <= options.length) matched = options[numIdx - 1]
+          }
+          if (matched) {
+            return typeof matched === 'object' ? (matched.label || matched.text || matched.title || valItem) : matched
+          }
+          return valItem
+        }
+
+        if (typeof value === 'string' || typeof value === 'number') {
+          humanVal = findOptLabel(value)
+        } else if (Array.isArray(value)) {
+          humanVal = value.map((valItem) => findOptLabel(valItem))
         }
       }
     }

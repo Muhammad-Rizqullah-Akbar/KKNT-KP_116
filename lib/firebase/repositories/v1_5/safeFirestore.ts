@@ -71,10 +71,24 @@ function sanitizeFirestoreData(data: any): any {
   return sanitized
 }
 
+import { recursivelyOffloadBase64Media } from '@/lib/firebase/mediaOffloader'
+
 export async function safeSetDoc(collectionName: string, docId: string, data: any): Promise<void> {
-  const cleanData = sanitizeFirestoreData(data)
+  let cleanData = sanitizeFirestoreData(data)
+
+  // Guard against Firestore 1MB (1,048,576 bytes) document size limit
   try {
-    await withTimeout(adminFirestore.collection(collectionName).doc(docId).set(cleanData, { merge: true }), 1500)
+    const payloadSize = Buffer.byteLength(JSON.stringify(cleanData))
+    if (payloadSize > 800000) {
+      console.warn(`[safeFirestore] Document "${collectionName}/${docId}" payload size (${payloadSize} bytes) is near 1MB limit. Offloading media...`)
+      cleanData = await recursivelyOffloadBase64Media(cleanData, docId)
+    }
+  } catch (e) {
+    // ignore byte size check errors
+  }
+
+  try {
+    await withTimeout(adminFirestore.collection(collectionName).doc(docId).set(cleanData, { merge: true }), 2500)
   } catch (adminErr: any) {
     console.warn(`[safeFirestore] Admin SDK setDoc failed for "${collectionName}/${docId}", attempting fallback:`, adminErr?.message || adminErr)
     await setDoc(doc(firestore, collectionName, docId), cleanData, { merge: true })

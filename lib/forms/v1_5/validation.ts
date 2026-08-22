@@ -30,10 +30,16 @@ export function validateCanonicalForm(candidate: CanonicalForm): FormValidationI
   // Validate Aspect Weights when Overall or Both mode is active
   const outputMode = candidate.version.scoring.outputMode || 'both'
   if (outputMode === 'overall' || outputMode === 'both') {
+    const aspectsList = candidate.version.aspects || []
+    const scoredAspects = aspectsList.filter((a: any) => a.isScored !== false)
     const stageDist = candidate.version.scoring.stagePointDistribution || {}
-    const sumWeights = Object.values(stageDist).reduce((a, b) => a + (Number(b) || 0), 0)
-    const hasScoredAspects = Object.keys(stageDist).length > 0
-    if (hasScoredAspects && Math.round(sumWeights) !== 100) {
+
+    // Only sum weights for active scored aspects belonging to the form
+    const sumWeights = scoredAspects.length > 0
+      ? scoredAspects.reduce((acc, a: any) => acc + (Number(stageDist[a.aspectId]) || 0), 0)
+      : Object.values(stageDist).reduce((a, b) => a + (Number(b) || 0), 0)
+
+    if (scoredAspects.length > 0 && Math.round(sumWeights) !== 100) {
       issues.push({
         path: 'version.scoring.stagePointDistribution',
         message: `Total bobot aspek penilaian harus tepat 100% (saat ini ${sumWeights}%).`,

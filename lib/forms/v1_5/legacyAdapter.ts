@@ -9,20 +9,52 @@ const isQuestionType = (value: string): value is QuestionType => QUESTION_TYPES.
 const normalizeStatus = (value: unknown): FormStatus => value === 'published' || value === 'archived' ? value : 'draft'
 function fallbackId(formId: string, source: LegacyQuestion): string { const text = `${formId}|${source.answerType || source.type || ''}|${source.question || source.label || ''}`; let hash = 0; for (let index = 0; index < text.length; index += 1) hash = (hash * 31 + text.charCodeAt(index)) >>> 0; return `legacy-${formId}-${hash.toString(36)}` }
 function optionId(questionId: string, label: string, position: number): string { let hash = 0; for (let index = 0; index < label.length; index += 1) hash = (hash * 31 + label.charCodeAt(index)) >>> 0; return `${questionId}-option-${position + 1}-${hash.toString(36)}` }
-function answerKey(raw: unknown, options: QuestionOption[]): AnswerKey {
+export function answerKey(raw: unknown, options: QuestionOption[]): AnswerKey {
   if (raw === undefined || raw === null || raw === '') return { kind: 'none' }
-  const labels = Array.isArray(raw) ? raw : [raw]
+  const rawList = Array.isArray(raw) ? raw : [raw]
   const correctOptionIds: string[] = []
-  labels.forEach((label) => {
-    if (typeof label === 'string') {
-      const matched = options.find((option) => option.label === label || option.optionId === label)
-      if (matched) {
+
+  rawList.forEach((item) => {
+    if (item === undefined || item === null || item === '') return
+
+    const strItem = String(item).trim()
+    const cleanItem = strItem.toLowerCase().replace(/[^a-z0-9]/g, '')
+
+    // 1. Direct optionId or exact label match
+    let matched = options.find((o) => o.optionId === strItem || o.label === strItem)
+
+    // 2. Normalized label match
+    if (!matched && cleanItem) {
+      matched = options.find((o) => {
+        const cleanLabel = o.label ? o.label.toLowerCase().replace(/[^a-z0-9]/g, '') : ''
+        const cleanOptId = o.optionId ? o.optionId.toLowerCase().replace(/[^a-z0-9]/g, '') : ''
+        return cleanLabel === cleanItem || cleanOptId === cleanItem
+      })
+    }
+
+    // 3. Numeric index match (0-based and 1-based)
+    if (!matched) {
+      const numIdx = Number(item)
+      if (!isNaN(numIdx)) {
+        if (numIdx >= 0 && numIdx < options.length) {
+          matched = options[numIdx]
+        } else if (numIdx >= 1 && numIdx <= options.length) {
+          matched = options[numIdx - 1]
+        }
+      }
+    }
+
+    if (matched) {
+      if (!correctOptionIds.includes(matched.optionId)) {
         correctOptionIds.push(matched.optionId)
-      } else {
-        correctOptionIds.push(label)
+      }
+    } else {
+      if (!correctOptionIds.includes(strItem)) {
+        correctOptionIds.push(strItem)
       }
     }
   })
+
   return correctOptionIds.length ? { kind: 'option', correctOptionIds } : { kind: 'none' }
 }
 
@@ -83,6 +115,17 @@ function adaptQuestion(formId: string, source: LegacyQuestion, warnings: string[
       })
     : defaultScales
 
+  const rawCorrectAnswer =
+    config.correctAnswer ??
+    (config as any).correct_answer ??
+    (source as any).correctAnswer ??
+    (source as any).correct_answer ??
+    (source as any).answerKey ??
+    (source as any).answer ??
+    (source.scoring as any)?.correctAnswer
+
+  const parsedAnswerKey = answerKey(rawCorrectAnswer, options)
+
   // Dynamic scheme inference learned from legacy version
   let defaultScheme: Question['scoring']['scheme'] = 'none'
   if (['single-choice', 'dropdown', 'binary', 'multiple-choice'].includes(type)) {
@@ -97,7 +140,12 @@ function adaptQuestion(formId: string, source: LegacyQuestion, warnings: string[
     ? (source.scoring.scheme as Question['scoring']['scheme'])
     : undefined
 
-  const finalScheme = explicitScheme !== undefined ? explicitScheme : defaultScheme
+  // If correct answer exists for a choice question, default to binary scheme even if scheme was none
+  let finalScheme = explicitScheme !== undefined ? explicitScheme : defaultScheme
+  if (parsedAnswerKey.kind === 'option' && ['single-choice', 'dropdown', 'binary', 'multiple-choice'].includes(type)) {
+    finalScheme = 'binary'
+  }
+
   const weight = typeof source.scoring?.weight === 'number' ? source.scoring.weight : 1
 
   return {
@@ -120,7 +168,7 @@ function adaptQuestion(formId: string, source: LegacyQuestion, warnings: string[
       scheme: finalScheme,
       weight,
     },
-    answerKey: answerKey(config.correctAnswer || (source as any).correctAnswer, options),
+    answerKey: parsedAnswerKey,
   }
 }
 /** Read-only conversion. It never writes, migrates, or mutates a legacy document. */

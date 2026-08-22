@@ -1,4 +1,5 @@
 import { adminFirestore } from '@/lib/firebaseAdmin'
+import { recursivelyOffloadBase64Media } from '@/lib/firebase/mediaOffloader'
 import type { FormMetadata, ScoringConfig, ValidationConfig, CanonicalForm } from '@/lib/forms/v1_5/types'
 import type {
   FormAspect,
@@ -82,8 +83,77 @@ export function normalizeFormAggregate(docId: string, data: any): FormAggregateD
     const aspectId = q.aspectId || q.stageId || q.stage_id || q.aspect || q.category || 'default'
     const rawOpts = Array.isArray(q.options) ? q.options : q.config?.options || []
 
+    const options = rawOpts.map((optItem: any, oIdx: number) => {
+      if (typeof optItem === 'string') {
+        return { optionId: `opt_${qId}_${oIdx}`, label: optItem, score: 1 }
+      }
+      if (optItem && typeof optItem === 'object') {
+        const lbl = optItem.label || optItem.text || optItem.title || String(optItem)
+        return {
+          optionId: optItem.optionId || optItem.id || `opt_${qId}_${oIdx}`,
+          label: lbl,
+          score: typeof optItem.score === 'number' ? optItem.score : 1,
+        }
+      }
+      return { optionId: `opt_${qId}_${oIdx}`, label: String(optItem), score: 1 }
+    })
+
+    const rawCorrectAnswer =
+      q.answerKey?.correctOptionIds ||
+      q.answerKey?.optionId ||
+      q.config?.correctAnswer ||
+      q.config?.correct_answer ||
+      q.correctAnswer ||
+      q.correct_answer ||
+      q.answer ||
+      q.scoring?.correctAnswer
+
+    let parsedAnswerKey = q.answerKey
+    if (!parsedAnswerKey || !Array.isArray(parsedAnswerKey.correctOptionIds) || parsedAnswerKey.correctOptionIds.length === 0) {
+      if (rawCorrectAnswer !== undefined && rawCorrectAnswer !== null && rawCorrectAnswer !== '') {
+        const items = Array.isArray(rawCorrectAnswer) ? rawCorrectAnswer : [rawCorrectAnswer]
+        const correctOptionIds: string[] = []
+        items.forEach((it: any) => {
+          if (it === undefined || it === null || it === '') return
+          const strIt = String(it).trim()
+          const cleanIt = strIt.toLowerCase().replace(/[^a-z0-9]/g, '')
+          let matched = options.find((o: any) => o.optionId === strIt || o.label === strIt)
+          if (!matched && cleanIt) {
+            matched = options.find((o: any) => {
+              const cL = o.label ? o.label.toLowerCase().replace(/[^a-z0-9]/g, '') : ''
+              const cId = o.optionId ? o.optionId.toLowerCase().replace(/[^a-z0-9]/g, '') : ''
+              return cL === cleanIt || cId === cleanIt
+            })
+          }
+          if (!matched) {
+            const numIdx = Number(it)
+            if (!isNaN(numIdx)) {
+              if (numIdx >= 0 && numIdx < options.length) matched = options[numIdx]
+              else if (numIdx >= 1 && numIdx <= options.length) matched = options[numIdx - 1]
+            }
+          }
+          if (matched) {
+            if (!correctOptionIds.includes(matched.optionId)) correctOptionIds.push(matched.optionId)
+          } else {
+            if (!correctOptionIds.includes(strIt)) correctOptionIds.push(strIt)
+          }
+        })
+        if (correctOptionIds.length > 0) {
+          parsedAnswerKey = { kind: 'option', correctOptionIds }
+        }
+      }
+    }
+    if (!parsedAnswerKey) parsedAnswerKey = { kind: 'none' }
+
     const mediaUrl = q.presentation?.media?.url || q.media?.url || q.imageUrl || q.image || q.photoURL || q.config?.imageUrl || q.config?.mediaUrl || null
     const mediaCaption = q.presentation?.media?.caption || q.media?.caption || q.imageCaption || q.caption || ''
+
+    let scheme = q.scoring?.scheme
+    if (!scheme || scheme === 'none') {
+      if (parsedAnswerKey.kind === 'option' && ['single-choice', 'dropdown', 'binary', 'multiple-choice'].includes(rawType)) {
+        scheme = 'binary'
+      }
+    }
 
     return {
       ...q,
@@ -94,8 +164,14 @@ export function normalizeFormAggregate(docId: string, data: any): FormAggregateD
       prompt,
       title: prompt,
       required: q.required !== false,
-      options: rawOpts,
+      options,
+      answerKey: parsedAnswerKey,
       config: q.config || {},
+      scoring: {
+        scheme: scheme || 'none',
+        weight: typeof q.scoring?.weight === 'number' ? q.scoring.weight : 1,
+        ...q.scoring,
+      },
       presentation: {
         description: q.presentation?.description || q.description || q.config?.description || '',
         placeholder: q.presentation?.placeholder || q.placeholder || q.config?.placeholder || undefined,
@@ -145,7 +221,11 @@ export function normalizeFormAggregate(docId: string, data: any): FormAggregateD
     }))
   }
 
-  const title = data.metadata?.title || data.title || 'Formulir ' + docId
+  let rawTitle = data.metadata?.title || data.title || 'Formulir ' + docId
+  if (rawTitle.startsWith('[Salinan') || rawTitle.startsWith('Salinan')) {
+    rawTitle = rawTitle.replace(/^\[Salinan[^\]]*\]\s*/i, '').replace(/^Salinan\s*(?:V1\.5)?\s*[-–:]\s*/i, '').trim()
+  }
+  const title = rawTitle
   const description = data.metadata?.description || data.description || ''
   const category = data.metadata?.category || data.category || 'Umum'
   const target = data.metadata?.target || data.target || 'Umum'
@@ -187,17 +267,38 @@ import { safeGetDoc, safeGetCollectionDocs, safeSetDoc } from './safeFirestore'
  * 1 FIRESTORE DOCUMENT READ: Load current active Form aggregate document.
  */
 export async function getFormAggregateFromDb(formId: string): Promise<FormAggregateDoc | null> {
+  const norm = (formId || '').trim().toUpperCase()
   let docObj = await safeGetDoc(FORMS_COLLECTION, formId)
   if (!docObj) {
     docObj = await safeGetDoc('v1_5_forms', formId)
   }
   if (!docObj) {
     const allForms = await safeGetCollectionDocs(FORMS_COLLECTION)
-    docObj = allForms.find((d) => d.id === formId || d.data?.formId === formId || d.data?.code === formId) || null
+    docObj =
+      allForms.find(
+        (d) =>
+          d.id === formId ||
+          d.data?.formId === formId ||
+          d.data?.code === formId ||
+          (d.data?.code && d.data.code.toUpperCase() === norm) ||
+          (d.data?.normalizedCode && d.data.normalizedCode === norm) ||
+          (d.data?.posttestCode && d.data.posttestCode.toUpperCase() === norm) ||
+          (d.data?.pretestCode && d.data.pretestCode.toUpperCase() === norm)
+      ) || null
   }
   if (!docObj) {
     const allV15 = await safeGetCollectionDocs('v1_5_forms')
-    docObj = allV15.find((d) => d.id === formId || d.data?.formId === formId || d.data?.code === formId) || null
+    docObj =
+      allV15.find(
+        (d) =>
+          d.id === formId ||
+          d.data?.formId === formId ||
+          d.data?.code === formId ||
+          (d.data?.code && d.data.code.toUpperCase() === norm) ||
+          (d.data?.normalizedCode && d.data.normalizedCode === norm) ||
+          (d.data?.posttestCode && d.data.posttestCode.toUpperCase() === norm) ||
+          (d.data?.pretestCode && d.data.pretestCode.toUpperCase() === norm)
+      ) || null
   }
   if (!docObj) return null
   return normalizeFormAggregate(docObj.id, docObj.data)
@@ -262,27 +363,30 @@ export async function saveFormAggregateToDb(
   data: Partial<FormAggregateDoc>,
   sessionUid: string
 ): Promise<FormAggregateDoc> {
+  // Offload any base64 images inside payload to disk/storage before persisting to Firestore
+  const cleanedPayload = await recursivelyOffloadBase64Media(data, formId)
+
   const existing = await safeGetDoc(FORMS_COLLECTION, formId)
 
   const now = new Date().toISOString()
   if (!existing) {
     const newDoc: FormAggregateDoc = {
       formId,
-      metadata: data.metadata || {
+      metadata: cleanedPayload.metadata || {
         title: 'Formulir Penilaian V1.5',
         kind: 'official',
         status: 'draft',
       },
-      activeVersionId: data.activeVersionId || `${formId}_v1`,
-      activeVersionNumber: data.activeVersionNumber || 1,
-      status: data.status || 'draft',
-      aspects: data.aspects || [],
-      questions: data.questions || [],
-      scoring: data.scoring || { totalPoints: 100, mode: 'auto', stagePointDistribution: {}, allowOverride: true, autoBalance: true },
-      validation: data.validation || { mode: 'all_required', exceptionQuestionIds: [], allowOverride: true },
-      thresholds: data.thresholds || [],
-      recommendations: data.recommendations || { mode: 'automatic', gradeArticleMap: {} },
-      distribution: data.distribution || { allowCadreDistribution: true },
+      activeVersionId: cleanedPayload.activeVersionId || `${formId}_v1`,
+      activeVersionNumber: cleanedPayload.activeVersionNumber || 1,
+      status: cleanedPayload.status || 'draft',
+      aspects: cleanedPayload.aspects || [],
+      questions: cleanedPayload.questions || [],
+      scoring: cleanedPayload.scoring || { totalPoints: 100, mode: 'auto', stagePointDistribution: {}, allowOverride: true, autoBalance: true },
+      validation: cleanedPayload.validation || { mode: 'all_required', exceptionQuestionIds: [], allowOverride: true },
+      thresholds: cleanedPayload.thresholds || [],
+      recommendations: cleanedPayload.recommendations || { mode: 'automatic', gradeArticleMap: {} },
+      distribution: cleanedPayload.distribution || { allowCadreDistribution: true },
       createdAt: now,
       createdBy: sessionUid,
       updatedAt: now,
@@ -293,7 +397,7 @@ export async function saveFormAggregateToDb(
   } else {
     const updateData: Partial<FormAggregateDoc> = {
       ...existing.data,
-      ...data,
+      ...cleanedPayload,
       updatedAt: now,
       updatedBy: sessionUid,
     }
