@@ -93,6 +93,13 @@ export function resolveQuestionAnswer(
   return undefined
 }
 
+function getFirstDefined(...vals: any[]) {
+  for (const v of vals) {
+    if (v !== undefined && v !== null && v !== '') return v
+  }
+  return undefined
+}
+
 /**
  * Calculates score for a single question based on canonical V1.5 question definition and submitted answer.
  */
@@ -122,38 +129,115 @@ export function calculateQuestionScore(
 
   // 1. SINGLE CHOICE / BINARY / DROPDOWN
   if (type === 'single-choice' || type === 'binary' || type === 'dropdown') {
-    const options = question.options || (question as any).presentation?.options || []
-    const answerKey = (question.answerKey as any) || {}
-    const correctOptionIds: string[] = answerKey.correctOptionIds || (answerKey.optionId ? [answerKey.optionId] : [])
-    const optionScores: Record<string, number> = answerKey.optionScores || {}
+    const rawOptions = question.options || (question as any).presentation?.options || (question as any).config?.options || []
+    const options = rawOptions.map((o: any, idx: number) => {
+      if (typeof o === 'string') return { optionId: `opt_${question.questionId}_${idx}`, label: o, score: 1 }
+      if (o && typeof o === 'object') {
+        const lbl = o.label || o.text || o.title || String(o)
+        return {
+          optionId: o.optionId || o.id || `opt_${question.questionId}_${idx}`,
+          label: lbl,
+          score: typeof o.score === 'number' ? o.score : 1,
+        }
+      }
+      return { optionId: `opt_${question.questionId}_${idx}`, label: String(o), score: 1 }
+    })
+
+    const rawCorrect = getFirstDefined(
+      (question.answerKey as any)?.correctOptionIds,
+      (question.answerKey as any)?.optionId,
+      (question as any).config?.correctAnswer,
+      (question as any).config?.correct_answer,
+      (question as any).correctAnswer,
+      (question as any).correct_answer,
+      (question as any).answerKey,
+      (question as any).answer,
+      (question as any).scoring?.correctAnswer
+    )
+
+    const correctOptionIds: string[] = []
+    if (rawCorrect !== undefined && rawCorrect !== null && rawCorrect !== '') {
+      const list = Array.isArray(rawCorrect) ? rawCorrect : [rawCorrect]
+      list.forEach((item: any) => {
+        if (item === undefined || item === null || item === '') return
+        const strItem = String(item).trim()
+        const cleanItem = strItem.toLowerCase().replace(/[^a-z0-9]/g, '')
+        let matched = options.find((o: any) => o.optionId === strItem || o.label === strItem)
+        if (!matched && cleanItem) {
+          matched = options.find((o: any) => {
+            const cL = o.label ? o.label.toLowerCase().replace(/[^a-z0-9]/g, '') : ''
+            const cId = o.optionId ? o.optionId.toLowerCase().replace(/[^a-z0-9]/g, '') : ''
+            return cL === cleanItem || cId === cleanItem
+          })
+        }
+        if (!matched) {
+          const numIdx = Number(item)
+          if (!isNaN(numIdx)) {
+            if (numIdx >= 0 && numIdx < options.length) matched = options[numIdx]
+            else if (numIdx >= 1 && numIdx <= options.length) matched = options[numIdx - 1]
+          }
+        }
+        if (matched) {
+          if (!correctOptionIds.includes(matched.optionId)) correctOptionIds.push(matched.optionId)
+          if (!correctOptionIds.includes(matched.label)) correctOptionIds.push(matched.label)
+        } else {
+          if (!correctOptionIds.includes(strItem)) correctOptionIds.push(strItem)
+        }
+      })
+    }
+
+    const optionScores: Record<string, number> = (question.answerKey as any)?.optionScores || {}
 
     // Calculate maximum score for this question across all options
-    const optionMaxScores = options.map((o) => typeof o.score === 'number' ? o.score : (optionScores[o.optionId || (o as any).id] ?? 0))
+    const optionMaxScores = options.map((o: any) => typeof o.score === 'number' ? o.score : (optionScores[o.optionId || o.id] ?? 0))
     let maxScore = Math.max(...optionMaxScores, typeof question.scoring?.weight === 'number' ? question.scoring.weight : 0)
     if (maxScore <= 0) maxScore = 5 // Fallback default max score
 
-    const selectedOptId = typeof answerValue === 'string' ? answerValue : ''
-    const selectedOptObj = options.find((o: any) =>
-      o.optionId === selectedOptId ||
-      o.id === selectedOptId ||
-      o.label === selectedOptId ||
-      String(o.val || o.value) === selectedOptId
+    const strAnsVal = answerValue !== undefined && answerValue !== null ? String(answerValue).trim() : ''
+    const cleanAnsVal = strAnsVal.toLowerCase().replace(/[^a-z0-9]/g, '')
+
+    let selectedOptObj = options.find((o: any) =>
+      o.optionId === strAnsVal ||
+      o.id === strAnsVal ||
+      o.label === strAnsVal ||
+      String(o.value ?? o.val ?? '') === strAnsVal
     )
+
+    if (!selectedOptObj && cleanAnsVal) {
+      selectedOptObj = options.find((o: any) => {
+        const cL = o.label ? o.label.toLowerCase().replace(/[^a-z0-9]/g, '') : ''
+        const cId = o.optionId ? o.optionId.toLowerCase().replace(/[^a-z0-9]/g, '') : ''
+        return cL === cleanAnsVal || cId === cleanAnsVal
+      })
+    }
+
+    if (!selectedOptObj && !isNaN(Number(answerValue))) {
+      const numIdx = Number(answerValue)
+      if (numIdx >= 0 && numIdx < options.length) selectedOptObj = options[numIdx]
+      else if (numIdx >= 1 && numIdx <= options.length) selectedOptObj = options[numIdx - 1]
+    }
 
     let awardedScore = 0
     let isCorrect = false
 
     if (correctOptionIds.length > 0) {
       isCorrect = Boolean(
-        selectedOptId
-          ? correctOptionIds.includes(selectedOptId) || (selectedOptObj && correctOptionIds.includes(selectedOptObj.optionId || (selectedOptObj as any).id))
+        strAnsVal
+          ? correctOptionIds.some((cid) => {
+              const cleanCid = cid.toLowerCase().replace(/[^a-z0-9]/g, '')
+              return (
+                cid === strAnsVal ||
+                (selectedOptObj && (cid === selectedOptObj.optionId || cid === (selectedOptObj as any).id || cid === selectedOptObj.label)) ||
+                (cleanCid && (cleanCid === cleanAnsVal || (selectedOptObj && (cleanCid === selectedOptObj.label.toLowerCase().replace(/[^a-z0-9]/g, '') || cleanCid === selectedOptObj.optionId.toLowerCase().replace(/[^a-z0-9]/g, '')))))
+              )
+            })
           : false
       )
-      
+
       if (isCorrect) {
-        awardedScore = selectedOptObj?.score ?? optionScores[selectedOptId] ?? maxScore
-      } else if (selectedOptObj && typeof selectedOptObj.score === 'number') {
-        awardedScore = selectedOptObj.score
+        awardedScore = selectedOptObj?.score ?? optionScores[strAnsVal] ?? maxScore
+      } else {
+        awardedScore = optionScores[strAnsVal] ?? 0
       }
     } else {
       if (selectedOptObj) {
@@ -173,10 +257,10 @@ export function calculateQuestionScore(
       maximumScore: maxScore,
       percentage: maxScore > 0 ? Math.round((awardedScore / maxScore) * 100) : 0,
       includedInTotal: true,
-      selectedValue: selectedOptObj?.label || selectedOptId || answerValue,
+      selectedValue: selectedOptObj?.label || strAnsVal || answerValue,
       details: {
-        selectedOptionId: selectedOptId,
-        selectedLabel: selectedOptObj?.label || selectedOptId,
+        selectedOptionId: selectedOptObj?.optionId || strAnsVal,
+        selectedLabel: selectedOptObj?.label || strAnsVal,
         correctOptionIds,
         isCorrect,
       },
@@ -185,22 +269,79 @@ export function calculateQuestionScore(
 
   // 2. MULTIPLE CHOICE
   if (type === 'multiple-choice') {
-    const options = question.options || (question as any).presentation?.options || []
-    const answerKey = (question.answerKey as any) || {}
-    const correctOptionIds: string[] = answerKey.correctOptionIds || []
-    const optionScores: Record<string, number> = answerKey.optionScores || {}
-    const selectedOptionIds: string[] = Array.isArray(answerValue) ? answerValue : []
+    const rawOptions = question.options || (question as any).presentation?.options || (question as any).config?.options || []
+    const options = rawOptions.map((o: any, idx: number) => {
+      if (typeof o === 'string') return { optionId: `opt_${question.questionId}_${idx}`, label: o, score: 1 }
+      if (o && typeof o === 'object') {
+        const lbl = o.label || o.text || o.title || String(o)
+        return {
+          optionId: o.optionId || o.id || `opt_${question.questionId}_${idx}`,
+          label: lbl,
+          score: typeof o.score === 'number' ? o.score : 1,
+        }
+      }
+      return { optionId: `opt_${question.questionId}_${idx}`, label: String(o), score: 1 }
+    })
+
+    const rawCorrect = getFirstDefined(
+      (question.answerKey as any)?.correctOptionIds,
+      (question.answerKey as any)?.optionId,
+      (question as any).config?.correctAnswer,
+      (question as any).config?.correct_answer,
+      (question as any).correctAnswer,
+      (question as any).correct_answer,
+      (question as any).answerKey,
+      (question as any).answer,
+      (question as any).scoring?.correctAnswer
+    )
+
+    const correctOptionIds: string[] = []
+    if (rawCorrect !== undefined && rawCorrect !== null && rawCorrect !== '') {
+      const list = Array.isArray(rawCorrect) ? rawCorrect : [rawCorrect]
+      list.forEach((item: any) => {
+        if (item === undefined || item === null || item === '') return
+        const strItem = String(item).trim()
+        const cleanItem = strItem.toLowerCase().replace(/[^a-z0-9]/g, '')
+        let matched = options.find((o: any) => o.optionId === strItem || o.label === strItem)
+        if (!matched && cleanItem) {
+          matched = options.find((o: any) => {
+            const cL = o.label ? o.label.toLowerCase().replace(/[^a-z0-9]/g, '') : ''
+            const cId = o.optionId ? o.optionId.toLowerCase().replace(/[^a-z0-9]/g, '') : ''
+            return cL === cleanItem || cId === cleanItem
+          })
+        }
+        if (!matched) {
+          const numIdx = Number(item)
+          if (!isNaN(numIdx)) {
+            if (numIdx >= 0 && numIdx < options.length) matched = options[numIdx]
+            else if (numIdx >= 1 && numIdx <= options.length) matched = options[numIdx - 1]
+          }
+        }
+        if (matched) {
+          if (!correctOptionIds.includes(matched.optionId)) correctOptionIds.push(matched.optionId)
+          if (!correctOptionIds.includes(matched.label)) correctOptionIds.push(matched.label)
+        } else {
+          if (!correctOptionIds.includes(strItem)) correctOptionIds.push(strItem)
+        }
+      })
+    }
+
+    const optionScores: Record<string, number> = (question.answerKey as any)?.optionScores || {}
+    const selectedOptionIds: string[] = Array.isArray(answerValue) ? answerValue : (answerValue !== undefined && answerValue !== null ? [answerValue] : [])
 
     let maxScore = 0
     if (correctOptionIds.length > 0) {
-      correctOptionIds.forEach((optId) => {
-        const optObj = options.find((o) => o.optionId === optId || (o as any).id === optId)
-        const optPts = optObj?.score ?? optionScores[optId] ?? 5
-        maxScore += optPts
+      options.forEach((o: any) => {
+        const isOptCorrect = correctOptionIds.some((cid) => cid === o.optionId || cid === o.label)
+        if (isOptCorrect) {
+          const pts = typeof o.score === 'number' ? o.score : (optionScores[o.optionId] ?? 5)
+          maxScore += pts
+        }
       })
+      if (maxScore <= 0) maxScore = correctOptionIds.length * 5
     } else {
-      options.forEach((o) => {
-        const pts = typeof o.score === 'number' ? o.score : (optionScores[o.optionId || (o as any).id] ?? 0)
+      options.forEach((o: any) => {
+        const pts = typeof o.score === 'number' ? o.score : (optionScores[o.optionId] ?? 0)
         if (pts > 0) maxScore += pts
       })
     }
@@ -208,29 +349,46 @@ export function calculateQuestionScore(
 
     let score = 0
     selectedOptionIds.forEach((itemVal) => {
-      const optObj = options.find((o: any) =>
-        o.optionId === itemVal ||
-        o.id === itemVal ||
-        o.label === itemVal ||
-        String(o.val || o.value) === itemVal
-      )
+      const strVal = String(itemVal).trim()
+      const cleanVal = strVal.toLowerCase().replace(/[^a-z0-9]/g, '')
+      let optObj = options.find((o: any) => o.optionId === strVal || o.id === strVal || o.label === strVal)
+      if (!optObj && cleanVal) {
+        optObj = options.find((o: any) => {
+          const cL = o.label ? o.label.toLowerCase().replace(/[^a-z0-9]/g, '') : ''
+          const cId = o.optionId ? o.optionId.toLowerCase().replace(/[^a-z0-9]/g, '') : ''
+          return cL === cleanVal || cId === cleanVal
+        })
+      }
 
       if (correctOptionIds.length > 0) {
-        if (optObj && (correctOptionIds.includes(optObj.optionId || (optObj as any).id) || correctOptionIds.includes(itemVal))) {
-          score += optObj?.score ?? optionScores[itemVal] ?? (maxScore / correctOptionIds.length)
+        const isItemCorrect = correctOptionIds.some((cid) => {
+          const cleanCid = cid.toLowerCase().replace(/[^a-z0-9]/g, '')
+          return (
+            cid === strVal ||
+            (optObj && (cid === optObj.optionId || cid === optObj.id || cid === optObj.label)) ||
+            (cleanCid && (cleanCid === cleanVal || (optObj && (cleanCid === optObj.label.toLowerCase().replace(/[^a-z0-9]/g, '') || cleanCid === optObj.optionId.toLowerCase().replace(/[^a-z0-9]/g, '')))))
+          )
+        })
+
+        if (isItemCorrect) {
+          score += optObj?.score ?? optionScores[strVal] ?? (maxScore / Math.max(1, correctOptionIds.length))
+        } else {
+          score += optionScores[strVal] ?? 0
         }
       } else {
         if (optObj && typeof optObj.score === 'number') {
           score += optObj.score
-        } else if (optionScores[itemVal] !== undefined) {
-          score += optionScores[itemVal]
+        } else if (optionScores[strVal] !== undefined) {
+          score += optionScores[strVal]
         }
       }
     })
 
     const selectedLabels = selectedOptionIds.map((itemVal) => {
-      const optObj = options.find((o: any) => o.optionId === itemVal || o.id === itemVal || o.label === itemVal)
-      return optObj?.label || itemVal
+      const strVal = String(itemVal).trim()
+      const cleanVal = strVal.toLowerCase().replace(/[^a-z0-9]/g, '')
+      const optObj = options.find((o: any) => o.optionId === strVal || o.id === strVal || o.label === strVal || (cleanVal && o.label.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanVal))
+      return optObj?.label || strVal
     })
 
     return {
@@ -478,6 +636,26 @@ export function calculateQuestionScore(
 /**
  * Calculates Aspect score breakdowns.
  */
+export function isBiodataAspect(title: string): boolean {
+  if (!title) return false
+  const clean = title.trim().toLowerCase()
+  const biodataKeywords = [
+    'data responden',
+    'informasi responden',
+    'identitas responden',
+    'biodata',
+    'demografi',
+    'profil responden',
+    'data diri',
+    'data umum',
+    'sumber informasi',
+    'sumber informasi & media',
+    'sumber informasi kader',
+    'sumber data',
+  ]
+  return biodataKeywords.some((k) => clean === k || clean.includes(k))
+}
+
 export function calculateAspectScores(
   aspects: FormAspect[],
   questions: BuilderQuestion[],
@@ -487,14 +665,14 @@ export function calculateAspectScores(
   const aspectResults: AspectScoreResult[] = []
 
   const effectiveAspects =
-    Array.isArray(aspects) && aspects.length > 0
+    aspects && aspects.length > 0
       ? aspects
       : [
           {
             aspectId: 'default',
-            title: 'Evaluasi Kuesioner',
-            weightPercentage: 100,
-            isScored: true,
+            title: 'Semua Pertanyaan',
+            description: '',
+            questionIds: questions.map((q) => q.questionId),
           },
         ]
 
@@ -502,13 +680,7 @@ export function calculateAspectScores(
   effectiveAspects.forEach((asp) => questionsByAspect.set(asp.aspectId, []))
 
   questions.forEach((q) => {
-    const rawAspId =
-      q.aspectId ||
-      (q as any).stageId ||
-      (q as any).stage_id ||
-      (q as any).aspect ||
-      (q as any).category ||
-      'default'
+    const rawAspId = q.aspectId || 'default'
 
     if (questionsByAspect.has(rawAspId)) {
       questionsByAspect.get(rawAspId)!.push(q)
@@ -532,8 +704,9 @@ export function calculateAspectScores(
     }
   })
 
-  // Equal weight distribution fallback
-  const autoWeight = effectiveAspects.length > 0 ? Math.floor(100 / effectiveAspects.length) : 100
+  // Equal weight distribution fallback calculated only among scored non-biodata aspects
+  const scoredAspectsList = effectiveAspects.filter((a) => a.isScored !== false && !isBiodataAspect(a.title))
+  const autoWeight = scoredAspectsList.length > 0 ? Math.floor(100 / scoredAspectsList.length) : 100
 
   effectiveAspects.forEach((asp, idx) => {
     const aspQuestions = questionsByAspect.get(asp.aspectId) || []
@@ -542,8 +715,8 @@ export function calculateAspectScores(
     let rawScore = 0
     let maximumScore = 0
 
-    // If aspect is non-evaluated / biodata (isScored === false), omit scoring
-    const isScored = asp.isScored !== false
+    // If aspect is non-evaluated / biodata / sumber informasi, omit from scoring
+    const isScored = asp.isScored !== false && !isBiodataAspect(asp.title)
 
     aspQuestions.forEach((q) => {
       const qIdx = questions.indexOf(q)
@@ -570,11 +743,20 @@ export function calculateAspectScores(
     })
 
     const percentage = isScored && maximumScore > 0 ? Math.round((rawScore / maximumScore) * 100) : 0
-    const weightPercentage = isScored
-      ? stagePointDistribution[asp.aspectId] ??
-        stagePointDistribution[(asp as any).id] ??
-        (idx === aspects.length - 1 ? 100 - autoWeight * (aspects.length - 1) : autoWeight)
-      : 0
+
+    let weightPercentage = 0
+    if (isScored) {
+      const explicitWeight = stagePointDistribution[asp.aspectId] ?? stagePointDistribution[(asp as any).id]
+      if (explicitWeight !== undefined && explicitWeight !== null) {
+        weightPercentage = explicitWeight
+      } else {
+        const scoredIdx = scoredAspectsList.findIndex((a) => a.aspectId === asp.aspectId)
+        weightPercentage =
+          scoredIdx === scoredAspectsList.length - 1
+            ? 100 - autoWeight * (scoredAspectsList.length - 1)
+            : autoWeight
+      }
+    }
 
     const weightedContribution = Math.round((percentage * (weightPercentage / 100)) * 100) / 100
 
