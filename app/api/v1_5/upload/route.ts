@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthorizationContext } from '@/lib/auth/server'
+import { saveBase64MediaToFileOrStorage } from '@/lib/firebase/mediaOffloader'
 
 /**
  * POST /api/v1_5/upload
@@ -19,15 +20,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, message: 'File gambar tidak ditemukan.' }, { status: 400 })
     }
 
-    // Convert file to base64 Data URL for local persistence/preview
     const buffer = Buffer.from(await file.arrayBuffer())
     const mimeType = file.type || 'image/png'
     const dataUrl = `data:${mimeType};base64,${buffer.toString('base64')}`
 
+    const offloadedUrl = await saveBase64MediaToFileOrStorage(dataUrl, 'upload')
+
     return NextResponse.json({
       success: true,
       message: 'Gambar berhasil diunggah.',
-      url: dataUrl,
+      url: offloadedUrl,
       fileName: file.name,
     })
   } catch (error: any) {

@@ -48,13 +48,27 @@ function expandScaleLabel(label: any): string {
 function formatAnswerDisplay(question: PublicQuestion, val: any): React.ReactNode {
   if (val === undefined || val === null || val === '') return '-'
 
-  const options = (question as any).options || (question as any).presentation?.options || []
+  const rawOptions = (question as any).options || (question as any).presentation?.options || (question as any).config?.options || []
+  const options = rawOptions.map((o: any, idx: number) => {
+    if (typeof o === 'string') return { optionId: `opt_${question.questionId}_${idx}`, label: o }
+    if (o && typeof o === 'object') return { optionId: o.optionId || o.id || o.value || `opt_${question.questionId}_${idx}`, label: o.label || o.text || o.prompt || String(o) }
+    return { optionId: `opt_${question.questionId}_${idx}`, label: String(o) }
+  })
 
   // Single Choice / Dropdown / Radio / Boolean
-  if (typeof val === 'string') {
-    const matchOpt = options.find((o: any) => o.id === val || o.optionId === val || o.val === val || o.value === val)
+  if (typeof val === 'string' || typeof val === 'number') {
+    const strVal = String(val).trim()
+    const cleanVal = strVal.toLowerCase().replace(/[^a-z0-9]/g, '')
+    let matchOpt = options.find((o: any) => o.optionId === strVal || o.id === strVal || o.label === strVal)
+    if (!matchOpt && cleanVal) {
+      matchOpt = options.find((o: any) => {
+        const cL = o.label ? o.label.toLowerCase().replace(/[^a-z0-9]/g, '') : ''
+        const cId = o.optionId ? o.optionId.toLowerCase().replace(/[^a-z0-9]/g, '') : ''
+        return cL === cleanVal || cId === cleanVal
+      })
+    }
     if (matchOpt) {
-      return expandScaleLabel(matchOpt.label || matchOpt.text || matchOpt.prompt || val)
+      return expandScaleLabel(matchOpt.label)
     }
     return expandScaleLabel(val)
   }
@@ -62,8 +76,17 @@ function formatAnswerDisplay(question: PublicQuestion, val: any): React.ReactNod
   // Multiple Choice / Checkbox (array)
   if (Array.isArray(val)) {
     const labels = val.map((itemVal) => {
-      const matchOpt = options.find((o: any) => o.id === itemVal || o.optionId === itemVal || o.val === itemVal || o.value === itemVal)
-      return expandScaleLabel(matchOpt ? (matchOpt.label || matchOpt.text || matchOpt.prompt || itemVal) : String(itemVal))
+      const strVal = String(itemVal).trim()
+      const cleanVal = strVal.toLowerCase().replace(/[^a-z0-9]/g, '')
+      let matchOpt = options.find((o: any) => o.optionId === strVal || o.id === strVal || o.label === strVal)
+      if (!matchOpt && cleanVal) {
+        matchOpt = options.find((o: any) => {
+          const cL = o.label ? o.label.toLowerCase().replace(/[^a-z0-9]/g, '') : ''
+          const cId = o.optionId ? o.optionId.toLowerCase().replace(/[^a-z0-9]/g, '') : ''
+          return cL === cleanVal || cId === cleanVal
+        })
+      }
+      return expandScaleLabel(matchOpt ? matchOpt.label : String(itemVal))
     })
     return labels.join(', ')
   }

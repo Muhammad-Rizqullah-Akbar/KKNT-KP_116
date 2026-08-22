@@ -111,8 +111,17 @@ export default function LegacyFormsPage() {
     setIsDuplicating(f.id)
     try {
       const copyCode = `${f.code || 'FORM'}_COPY_${Math.random().toString(36).substring(2, 6).toUpperCase()}`
+      const rawTitle = f.title || 'Formulir'
+      let baseTitle = rawTitle.replace(/^\[Salinan[^\]]*\]\s*/i, '').replace(/^Salinan\s*[-–:]\s*/i, '').trim()
+      let cleanTitle = baseTitle
+      if (/pre[-_\s]*test/i.test(baseTitle)) {
+        cleanTitle = baseTitle.replace(/pre[-_\s]*test/gi, 'Post-Test')
+      } else if (!/post[-_\s]*test/i.test(baseTitle)) {
+        cleanTitle = `${baseTitle} (Post-Test)`
+      }
+
       const duplicated = await createForm({
-        title: `[Salinan] ${f.title}`,
+        title: cleanTitle,
         code: copyCode,
         description: f.description || '',
         target: f.target || '',

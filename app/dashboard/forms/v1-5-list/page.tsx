@@ -37,7 +37,8 @@ export function getDerivedLifecycle(f: FormAggregateDoc): {
       const indicators = (q as any).presentation?.indicators || (q as any).config?.indicators || []
       return indicators.length === 0
     }
-    const isNonScoring = ['biodata-name', 'biodata-email', 'biodata-phone', 'biodata-address', 'biodata-institution', 'short-text', 'long-text', 'text', 'textarea', 'file-upload', 'image', 'signature', 'date'].includes(q.type)
+    const targetAspect = f.aspects?.find((a: any) => a.aspectId === (q.aspectId || f.aspects?.[0]?.aspectId))
+    const isNonScoring = targetAspect?.isScored === false || ['biodata-name', 'biodata-email', 'biodata-phone', 'biodata-address', 'biodata-institution', 'short-text', 'long-text', 'text', 'textarea', 'file-upload', 'image', 'signature', 'date'].includes(q.type)
     if (isNonScoring) return false
     return q.answerKey?.kind === 'none' || !(q.answerKey as any)?.correctOptionIds?.length
   })
@@ -102,6 +103,55 @@ export default function V15FormsDashboardPage() {
   // Distribution Quick Access Modal & Edit Confirm Modal State
   const [distributionModalForm, setDistributionModalForm] = useState<FormAggregateDoc | null>(null)
   const [editConfirmForm, setEditConfirmForm] = useState<FormAggregateDoc | null>(null)
+
+  // Edit Form Name Modal State (Edit tanpa ubah versi)
+  const [editingTitleForm, setEditingTitleForm] = useState<FormAggregateDoc | null>(null)
+  const [editTitleInput, setEditTitleInput] = useState('')
+  const [editDescriptionInput, setEditDescriptionInput] = useState('')
+  const [editCategoryInput, setEditCategoryInput] = useState('')
+  const [editTargetInput, setEditTargetInput] = useState('')
+  const [isUpdatingTitle, setIsUpdatingTitle] = useState(false)
+
+  const handleOpenEditTitleModal = (form: FormAggregateDoc) => {
+    setEditingTitleForm(form)
+    setEditTitleInput(form.metadata?.title || '')
+    setEditDescriptionInput(form.metadata?.description || '')
+    setEditCategoryInput(form.metadata?.category || 'Umum')
+    setEditTargetInput(form.metadata?.target || 'Umum')
+    setActiveMenuFormId(null)
+  }
+
+  const handleSaveTitleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingTitleForm || !editTitleInput.trim()) return
+    setIsUpdatingTitle(true)
+    try {
+      const res = await safeFetchJson(`/api/v1_5/forms/${editingTitleForm.formId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          metadata: {
+            title: editTitleInput.trim(),
+            description: editDescriptionInput.trim(),
+            category: editCategoryInput.trim(),
+            target: editTargetInput.trim(),
+          },
+        }),
+      })
+
+      if (res.ok && res.data?.success) {
+        showToast('Nama formulir berhasil diperbarui tanpa mengubah versi!')
+        setEditingTitleForm(null)
+        fetchForms()
+      } else {
+        showToast(res.error || 'Gagal memperbarui nama formulir.')
+      }
+    } catch (err: any) {
+      showToast(`Error: ${err.message}`)
+    } finally {
+      setIsUpdatingTitle(false)
+    }
+  }
   const [isTogglingCadrePerm, setIsTogglingCadrePerm] = useState(false)
   const [isCreatingNewVersion, setIsCreatingNewVersion] = useState(false)
 
@@ -374,7 +424,7 @@ export default function V15FormsDashboardPage() {
       if (!res.ok || !data.success) {
         throw new Error(data.message || 'Gagal menduplikat formulir.')
       }
-      showToast(`Formulir "${data.form.metadata?.title || 'Salinan'}" berhasil diduplikat!`)
+      showToast(`Formulir "${data.form.metadata?.title || 'Baru'}" berhasil diduplikat!`)
       fetchForms()
     } catch (err: any) {
       showToast(`Error: ${err.message}`)
@@ -860,6 +910,15 @@ export default function V15FormsDashboardPage() {
 
                               <button
                                 type="button"
+                                onClick={() => handleOpenEditTitleModal(f)}
+                                className="w-full text-left px-3.5 py-2 hover:bg-slate-800 flex items-center gap-2 transition-colors cursor-pointer text-amber-300 font-semibold"
+                              >
+                                <Icon name="edit" className="w-3.5 h-3.5 text-amber-400" />
+                                <span>Ubah Nama Formulir</span>
+                              </button>
+
+                              <button
+                                type="button"
                                 onClick={() => {
                                   setActiveMenuFormId(null)
                                   setSelectedHistoryFormId(f.formId)
@@ -1063,6 +1122,15 @@ export default function V15FormsDashboardPage() {
                                 </button>
                               </>
                             )}
+
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditTitleModal(f)}
+                              className="w-full text-left px-3.5 py-2 hover:bg-slate-800 flex items-center gap-2 transition-colors cursor-pointer text-amber-300 font-semibold"
+                            >
+                              <Icon name="edit" className="w-3.5 h-3.5 text-amber-400" />
+                              <span>Ubah Nama Formulir</span>
+                            </button>
 
                             <button
                               type="button"
@@ -1420,6 +1488,104 @@ export default function V15FormsDashboardPage() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT FORM NAME MODAL (Edit tanpa ubah versi) */}
+      {editingTitleForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
+          <div className="w-full max-w-lg p-6 rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                  <Icon name="edit" className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-100">Ubah Nama & Informasi Formulir</h3>
+                  <p className="text-xs text-slate-400">
+                    Versi {editingTitleForm.activeVersionNumber || 1} tetap dipertahankan tanpa membuat versi baru.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingTitleForm(null)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+              >
+                <Icon name="x" className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveTitleSubmit} className="space-y-4">
+              <div className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/30 text-xs text-purple-300 flex items-center gap-2">
+                <Icon name="info" className="w-4 h-4 shrink-0 text-purple-400" />
+                <span>Mengubah nama formulir tidak akan mengubah versi aktif snapshot.</span>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                  Nama / Judul Formulir Baru <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editTitleInput}
+                  onChange={(e) => setEditTitleInput(e.target.value)}
+                  placeholder="Masukkan nama/judul formulir..."
+                  className="w-full bg-slate-950 border border-slate-700 text-slate-100 text-sm font-semibold rounded-xl px-4 py-2.5 focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">Deskripsi Singkat</label>
+                <textarea
+                  rows={2}
+                  value={editDescriptionInput}
+                  onChange={(e) => setEditDescriptionInput(e.target.value)}
+                  placeholder="Keterangan singkat formulir..."
+                  className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-xl px-4 py-2 focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">Kategori</label>
+                  <input
+                    type="text"
+                    value={editCategoryInput}
+                    onChange={(e) => setEditCategoryInput(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-xl px-3 py-2 focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">Target Responden</label>
+                  <input
+                    type="text"
+                    value={editTargetInput}
+                    onChange={(e) => setEditTargetInput(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-xl px-3 py-2 focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setEditingTitleForm(null)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isUpdatingTitle || !editTitleInput.trim()}
+                  className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 text-xs font-bold shadow-md shadow-amber-500/20 transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  {isUpdatingTitle ? 'Menyimpan...' : 'Simpan Nama'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

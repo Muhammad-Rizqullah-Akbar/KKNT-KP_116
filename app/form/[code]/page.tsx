@@ -11,6 +11,8 @@ import type { PublicDistributionDTO, PublicResponseSessionDTO } from '@/lib/form
 import { Icon } from '@/components/ui/Icons'
 import { safeFetchJson } from '@/lib/shared/safeFetch'
 
+import { isBiodataAspect } from '@/lib/forms/v1_5/scoring/scoringEngine'
+
 interface PageProps {
   params: Promise<{ code: string }>
 }
@@ -258,14 +260,21 @@ export default function PublicDistributionPage({ params }: PageProps) {
 
       // Extract biodata entries for receipt summary
       const questionsList = sessionData.form?.version?.questions || sessionData.form?.questions || []
+      const aspectsList = sessionData.form?.version?.aspects || sessionData.form?.aspects || []
       const extractedBiodata: { label: string; value: string }[] = []
 
       questionsList.forEach((q: any) => {
         const prompt = q.prompt || q.title || q.label || ''
         const promptLower = prompt.toLowerCase()
+        const aspectObj = aspectsList.find((a: any) => a.aspectId === q.aspectId || a.id === q.aspectId)
+        const aspectTitle = aspectObj?.title || aspectObj?.name || q.aspectTitle || q.category || ''
+        const isNonScoredAspect = (aspectObj && aspectObj.isScored === false) || isBiodataAspect(aspectTitle)
         const isBiodataQuestion =
+          isNonScoredAspect ||
           q.category === 'biodata' ||
           q.isBiodata === true ||
+          !!q.biodataKey ||
+          (typeof q.type === 'string' && q.type.startsWith('biodata-')) ||
           promptLower.includes('nama') ||
           promptLower.includes('email') ||
           promptLower.includes('telepon') ||
@@ -274,13 +283,21 @@ export default function PublicDistributionPage({ params }: PageProps) {
           promptLower.includes('instansi') ||
           promptLower.includes('organisasi') ||
           promptLower.includes('lokasi') ||
-          promptLower.includes('alamat')
+          promptLower.includes('alamat') ||
+          promptLower.includes('sumber informasi') ||
+          promptLower.includes('darimana')
 
         if (isBiodataQuestion) {
           const val = answers[q.questionId]
           if (val !== undefined && val !== null && val !== '') {
             let displayVal = String(val)
-            if (typeof val === 'string' && q.options) {
+            if (Array.isArray(val) && q.options) {
+              const selectedLabels = val.map((v: any) => {
+                const opt = q.options.find((o: any) => o.id === v || o.optionId === v || o.val === v || o.value === v)
+                return opt ? (opt.label || opt.text || opt.prompt || v) : v
+              })
+              displayVal = selectedLabels.join(', ')
+            } else if (typeof val === 'string' && q.options) {
               const opt = q.options.find((o: any) => o.id === val || o.optionId === val || o.val === val || o.value === val)
               if (opt) displayVal = opt.label || opt.text || opt.prompt || val
             }

@@ -1,7 +1,51 @@
 import { NextResponse } from 'next/server'
 import { getAuthorizationContext, requireRole } from '@/lib/auth/server'
 import { getFormAggregateFromDb } from '@/lib/firebase/repositories/v1_5/v1_5Forms.repo'
-import { saveDraftWorkflow } from '@/lib/forms/v1_5/formManagement.service'
+import { saveDraftWorkflow, updateFormMetadataWorkflow } from '@/lib/forms/v1_5/formManagement.service'
+
+/**
+ * PATCH /api/v1_5/forms/[formId]
+ * Update form title / metadata without changing version number.
+ */
+export async function PATCH(request: Request, { params }: RouteParams) {
+  try {
+    const { formId } = await params
+    const authContext = (await getAuthorizationContext()) || {
+      uid: 'dev-user',
+      role: 'admin' as const,
+      token: {} as any,
+    }
+    const body = await request.json()
+
+    const metadataUpdate = body.metadata || {
+      title: body.title,
+      description: body.description,
+      category: body.category,
+      target: body.target,
+    }
+
+    if (!metadataUpdate.title && !body.title) {
+      return NextResponse.json(
+        { success: false, message: 'Judul formulir wajib disertakan.' },
+        { status: 400 }
+      )
+    }
+
+    const updated = await updateFormMetadataWorkflow(formId, metadataUpdate, authContext.uid)
+
+    return NextResponse.json({
+      success: true,
+      message: 'Nama formulir berhasil diperbarui tanpa mengubah versi.',
+      form: updated,
+    })
+  } catch (error: any) {
+    const status = error.status || 500
+    return NextResponse.json(
+      { success: false, message: error.message || 'Gagal memperbarui nama formulir.' },
+      { status }
+    )
+  }
+}
 import { toPublicFormProjection } from '@/lib/forms/v1_5/legacyAdapter'
 
 interface RouteParams {

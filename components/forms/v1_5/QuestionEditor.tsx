@@ -123,7 +123,7 @@ export function QuestionEditor({ question, aspects = [], onUpdate }: QuestionEdi
           <span>KONTEN DAN VALIDASI</span>
         </button>
 
-        {isScoredAspect && (
+        {(isScoredAspect || ['single-choice', 'multiple-choice', 'dropdown', 'binary', 'indicator-table', 'likert'].includes(question.type)) && (
           <button
             type="button"
             onClick={() => setActiveTab('answer')}
@@ -134,7 +134,7 @@ export function QuestionEditor({ question, aspects = [], onUpdate }: QuestionEdi
             }`}
           >
             <span className="w-2 h-2 rounded-full bg-emerald-400" />
-            <span>KUNCI JAWABAN, OPSI DAN SKALA</span>
+            <span>{isScoredAspect ? 'KUNCI JAWABAN, OPSI DAN SKALA' : 'OPSI JAWABAN & PILIHAN'}</span>
           </button>
         )}
       </div>
@@ -179,23 +179,24 @@ export function QuestionEditor({ question, aspects = [], onUpdate }: QuestionEdi
               >
                 {!isScoredAspect ? (
                   <>
+                    <optgroup label="Tipe Input Umum / Fleksibel">
+                      <option value="dropdown">Menu Dropdown</option>
+                      <option value="single-choice">Pilihan Ganda Tunggal</option>
+                      <option value="multiple-choice">Pilihan Ganda Kompleks</option>
+                      <option value="text">Teks Isian Singkat</option>
+                      <option value="textarea">Teks Uraian Panjang</option>
+                      <option value="number">Angka / Isian Numerik</option>
+                      <option value="date">Tanggal</option>
+                      <option value="file-upload">Unggah Berkas / Dokumen</option>
+                      <option value="signature">Tanda Tangan</option>
+                      <option value="binary">Ya / Tidak (Biner)</option>
+                    </optgroup>
                     <optgroup label="Field Biodata Terstandardisasi">
                       <option value="biodata-name">Nama Lengkap Responden</option>
                       <option value="biodata-email">Alamat Email / Gmail</option>
                       <option value="biodata-phone">Nomor Telepon / WhatsApp</option>
                       <option value="biodata-address">Lokasi Asal / Alamat</option>
                       <option value="biodata-institution">Organisasi / Instansi Asal</option>
-                    </optgroup>
-                    <optgroup label="Tipe Pertanyaan Standar">
-                      <option value="text">Teks Isian Singkat</option>
-                      <option value="textarea">Teks Uraian Panjang</option>
-                      <option value="number">Isian Numerik</option>
-                      <option value="single-choice">Pilihan Ganda Tunggal</option>
-                      <option value="multiple-choice">Pilihan Ganda Kompleks</option>
-                      <option value="dropdown">Menu Dropdown</option>
-                      <option value="date">Tanggal</option>
-                      <option value="file-upload">Unggah Berkas / Dokumen</option>
-                      <option value="signature">Tanda Tangan</option>
                     </optgroup>
                   </>
                 ) : (
@@ -324,6 +325,8 @@ export function QuestionEditor({ question, aspects = [], onUpdate }: QuestionEdi
                           const data = await res.json()
                           if (data.success && data.url) {
                             onUpdate({
+                              imageUrl: data.url,
+                              mediaUrl: data.url,
                               presentation: {
                                 ...question.presentation,
                                 media: { ...question.presentation.media, type: 'image', url: data.url },
@@ -333,10 +336,13 @@ export function QuestionEditor({ question, aspects = [], onUpdate }: QuestionEdi
                             const reader = new FileReader()
                             reader.onload = (evt) => {
                               if (evt.target?.result) {
+                                const base64 = String(evt.target.result)
                                 onUpdate({
+                                  imageUrl: base64,
+                                  mediaUrl: base64,
                                   presentation: {
                                     ...question.presentation,
-                                    media: { ...question.presentation.media, type: 'image', url: String(evt.target.result) },
+                                    media: { ...question.presentation.media, type: 'image', url: base64 },
                                   },
                                 })
                               }
@@ -347,10 +353,13 @@ export function QuestionEditor({ question, aspects = [], onUpdate }: QuestionEdi
                           const reader = new FileReader()
                           reader.onload = (evt) => {
                             if (evt.target?.result) {
+                              const base64 = String(evt.target.result)
                               onUpdate({
+                                imageUrl: base64,
+                                mediaUrl: base64,
                                 presentation: {
                                   ...question.presentation,
-                                  media: { ...question.presentation.media, type: 'image', url: String(evt.target.result) },
+                                  media: { ...question.presentation.media, type: 'image', url: base64 },
                                 },
                               })
                             }
@@ -424,12 +433,19 @@ export function QuestionEditor({ question, aspects = [], onUpdate }: QuestionEdi
               <div className="flex items-center justify-between">
                 <div>
                   <span className="text-xs font-bold text-slate-200">
-                    Opsi Jawaban & Kunci Benar (Tandai ✓ Pada Jawaban Benar)
+                    {isScoredAspect
+                      ? 'Opsi Jawaban & Kunci Benar (Tandai ✓ Pada Jawaban Benar)'
+                      : 'Daftar Opsi Jawaban (Tambahkan Pilihan yang Dapat Dipilih Responden)'}
                   </span>
-                  {question.type === 'multiple-choice' && (
+                  {isScoredAspect && question.type === 'multiple-choice' && (
                     <p className="text-[11px] text-cyan-400 mt-0.5 font-medium">
                       💡 Pilihan ganda kompleks: Responden dibatasi hanya memilih sebanyak jumlah opsi kunci yang Anda tentukan (
                       {(question.answerKey.kind === 'option' ? question.answerKey.correctOptionIds.length : 0)} Opsi Kunci Benar).
+                    </p>
+                  )}
+                  {!isScoredAspect && (
+                    <p className="text-[11px] text-purple-300 mt-0.5 font-medium">
+                      💡 Pilihan opsi ini akan tampil sebagai menu dropdown / opsi pilihan pada biodata responden.
                     </p>
                   )}
                 </div>
@@ -447,7 +463,7 @@ export function QuestionEditor({ question, aspects = [], onUpdate }: QuestionEdi
                 {question.options.map((option, idx) => {
                   const correctOptionIds =
                     question.answerKey.kind === 'option' ? question.answerKey.correctOptionIds : []
-                  const isCorrect = correctOptionIds.includes(option.optionId)
+                  const isCorrect = isScoredAspect && correctOptionIds.includes(option.optionId)
 
                   return (
                     <div
@@ -458,18 +474,24 @@ export function QuestionEditor({ question, aspects = [], onUpdate }: QuestionEdi
                           : 'bg-slate-900 border-slate-800'
                       }`}
                     >
-                      <button
-                        type="button"
-                        onClick={() => toggleCorrectOption(option.optionId)}
-                        className={`w-6 h-6 rounded-lg flex items-center justify-center border font-bold text-xs shrink-0 transition-colors ${
-                          isCorrect
-                            ? 'bg-emerald-500 text-slate-950 border-emerald-400'
-                            : 'bg-slate-950 text-slate-500 border-slate-700 hover:border-slate-500'
-                        }`}
-                        title={isCorrect ? 'Opsi Kunci Benar' : 'Tandai Sebagai Jawaban Benar'}
-                      >
-                        {isCorrect ? '✓' : idx + 1}
-                      </button>
+                      {isScoredAspect ? (
+                        <button
+                          type="button"
+                          onClick={() => toggleCorrectOption(option.optionId)}
+                          className={`w-6 h-6 rounded-lg flex items-center justify-center border font-bold text-xs shrink-0 transition-colors ${
+                            isCorrect
+                              ? 'bg-emerald-500 text-slate-950 border-emerald-400'
+                              : 'bg-slate-950 text-slate-500 border-slate-700 hover:border-slate-500'
+                          }`}
+                          title={isCorrect ? 'Opsi Kunci Benar' : 'Tandai Sebagai Jawaban Benar'}
+                        >
+                          {isCorrect ? '✓' : idx + 1}
+                        </button>
+                      ) : (
+                        <span className="w-6 h-6 rounded-lg bg-purple-500/20 text-purple-300 border border-purple-500/40 flex items-center justify-center font-bold text-xs shrink-0 font-mono">
+                          {idx + 1}
+                        </span>
+                      )}
 
                       <input
                         type="text"
@@ -479,8 +501,8 @@ export function QuestionEditor({ question, aspects = [], onUpdate }: QuestionEdi
                         className="flex-1 bg-slate-950 border border-slate-700 text-slate-200 text-xs font-medium rounded-lg px-3 py-1.5 focus:outline-none focus:border-emerald-500"
                       />
 
-                      {/* Option Score Input for Correct Answers */}
-                      {isCorrect && (
+                      {/* Option Score Input for Correct Answers in Scored Aspect */}
+                      {isScoredAspect && isCorrect && (
                         <div className="flex items-center gap-1 bg-slate-950 border border-emerald-500/40 rounded-lg px-2 py-1 shrink-0">
                           <span className="text-[10px] text-emerald-400 font-bold">Skor:</span>
                           <input

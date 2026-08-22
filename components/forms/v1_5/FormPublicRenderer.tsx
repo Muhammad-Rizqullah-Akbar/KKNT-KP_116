@@ -72,8 +72,21 @@ export function FormPublicRenderer({
 
             {/* Media Attachment if available (V1 & V1.5 Universal Renderer) */}
             {(() => {
-              const mediaUrl = question.presentation?.media?.url || (question as any).imageUrl || (question as any).image || (question as any).mediaUrl || (question as any).photoURL
-              const caption = question.presentation?.media?.caption || (question as any).imageCaption || (question as any).caption
+              const mediaUrl =
+                question.presentation?.media?.url ||
+                (question as any).presentation?.imageUrl ||
+                (question as any).imageUrl ||
+                (question as any).image ||
+                (question as any).mediaUrl ||
+                (question as any).photoURL ||
+                (question as any).media?.url ||
+                (question as any).config?.imageUrl ||
+                (question as any).config?.media?.url
+              const caption =
+                question.presentation?.media?.caption ||
+                (question as any).imageCaption ||
+                (question as any).caption ||
+                (question as any).config?.caption
               if (!mediaUrl) return null
               return (
                 <div className="rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 p-3 max-w-md shadow-md my-2">
@@ -81,7 +94,16 @@ export function FormPublicRenderer({
                   <img
                     src={mediaUrl}
                     alt={caption || 'Lampiran Gambar Pertanyaan'}
-                    className="w-full h-auto max-h-72 object-contain rounded-xl"
+                    className="w-full h-auto max-h-80 object-contain rounded-xl"
+                    loading="lazy"
+                    onError={(e) => {
+                      // If relative local upload path fails on Vercel, try checking if base64 or alternative property exists
+                      const target = e.currentTarget
+                      const altUrl = (question as any).imageUrl || (question as any).image || (question as any).mediaUrl
+                      if (altUrl && altUrl !== mediaUrl) {
+                        target.src = altUrl
+                      }
+                    }}
                   />
                   {caption && (
                     <p className="text-xs text-slate-400 text-center mt-2 italic font-medium">
@@ -113,42 +135,58 @@ function renderQuestionInput(
 
   switch (type) {
     case 'single-choice':
-    case 'binary':
+    case 'binary': {
+      const sanitizedSingleOpts = options.map((opt: any, idx: number) => {
+        if (typeof opt === 'string') return { optionId: `opt_${question.questionId}_${idx}`, label: opt }
+        if (opt && typeof opt === 'object') return { optionId: opt.optionId || opt.id || opt.value || `opt_${question.questionId}_${idx}`, label: opt.label || opt.text || opt.prompt || String(opt) }
+        return { optionId: `opt_${question.questionId}_${idx}`, label: String(opt) }
+      })
+
       return (
         <div className="space-y-2.5">
-          {options.length === 0 ? (
+          {sanitizedSingleOpts.length === 0 ? (
             <p className="text-xs text-amber-400/80 italic p-3 bg-slate-950 rounded-xl border border-slate-800">
               Belum ada pilihan jawaban.
             </p>
           ) : (
-            options.map((opt) => (
-              <label
-                key={opt.optionId}
-                className={`flex items-center gap-3.5 p-4 rounded-xl border text-sm font-medium cursor-pointer transition-all ${
-                  value === opt.optionId
-                    ? 'bg-cyan-950/40 border-cyan-500/60 text-cyan-200 shadow-sm ring-1 ring-cyan-500/30'
-                    : 'bg-slate-950/60 border-slate-800 text-slate-300 hover:bg-slate-800/80 hover:border-slate-700'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name={question.questionId}
-                  value={opt.optionId}
-                  checked={value === opt.optionId}
-                  onChange={() => onChange(opt.optionId)}
-                  disabled={isDisabled}
-                  className="w-4 h-4 text-cyan-500 focus:ring-cyan-400 focus:ring-offset-slate-900"
-                />
-                <span>{opt.label || <span className="italic text-slate-500">Opsi tanpa label</span>}</span>
-              </label>
-            ))
+            sanitizedSingleOpts.map((opt) => {
+              const isChecked = value === opt.optionId || value === opt.label || String(value) === String(opt.optionId)
+              return (
+                <label
+                  key={opt.optionId}
+                  className={`flex items-center gap-3.5 p-4 rounded-xl border text-sm font-medium cursor-pointer transition-all ${
+                    isChecked
+                      ? 'bg-cyan-950/40 border-cyan-500/60 text-cyan-200 shadow-sm ring-1 ring-cyan-500/30'
+                      : 'bg-slate-950/60 border-slate-800 text-slate-300 hover:bg-slate-800/80 hover:border-slate-700'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name={question.questionId}
+                    value={opt.optionId}
+                    checked={isChecked}
+                    onChange={() => onChange(opt.optionId)}
+                    disabled={isDisabled}
+                    className="w-4 h-4 text-cyan-500 focus:ring-cyan-400 focus:ring-offset-slate-900"
+                  />
+                  <span>{opt.label || <span className="italic text-slate-500">Opsi tanpa label</span>}</span>
+                </label>
+              )
+            })
           )}
         </div>
       )
+    }
 
     case 'multiple-choice': {
-      const selectedValues: string[] = Array.isArray(value) ? value : []
-      const correctFromOpts = options.filter((o: any) => o.isCorrect || o.correct).length
+      const sanitizedMultiOpts = options.map((opt: any, idx: number) => {
+        if (typeof opt === 'string') return { optionId: `opt_${question.questionId}_${idx}`, label: opt }
+        if (opt && typeof opt === 'object') return { optionId: opt.optionId || opt.id || opt.value || `opt_${question.questionId}_${idx}`, label: opt.label || opt.text || opt.prompt || String(opt) }
+        return { optionId: `opt_${question.questionId}_${idx}`, label: String(opt) }
+      })
+
+      const selectedValues: string[] = Array.isArray(value) ? value : (value !== undefined && value !== null ? [String(value)] : [])
+      const correctFromOpts = sanitizedMultiOpts.filter((o: any) => o.isCorrect || o.correct).length
       const requiredCount =
         question.answerKey?.correctOptionIds?.length ||
         correctFromOpts ||
@@ -159,12 +197,13 @@ function renderQuestionInput(
 
       const isLimitReached = requiredCount > 0 && selectedValues.length >= requiredCount
 
-      const toggleOption = (optId: string) => {
-        if (selectedValues.includes(optId)) {
-          onChange(selectedValues.filter((id) => id !== optId))
+      const toggleOption = (opt: { optionId: string; label: string }) => {
+        const isCurrentlyChecked = selectedValues.some((v) => v === opt.optionId || v === opt.label)
+        if (isCurrentlyChecked) {
+          onChange(selectedValues.filter((id) => id !== opt.optionId && id !== opt.label))
         } else {
           if (requiredCount > 0 && selectedValues.length >= requiredCount) return
-          onChange([...selectedValues, optId])
+          onChange([...selectedValues, opt.optionId])
         }
       }
 
@@ -185,13 +224,13 @@ function renderQuestionInput(
             </div>
           )}
 
-          {options.length === 0 ? (
+          {sanitizedMultiOpts.length === 0 ? (
             <p className="text-xs text-amber-400/80 italic p-3 bg-slate-950 rounded-xl border border-slate-800">
               Belum ada pilihan jawaban.
             </p>
           ) : (
-            options.map((opt) => {
-              const isChecked = selectedValues.includes(opt.optionId)
+            sanitizedMultiOpts.map((opt) => {
+              const isChecked = selectedValues.some((v) => v === opt.optionId || v === opt.label)
               const isOptionDisabled = isDisabled || (!isChecked && isLimitReached)
 
               return (
@@ -208,7 +247,7 @@ function renderQuestionInput(
                   <input
                     type="checkbox"
                     checked={isChecked}
-                    onChange={() => toggleOption(opt.optionId)}
+                    onChange={() => toggleOption(opt)}
                     disabled={isOptionDisabled}
                     className="w-4 h-4 text-cyan-500 rounded focus:ring-cyan-400 focus:ring-offset-slate-900"
                   />
@@ -221,7 +260,13 @@ function renderQuestionInput(
       )
     }
 
-    case 'dropdown':
+    case 'dropdown': {
+      const sanitizedDropOpts = options.map((opt: any, idx: number) => {
+        if (typeof opt === 'string') return { optionId: `opt_${question.questionId}_${idx}`, label: opt }
+        if (opt && typeof opt === 'object') return { optionId: opt.optionId || opt.id || opt.value || `opt_${question.questionId}_${idx}`, label: opt.label || opt.text || opt.prompt || String(opt) }
+        return { optionId: `opt_${question.questionId}_${idx}`, label: String(opt) }
+      })
+
       return (
         <select
           value={value || ''}
@@ -230,13 +275,14 @@ function renderQuestionInput(
           className="w-full bg-slate-950 border border-slate-700 text-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:border-cyan-500 shadow-sm"
         >
           <option value="">-- Pilih Jawaban --</option>
-          {options.map((opt) => (
+          {sanitizedDropOpts.map((opt) => (
             <option key={opt.optionId} value={opt.optionId}>
               {opt.label}
             </option>
           ))}
         </select>
       )
+    }
 
     case 'rating': {
       const min = presentation?.ratingMin ?? 1
@@ -520,6 +566,44 @@ function renderQuestionInput(
             Bersihkan Tanda Tangan
           </button>
         </div>
+      )
+
+    case 'biodata-name':
+    case 'biodata-address':
+    case 'biodata-institution':
+      return (
+        <input
+          type="text"
+          value={value || ''}
+          placeholder={presentation?.placeholder || 'Ketik data di sini...'}
+          onChange={(e) => onChange(e.target.value)}
+          disabled={isDisabled}
+          className="w-full bg-slate-950 border border-slate-700 text-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-cyan-500 placeholder:text-slate-600 shadow-sm"
+        />
+      )
+
+    case 'biodata-email':
+      return (
+        <input
+          type="email"
+          value={value || ''}
+          placeholder={presentation?.placeholder || 'contoh@email.com'}
+          onChange={(e) => onChange(e.target.value)}
+          disabled={isDisabled}
+          className="w-full bg-slate-950 border border-slate-700 text-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-cyan-500 placeholder:text-slate-600 shadow-sm"
+        />
+      )
+
+    case 'biodata-phone':
+      return (
+        <input
+          type="tel"
+          value={value || ''}
+          placeholder={presentation?.placeholder || '08xxxxxxxxxx'}
+          onChange={(e) => onChange(e.target.value)}
+          disabled={isDisabled}
+          className="w-full bg-slate-950 border border-slate-700 text-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-cyan-500 placeholder:text-slate-600 shadow-sm"
+        />
       )
 
     default:
