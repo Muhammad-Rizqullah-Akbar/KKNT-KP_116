@@ -28,6 +28,9 @@ import type { ResponseResultDoc, RecommendationItem } from '@/lib/forms/v1_5/sco
 
 import { randomBytes, randomUUID } from 'crypto'
 
+import { extractRespondentName, extractRespondentEmail } from '@/lib/forms/v1_5/respondentUtils'
+export { extractRespondentName, extractRespondentEmail }
+
 /**
  * Generates an opaque random token for session locking.
  */
@@ -46,7 +49,7 @@ export async function startResponseWorkflow(
   let dist = await getDistributionByCodeDoc(normalized)
 
   if (!dist) {
-    // Direct Form ID / Legacy Form Code fallback
+    // Direct Form ID / Legacy Form Code / Article Code fallback
     const rawCode = params.distributionCode.trim()
     const formAgg = await getFormAggregateFromDb(rawCode)
     if (formAgg) {
@@ -67,23 +70,6 @@ export async function startResponseWorkflow(
         updatedAt: formAgg.updatedAt || new Date().toISOString(),
         updatedBy: 'system',
       }
-    }
-  }
-
-  if (!dist) {
-    try {
-      const allDists = await listDistributionsDoc()
-      const activeDist = allDists.find((d) => d.status === 'active') || allDists[0]
-      if (activeDist) {
-        dist = {
-          ...activeDist,
-          code: normalized,
-          normalizedCode: normalized,
-          status: 'active',
-        }
-      }
-    } catch (e) {
-      console.warn('Fallback listDistributionsDoc in response.service failed:', e)
     }
   }
 

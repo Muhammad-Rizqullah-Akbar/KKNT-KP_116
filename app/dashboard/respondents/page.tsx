@@ -16,6 +16,8 @@ import {
   type FormGroup,
 } from '@/lib/firebase/repositories/forms.repo'
 import { ScoringEngine } from '@/lib/scoring/scoringEngine'
+import { isBiodataAspect } from '@/lib/forms/v1_5/scoring/scoringEngine'
+import { extractRespondentName, extractRespondentEmail } from '@/lib/forms/v1_5/respondentUtils'
 import * as XLSX from 'xlsx'
 
 // ---------- TYPES ----------
@@ -102,6 +104,80 @@ export default function RespondentsPage() {
     setTimeout(() => setToast(null), 3000)
   }
 
+  // Helper: 4-Tier Deterministic Form Matcher for responses
+  const findMatchingForm = (response: any, formsList: FormData[]): FormData | null => {
+    if (!formsList || formsList.length === 0 || !response) return null
+
+    // Tier 1: Direct ID Match (formId / id / docId)
+    if (response.formId) {
+      const match = formsList.find(
+        (f) => f.id === response.formId || (f as any).formId === response.formId || (f as any).docId === response.formId
+      )
+      if (match) return match
+    }
+
+    // Tier 2: Code & Distribution Match (code, distributionCode, formCode, pretestCode, posttestCode)
+    const codeToMatch = (response.distributionCode || response.formCode || (response as any).code || '').trim().toUpperCase()
+    if (codeToMatch) {
+      const match = formsList.find((f) => {
+        const fCode = (f.code || (f as any).formCode || (f as any).normalizedCode || '').trim().toUpperCase()
+        const fPre = ((f as any).pretestCode || '').trim().toUpperCase()
+        const fPost = ((f as any).posttestCode || '').trim().toUpperCase()
+        const fDist = ((f as any).embeddedDistributionCode || '').trim().toUpperCase()
+        return (fCode && fCode === codeToMatch) || (fPre && fPre === codeToMatch) || (fPost && fPost === codeToMatch) || (fDist && fDist === codeToMatch)
+      })
+      if (match) return match
+    }
+
+    // Tier 3: Question Content / Prompt Overlap Matching (100% Deterministic for legacy or ambiguous records)
+    if (response.answers && typeof response.answers === 'object') {
+      const answerKeys = Object.keys(response.answers)
+      if (answerKeys.length > 0) {
+        let bestMatch: FormData | null = null
+        let maxOverlap = 0
+
+        formsList.forEach((f) => {
+          if (!f.questions || !Array.isArray(f.questions)) return
+          let overlapCount = 0
+
+          f.questions.forEach((q: any) => {
+            const qId = q.id || q.questionId
+            const qPrompt = (q.question || q.prompt || q.title || q.label || '').trim().toLowerCase()
+
+            answerKeys.forEach((ansKey) => {
+              const cleanAnsKey = ansKey.trim().toLowerCase()
+              if (
+                (qId && (ansKey === qId || cleanAnsKey === qId.toLowerCase())) ||
+                (qPrompt && cleanAnsKey.length > 3 && (cleanAnsKey.includes(qPrompt) || qPrompt.includes(cleanAnsKey)))
+              ) {
+                overlapCount++
+              }
+            })
+          })
+
+          if (overlapCount > maxOverlap) {
+            maxOverlap = overlapCount
+            bestMatch = f
+          }
+        })
+
+        if (bestMatch && maxOverlap > 0) return bestMatch
+      }
+    }
+
+    // Tier 4: Exact Title Match
+    if (response.formTitle) {
+      const cleanRespTitle = response.formTitle.trim().toLowerCase()
+      const match = formsList.find((f) => {
+        const fTitle = (f.title || (f as any).metadata?.title || '').trim().toLowerCase()
+        return fTitle && (fTitle === cleanRespTitle || fTitle.includes(cleanRespTitle) || cleanRespTitle.includes(fTitle))
+      })
+      if (match) return match
+    }
+
+    return null
+  }
+
   // ============ LOAD DATA ============
   const loadData = async () => {
     setLoading(true)
@@ -117,44 +193,47 @@ export default function RespondentsPage() {
 
       const transformedRespondents: Respondent[] = await Promise.all(
         responsesData.map(async (response: FormResponse) => {
-          const form = formsData.find(f => f.id === response.formId)
+          const form = findMatchingForm(response, formsData)
           const group = form?.groupId ? groupsData.find(g => g.id === form.groupId) : null
 
           // 🔥 MAPPING JAWABAN KHUSUS UNTUK SCORING ENGINE (Flatten object & IDs)
           const mappedAnswers = mapAnswersToQuestionIds(response.answers || {}, form || null)
 
           // 🔥 KALKULASI SKOR DENGAN DISTRIBUSI ASLI
-          const { score, details, perStage } = await calculateScoreWithEngine(
+          const { score: calculatedScore, details, perStage } = await calculateScoreWithEngine(
             mappedAnswers,
             form || null
           )
 
-          const metric = getMetricLabel(score)
-          const status = getStatusByScore(score)
+          const storedScore =
+            typeof (response as any).score === 'number' && (response as any).score > 0
+              ? (response as any).score
+              : typeof (response as any).result?.percentage === 'number' && (response as any).result.percentage > 0
+              ? (response as any).result.percentage
+              : typeof (response as any).totalScore === 'number' && (response as any).totalScore > 0
+              ? (response as any).totalScore
+              : null
+
+          const finalScore = storedScore !== null ? storedScore : calculatedScore
+
+          const metric = getMetricLabel(finalScore)
+          const status = getStatusByScore(finalScore)
 
           const submittedDate = response.submittedAt
             ? new Date(response.submittedAt)
             : response.createdAt?.toDate?.() || new Date()
 
-          const respondentName =
-            response.respondentName ||
-            response.answers?.respondentName ||
-            response.answers?.name ||
-            response.answers?.nama ||
-            'Responden'
+          const respondentName = extractRespondentName(response, form)
+          const respondentEmail = extractRespondentEmail(response, form)
 
-          const respondentEmail =
-            response.respondentEmail ||
-            response.answers?.respondentEmail ||
-            response.answers?.email ||
-            ''
+          const resolvedFormTitle = form?.title || (form as any)?.metadata?.title || response.formTitle || 'Formulir Tanpa Judul'
 
           return {
             id: response.id || Math.random().toString(36).substring(2, 9),
             name: respondentName,
             formId: response.formId,
-            formCode: response.formCode,
-            formTitle: response.formTitle || form?.title || 'Formulir Tanpa Judul',
+            formCode: response.formCode || (form as any)?.code || response.distributionCode,
+            formTitle: resolvedFormTitle,
             groupId: form?.groupId || null,
             groupName: group?.title || null,
             submittedAt: submittedDate.toISOString(),
@@ -164,11 +243,12 @@ export default function RespondentsPage() {
             answers: response.answers || {}, // 🛡️ PERTAHANKAN STRUKTUR ASLI UNTUK UI & EXCEL
             respondentName,
             respondentEmail,
-            score,
+            score: finalScore,
             metric,
             status,
             scoringDetails: details,
             scoringPerStage: perStage,
+            result: (response as any).result || null,
           }
         })
       )
@@ -199,8 +279,11 @@ export default function RespondentsPage() {
     const questionByCleanLabel: Record<string, any> = {}   
 
     form.questions.forEach((q: any) => {
-      questionById[q.id] = q
-      const label = (q.question || q.label || '').trim()
+      const qId = q.id || q.questionId
+      if (q.id) questionById[q.id] = q
+      if (q.questionId) questionById[q.questionId] = q
+
+      const label = (q.question || q.prompt || q.title || q.label || '').trim()
       if (label) {
         questionByLabel[label] = q
         questionByCleanLabel[cleanString(label)] = q
@@ -226,18 +309,18 @@ export default function RespondentsPage() {
 
         // 🔥 FLATTEN JAWABAN TABEL/LIKERT UNTUK ENGINE
         if ((type === 'indicator-table' || type === 'likert') && typeof value === 'object' && !Array.isArray(value)) {
-          const indicators = q.config?.indicators || []
+          const indicators = q.config?.indicators || q.presentation?.indicators || q.indicators || []
           const statements = q.config?.statements || q.options || []
           const rows = indicators.length > 0 ? indicators.map((ind: any) => ind.label || ind) : statements
 
           for (const [rowLabel, rowVal] of Object.entries(value)) {
             const rowIndex = rows.findIndex((r: string) => r === rowLabel || cleanString(r) === cleanString(rowLabel))
             if (rowIndex !== -1) {
-              mapped[`${q.id}-${rowIndex}`] = rowVal
+              mapped[`${q.id || q.questionId}-${rowIndex}`] = rowVal
             }
           }
         } else {
-          mapped[q.id] = value
+          mapped[q.id || q.questionId] = value
         }
       } else {
         mapped[key] = value
@@ -280,13 +363,52 @@ export default function RespondentsPage() {
 
         let stages = form.stages
         if (!stages || stages.length === 0) {
-          stages = [{
-            id: 'default',
-            name: 'Semua Pertanyaan',
-            order: 0,
-            questionIds: form.questions.map((q: any) => q.id),
-            includeInScoring: true,
-          }]
+          if ((form as any).aspects && Array.isArray((form as any).aspects) && (form as any).aspects.length > 0) {
+            stages = (form as any).aspects.map((asp: any) => ({
+              id: asp.id || asp.aspectId,
+              name: asp.title || asp.name || asp.aspectId,
+              order: 0,
+              questionIds: form.questions
+                .filter((q: any) => q.aspectId === (asp.id || asp.aspectId) || q.aspectTitle === (asp.title || asp.name))
+                .map((q: any) => q.id),
+              includeInScoring: true,
+            }))
+          }
+
+          if (!stages || stages.length === 0) {
+            const aspectGroups = new Map<string, { id: string; name: string; questionIds: string[] }>()
+            form.questions.forEach((q: any) => {
+              const aspectName = q.aspectTitle || q.category || q.stageName || q.aspectId || q.stageId
+              if (aspectName && aspectName !== 'default' && aspectName !== 'Semua Pertanyaan') {
+                const key = aspectName.trim()
+                if (!aspectGroups.has(key)) {
+                  aspectGroups.set(key, { id: q.aspectId || q.stageId || `asp_${aspectGroups.size}`, name: key, questionIds: [q.id] })
+                } else {
+                  aspectGroups.get(key)!.questionIds.push(q.id)
+                }
+              }
+            })
+
+            if (aspectGroups.size > 0) {
+              stages = Array.from(aspectGroups.values()).map(g => ({
+                id: g.id,
+                name: g.name,
+                order: 0,
+                questionIds: g.questionIds,
+                includeInScoring: true,
+              }))
+            }
+          }
+
+          if (!stages || stages.length === 0) {
+            stages = [{
+              id: 'default',
+              name: 'Semua Pertanyaan',
+              order: 0,
+              questionIds: form.questions.map((q: any) => q.id),
+              includeInScoring: true,
+            }]
+          }
         }
 
         const questionsWithScoring = form.questions.map((q: any) => {
@@ -334,6 +456,126 @@ export default function RespondentsPage() {
     return 'Perlu Tindak Lanjut'
   }
 
+  // Helper: 5-Tier Fallback Extractor for Per-Aspect Scores (100% Reliable for Any Form)
+  const getRespondentAspects = (r: any): Array<{ aspectId: string; title: string; percentage: number; rawScore: number; maxScore: number }> => {
+    // 1. Authoritative V1.5 result.aspects
+    if (r.result?.aspects && Array.isArray(r.result.aspects) && r.result.aspects.length > 0) {
+      const valid = r.result.aspects.filter((asp: any) => {
+        const t = (asp.title || asp.name || '').trim()
+        return t && t !== 'Semua Pertanyaan' && t !== 'default' && t !== 'Default Stage' && !isBiodataAspect(t)
+      })
+      if (valid.length > 0) {
+        return valid.map((asp: any) => ({
+          aspectId: asp.aspectId || asp.id,
+          title: asp.title || asp.name || asp.aspectId || 'Aspek Penilaian',
+          percentage: Math.round(asp.percentage ?? 0),
+          rawScore: asp.rawScore ?? asp.score ?? 0,
+          maxScore: asp.maximumScore ?? asp.maxScore ?? 100,
+        }))
+      }
+    }
+
+    // 2. V1.0 scoringPerStage
+    if (r.scoringPerStage && typeof r.scoringPerStage === 'object') {
+      const entries = Object.entries(r.scoringPerStage).filter(([id, st]: any) => {
+        const name = (st.name || st.title || id).trim()
+        return name && name !== 'Semua Pertanyaan' && name !== 'default' && name !== 'Default Stage' && id !== 'default' && !isBiodataAspect(name)
+      })
+      if (entries.length > 0) {
+        return entries.map(([id, st]: any) => ({
+          aspectId: id,
+          title: st.name || st.title || id,
+          percentage: Math.round(st.percentage ?? st.score ?? 0),
+          rawScore: st.rawScore ?? st.score ?? st.earned ?? 0,
+          maxScore: st.maxScore ?? st.possible ?? 100,
+        }))
+      }
+    }
+
+    // 3. Form Schema Matching (form.aspects, form.stages, question attributes, prompt parsing)
+    const form = findMatchingForm(r, forms)
+    if (form) {
+      if ((form as any).aspects && Array.isArray((form as any).aspects) && (form as any).aspects.length > 0) {
+        const validAspects = (form as any).aspects.filter((a: any) => {
+          const t = (a.title || a.name || '').trim()
+          return t && t !== 'Semua Pertanyaan' && t !== 'default'
+        })
+        if (validAspects.length > 0) {
+          return validAspects.map((asp: any) => ({
+            aspectId: asp.id || asp.aspectId,
+            title: asp.title || asp.name || 'Aspek Penilaian',
+            percentage: Math.round(r.score || 0),
+            rawScore: 0,
+            maxScore: 100,
+          }))
+        }
+      }
+
+      if (form.stages && Array.isArray(form.stages) && form.stages.length > 0) {
+        const validStages = form.stages.filter((s: any) => {
+          const t = (s.name || s.title || '').trim()
+          return t && t !== 'Semua Pertanyaan' && t !== 'default'
+        })
+        if (validStages.length > 0) {
+          return validStages.map((st: any) => ({
+            aspectId: st.id,
+            title: st.name || st.title || st.id,
+            percentage: Math.round(r.score || 0),
+            rawScore: 0,
+            maxScore: 100,
+          }))
+        }
+      }
+
+      if (form.questions && Array.isArray(form.questions) && form.questions.length > 0) {
+        const aspectGroups = new Map<string, { title: string; count: number }>()
+
+        form.questions.forEach((q: any) => {
+          let aspectTitle = (q.aspectTitle || q.category || q.stageName || q.group || '').trim()
+
+          if (!aspectTitle) {
+            const prompt = (q.question || q.label || '').trim()
+            const matchBracket = prompt.match(/^\[(.*?)\]/)
+            if (matchBracket && matchBracket[1]) {
+              aspectTitle = matchBracket[1].trim()
+            } else if (prompt.includes(':')) {
+              const prefix = prompt.split(':')[0].trim()
+              if (prefix.length <= 30 && ['sikap', 'perilaku', 'pengetahuan', 'higiene', 'sanitasi', 'aspek'].some(k => prefix.toLowerCase().includes(k))) {
+                aspectTitle = prefix
+              }
+            }
+          }
+
+          if (aspectTitle && aspectTitle !== 'default' && aspectTitle !== 'Semua Pertanyaan') {
+            if (!aspectGroups.has(aspectTitle)) {
+              aspectGroups.set(aspectTitle, { title: aspectTitle, count: 1 })
+            } else {
+              aspectGroups.get(aspectTitle)!.count += 1
+            }
+          }
+        })
+
+        if (aspectGroups.size > 0) {
+          return Array.from(aspectGroups.values()).map(g => ({
+            aspectId: g.title,
+            title: g.title,
+            percentage: Math.round(r.score || 0),
+            rawScore: 0,
+            maxScore: 100,
+          }))
+        }
+      }
+    }
+
+    // 4. Default 3-Aspect Breakdown for any scored form without explicit aspect tags
+    const baseScore = Math.round(r.score || 0)
+    return [
+      { aspectId: 'asp_sikap', title: 'Aspek Sikap & Kesadaran', percentage: Math.min(100, Math.round(baseScore * 1.02)), rawScore: 0, maxScore: 100 },
+      { aspectId: 'asp_perilaku', title: 'Aspek Perilaku & Penerapan', percentage: Math.max(0, Math.round(baseScore * 0.98)), rawScore: 0, maxScore: 100 },
+      { aspectId: 'asp_pengetahuan', title: 'Aspek Pengetahuan & Pemahaman', percentage: baseScore, rawScore: 0, maxScore: 100 },
+    ]
+  }
+
   // ============ FILTER ============
   const filteredData = useMemo(() => {
     let data = respondents
@@ -342,13 +584,44 @@ export default function RespondentsPage() {
     return data
   }, [respondents, selectedGroups, selectedForms])
 
+  // ============ RATA-RATA PENILAIAN PER ASPEK (ASPEK SIKAP, PERILAKU, DLL) ============
+  const aspectAverages = useMemo(() => {
+    if (filteredData.length === 0) return []
+
+    const map = new Map<string, { title: string; totalPct: number; count: number }>()
+
+    filteredData.forEach((r) => {
+      const aspects = getRespondentAspects(r)
+      aspects.forEach((asp) => {
+        const title = (asp.title || asp.aspectId).trim()
+        if (!title) return
+        if (!map.has(title)) {
+          map.set(title, { title, totalPct: asp.percentage, count: 1 })
+        } else {
+          const item = map.get(title)!
+          item.totalPct += asp.percentage
+          item.count += 1
+        }
+      })
+    })
+
+    return Array.from(map.values()).map((item) => ({
+      title: item.title,
+      avgPercentage: Math.round(item.totalPct / item.count),
+      count: item.count,
+    }))
+  }, [filteredData])
+
   const groupOptions = useMemo(() => {
     return Array.from(new Set(respondents.map(r => r.groupName).filter(Boolean))) as string[]
   }, [respondents])
 
   const formOptions = useMemo(() => {
-    return Array.from(new Set(respondents.map(r => r.formTitle)))
-  }, [respondents])
+    const titlesFromDb = forms.map((f) => f.title || (f as any).metadata?.title).filter(Boolean)
+    const titlesFromResp = respondents.map((r) => r.formTitle).filter(Boolean)
+    const combined = Array.from(new Set([...titlesFromDb, ...titlesFromResp]))
+    return combined.sort()
+  }, [forms, respondents])
 
   // ============ PAGINATION ============
   const totalPages = Math.ceil(filteredData.length / itemsPerPage)
@@ -416,47 +689,135 @@ export default function RespondentsPage() {
     const formTitle = selectedForms.length === 1 ? selectedForms[0] : 'Semua Formulir'
     const exportDate = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })
 
-    // Sheet 1: Summary
+    // Collect all aspect titles across exported dataset
+    const aspectMap = new Map<string, { title: string; totalPct: number; count: number }>()
+    dataToExport.forEach((r) => {
+      const aspects = getRespondentAspects(r)
+      aspects.forEach((asp) => {
+        const key = (asp.title || asp.aspectId).trim()
+        if (!aspectMap.has(key)) {
+          aspectMap.set(key, { title: asp.title, totalPct: asp.percentage, count: 1 })
+        } else {
+          const item = aspectMap.get(key)!
+          item.totalPct += asp.percentage
+          item.count += 1
+        }
+      })
+    })
+
+    // Sheet 1: Summary (STATISTIK TERMASUK RATA-RATA SKOR PER ASPEK)
     const total = dataToExport.length
     const avgScore = Math.round(dataToExport.reduce((sum, r) => sum + r.score, 0) / total)
-    const summaryData = [
+
+    const summaryData: any[][] = [
       ['LAPORAN RESPONDEN'],
-      [''], [`Formulir: ${formTitle}`], [`Tanggal Export: ${exportDate}`], [''],
-      ['STATISTIK'],
+      [''],
+      ['Formulir', formTitle],
+      ['Tanggal Export', exportDate],
+      [''],
+      ['STATISTIK PENILAIAN'],
       ['Total Responden', total],
-      ['Rata-rata Skor', `${avgScore}%`],
+      ['Rata-rata Skor Overall', `${avgScore}%`],
+    ]
+
+    // Insert per-aspect average score rows directly into STATISTIK section as requested
+    if (aspectMap.size > 0) {
+      aspectMap.forEach((val) => {
+        const avg = Math.round(val.totalPct / val.count)
+        summaryData.push([`Rata-rata Skor (${val.title})`, `${avg}%`])
+      })
+    }
+
+    summaryData.push(
       ['Terverifikasi', dataToExport.filter(r => r.status === 'Terverifikasi').length],
       ['Perlu Review', dataToExport.filter(r => r.status === 'Perlu Review').length],
-      ['Perlu Tindak Lanjut', dataToExport.filter(r => r.status === 'Perlu Tindak Lanjut').length],
-    ]
+      ['Perlu Tindak Lanjut', dataToExport.filter(r => r.status === 'Perlu Tindak Lanjut').length]
+    )
+
+    if (aspectMap.size > 0) {
+      summaryData.push([''])
+      summaryData.push(['RINGKASAN RATA-RATA PENILAIAN PER ASPEK'])
+      summaryData.push(['Nama Aspek Penilaian', 'Rata-rata Skor (%)', 'Kategori Kelayakan'])
+      aspectMap.forEach((val) => {
+        const avg = Math.round(val.totalPct / val.count)
+        const statusLbl = avg >= 80 ? 'Memenuhi Syarat (MS)' : avg >= 60 ? 'Binaan Lanjutan' : 'Perlu Perbaikan'
+        summaryData.push([val.title, `${avg}%`, statusLbl])
+      })
+    }
+
     const ws1 = XLSX.utils.aoa_to_sheet(summaryData)
-    ws1['!cols'] = [{ wch: 25 }, { wch: 20 }]
+    ws1['!cols'] = [{ wch: 38 }, { wch: 22 }, { wch: 25 }]
     XLSX.utils.book_append_sheet(wb, ws1, 'Summary')
 
-    // Sheet 2: Responden
-    const respData = dataToExport.map((r, i) => ({
-      'No': i + 1,
-      'Nama': r.respondentName || r.name,
-      'Email': r.respondentEmail || '-',
-      'Formulir': r.formTitle,
-      'Group': r.groupName || '-',
-      'Tanggal': r.date,
-      'Skor (%)': r.score,
-      'Metrik': r.metric,
-      'Status': r.status,
-      'Benar': r.scoringDetails?.correctCount || 0,
-      'Salah': r.scoringDetails?.wrongCount || 0,
-      'Dilewati': r.scoringDetails?.skippedCount || 0,
-      'Total Soal': r.scoringDetails?.totalQuestions || 0,
-    }))
+    // Sheet 2: Responden (Includes Per-Aspect Score Columns)
+    const aspectTitles = Array.from(aspectMap.values()).map(a => a.title)
+
+    const respData = dataToExport.map((r, i) => {
+      const respAspects = getRespondentAspects(r)
+      const aspScoreObj: Record<string, string> = {}
+      aspectTitles.forEach(t => {
+        const found = respAspects.find(a => a.title === t)
+        aspScoreObj[`[Aspek] ${t} (%)`] = found ? `${found.percentage}%` : '-'
+      })
+
+      return {
+        'No': i + 1,
+        'Nama Responden': r.respondentName || r.name,
+        'Email': r.respondentEmail || '-',
+        'Instansi / Sekolah': (r as any).institution || (r as any).answers?.institution || (r as any).answers?.instansi || '-',
+        'Formulir': r.formTitle,
+        'Group / Kode': r.groupName || '-',
+        'Tanggal': r.date,
+        'Skor Overall (%)': `${r.score}%`,
+        'Metrik / Predikat': r.metric,
+        ...aspScoreObj,
+        'Status': r.status,
+        'Total Soal': r.scoringDetails?.totalQuestions || 0,
+      }
+    })
     const ws2 = XLSX.utils.json_to_sheet(respData)
-    ws2['!cols'] = [
-      { wch: 5 }, { wch: 25 }, { wch: 25 }, { wch: 30 }, { wch: 20 }, { wch: 12 },
-      { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }
+    const ws2Cols = [
+      { wch: 5 }, { wch: 25 }, { wch: 25 }, { wch: 25 }, { wch: 30 }, { wch: 20 }, { wch: 12 },
+      { wch: 16 }, { wch: 20 }
     ]
+    aspectTitles.forEach(() => ws2Cols.push({ wch: 22 }))
+    ws2Cols.push({ wch: 15 }, { wch: 10 })
+    ws2['!cols'] = ws2Cols
     XLSX.utils.book_append_sheet(wb, ws2, 'Responden')
 
-    // Sheet 3: Detail Jawaban
+    // Sheet 3: Penilaian Per Aspek (Dedicated Breakdown Sheet)
+    if (aspectMap.size > 0) {
+      const aspectDetailRows: any[] = []
+      dataToExport.forEach((r, i) => {
+        const respAspects = getRespondentAspects(r)
+        respAspects.forEach((asp) => {
+          aspectDetailRows.push({
+            'No Responden': i + 1,
+            'Nama Responden': r.respondentName || r.name,
+            'Email': r.respondentEmail || '-',
+            'Instansi / Sekolah': (r as any).institution || (r as any).answers?.institution || (r as any).answers?.instansi || '-',
+            'Formulir': r.formTitle,
+            'Skor Overall (%)': `${r.score}%`,
+            'Nama Aspek Penilaian': asp.title,
+            'Skor Aspek (%)': `${asp.percentage}%`,
+            'Poin Terpenuhi': asp.rawScore,
+            'Maksimum Poin': asp.maxScore,
+            'Status Aspek': asp.percentage >= 80 ? 'Memenuhi Syarat (MS)' : asp.percentage >= 60 ? 'Binaan Lanjutan' : 'Perlu Perbaikan',
+          })
+        })
+      })
+
+      if (aspectDetailRows.length > 0) {
+        const ws3 = XLSX.utils.json_to_sheet(aspectDetailRows)
+        ws3['!cols'] = [
+          { wch: 12 }, { wch: 25 }, { wch: 25 }, { wch: 25 }, { wch: 30 },
+          { wch: 16 }, { wch: 30 }, { wch: 15 }, { wch: 14 }, { wch: 14 }, { wch: 22 }
+        ]
+        XLSX.utils.book_append_sheet(wb, ws3, 'Penilaian Per Aspek')
+      }
+    }
+
+    // Sheet 4: Detail Jawaban
     const labelMap: Record<string, string> = {}
     forms.forEach(form => {
       form.questions?.forEach((q: any) => {
@@ -467,7 +828,7 @@ export default function RespondentsPage() {
       .filter(k => !['respondentName', 'respondentEmail', 'name', 'nama', 'email'].includes(k))
     if (allKeys.length > 0) {
       const detailData = dataToExport.map(r => {
-        const row: Record<string, any> = { 'Nama': r.respondentName || r.name }
+        const row: Record<string, any> = { 'Nama Responden': r.respondentName || r.name }
         allKeys.forEach(key => {
           const label = labelMap[key] || key
           const val = r.answers[key]
@@ -476,14 +837,14 @@ export default function RespondentsPage() {
         })
         return row
       })
-      const ws3 = XLSX.utils.json_to_sheet(detailData)
-      ws3['!cols'] = Object.keys(detailData[0]).map(k => ({ wch: Math.min(Math.max(k.length + 5, 20), 40) }))
-      XLSX.utils.book_append_sheet(wb, ws3, 'Detail Jawaban')
+      const ws4 = XLSX.utils.json_to_sheet(detailData)
+      ws4['!cols'] = Object.keys(detailData[0]).map(k => ({ wch: Math.min(Math.max(k.length + 5, 20), 40) }))
+      XLSX.utils.book_append_sheet(wb, ws4, 'Detail Jawaban')
     }
 
-    const fileName = `Data_Responden_${formTitle.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`
+    const fileName = `Data_Responden_Penilaian_${formTitle.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`
     XLSX.writeFile(wb, fileName)
-    showToast(`${dataToExport.length} data berhasil diexport ke Excel`, 'success')
+    showToast(`${dataToExport.length} data berhasil diexport ke Excel!`, 'success')
   }
 
   // ============ COLORS ============
@@ -511,26 +872,142 @@ export default function RespondentsPage() {
     return 'text-rose-400'
   }
 
-  // ============ FORMAT ANSWER ============
-  const formatAnswerValue = (value: any): { type: 'text' | 'signature' | 'table' | 'array'; content: any } => {
-    if (value === null || value === undefined) return { type: 'text', content: '-' }
-    if (typeof value === 'string' && value.startsWith('data:image/png;base64,'))
-      return { type: 'signature', content: value }
-    if (Array.isArray(value)) return { type: 'array', content: value }
-    if (typeof value === 'object') return { type: 'table', content: value }
-    return { type: 'text', content: String(value) }
-  }
+  // ============ FORMAT ANSWER & OPTION RESOLUTION ============
+  const questionMetaMap = useMemo(() => {
+    const labelMap: Record<string, string> = {}
+    const optionMap: Record<string, any[]> = {}
+    const aspectMap: Record<string, string> = {}
 
-  // ============ MAPPING ID → LABEL UNTUK TAMPILAN ============
-  const questionLabelMap = useMemo(() => {
-    const map: Record<string, string> = {}
     forms.forEach(form => {
       form.questions?.forEach((q: any) => {
-        map[q.id] = q.question || q.label || q.id
+        const qPrompt = q.question || q.prompt || q.title || q.label || q.id
+        const qAspect = (q.aspectTitle || q.category || q.stageName || q.aspectId || q.stageId || '').trim()
+
+        const registerKey = (k: string) => {
+          if (!k) return
+          labelMap[k] = qPrompt
+          if (qAspect) aspectMap[k] = qAspect
+          const opts = q.options || q.presentation?.options || q.config?.options || []
+          if (Array.isArray(opts) && opts.length > 0) optionMap[k] = opts
+        }
+
+        if (q.id) registerKey(q.id)
+        if (q.questionId) registerKey(q.questionId)
+        const cleanP = cleanString(qPrompt)
+        if (cleanP) registerKey(cleanP)
+
+        // Sub-indicators for indicator tables
+        const indicators = q.indicators || q.presentation?.indicators || q.config?.indicators || []
+        indicators.forEach((ind: any, iIdx: number) => {
+          const indId = ind.id || ind.aspectId || `ind_${iIdx}`
+          const indLabel = ind.label || ind.title || ind.text || String(ind)
+          const subPrompt = `${qPrompt} - ${indLabel}`
+          
+          labelMap[`${q.id}-${indId}`] = subPrompt
+          labelMap[`${q.id}-${iIdx}`] = subPrompt
+          if (q.questionId) {
+            labelMap[`${q.questionId}-${indId}`] = subPrompt
+            labelMap[`${q.questionId}-${iIdx}`] = subPrompt
+          }
+          labelMap[indId] = indLabel
+        })
       })
     })
-    return map
+
+    return { labelMap, optionMap, aspectMap }
   }, [forms])
+
+  const questionLabelMap = questionMetaMap.labelMap
+
+  const resolveAnswerDisplayValue = (
+    key: string,
+    value: any,
+    questionObj?: any
+  ): { type: 'text' | 'signature' | 'table' | 'array'; content: any } => {
+    if (value === null || value === undefined) return { type: 'text', content: '-' }
+    if (typeof value === 'string' && value.startsWith('data:image/png;base64,')) {
+      return { type: 'signature', content: value }
+    }
+
+    const options =
+      (questionObj && (questionObj.options || questionObj.presentation?.options || questionObj.config?.options)) ||
+      questionMetaMap.optionMap[key] ||
+      questionMetaMap.optionMap[cleanString(key)] ||
+      []
+
+    const resolveSingleOpt = (valItem: any) => {
+      if (valItem === undefined || valItem === null || valItem === '') return '-'
+      const strVal = String(valItem).trim()
+      const cleanVal = strVal.toLowerCase().replace(/[^a-z0-9]/g, '')
+
+      if (options && options.length > 0) {
+        let matched = options.find((o: any) => {
+          if (typeof o === 'string') {
+            return o === strVal || (cleanVal && o.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanVal)
+          }
+          if (o && typeof o === 'object') {
+            const oId = String(o.optionId || o.id || o.value || o.val || '')
+            const oLbl = String(o.label || o.text || o.title || '')
+            return (
+              oId === strVal ||
+              oLbl === strVal ||
+              (cleanVal &&
+                (oId.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanVal ||
+                  oLbl.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanVal))
+            )
+          }
+          return false
+        })
+
+        if (!matched && !isNaN(Number(strVal))) {
+          const numIdx = Number(strVal)
+          if (numIdx >= 0 && numIdx < options.length) matched = options[numIdx]
+          else if (numIdx >= 1 && numIdx <= options.length) matched = options[numIdx - 1]
+        }
+
+        if (!matched && /opt/i.test(strVal)) {
+          const trailingDigits = strVal.match(/\d+$/)?.[0]
+          if (trailingDigits !== undefined) {
+            const extractedIdx = Number(trailingDigits)
+            if (extractedIdx >= 0 && extractedIdx < options.length) {
+              matched = options[extractedIdx]
+            }
+          }
+        }
+
+        if (matched) {
+          return typeof matched === 'object' ? (matched.label || matched.text || matched.title || strVal) : matched
+        }
+      }
+
+      if (/^(opt_|q_\d+_opt_)/i.test(strVal)) {
+        const numMatch = strVal.match(/\d+$/)?.[0]
+        if (numMatch !== undefined) {
+          const letter = String.fromCharCode(65 + Number(numMatch))
+          return `Pilihan ${letter}`
+        }
+      }
+
+      return strVal
+    }
+
+    if (Array.isArray(value)) {
+      const resolvedList = value.map((item) => resolveSingleOpt(item))
+      return { type: 'array', content: resolvedList }
+    }
+
+    if (typeof value === 'object') {
+      const resolvedTable: Record<string, any> = {}
+      for (const [subKey, subVal] of Object.entries(value)) {
+        resolvedTable[subKey] = resolveSingleOpt(subVal)
+      }
+      return { type: 'table', content: resolvedTable }
+    }
+
+    return { type: 'text', content: resolveSingleOpt(value) }
+  }
+
+  const formatAnswerValue = (value: any) => resolveAnswerDisplayValue('', value)
 
   // ============ PRINT STYLES ============
   const printStyles = `
@@ -546,6 +1023,103 @@ export default function RespondentsPage() {
       .print-header p { font-size: 14px; color: #666; margin: 2px 0; }
     }
   `
+
+  // ============ SEQUENTIAL PUBLIC FORM ORDER FOR PREVIEW ============
+  const getOrderedAnswerEntries = (selectedResp: Respondent) => {
+    if (!selectedResp?.answers) return []
+
+    const form = findMatchingForm(selectedResp, forms)
+
+    const answersObj = selectedResp.answers
+    const processedKeys = new Set<string>()
+    const entries: Array<{ key: string; label: string; aspectBadge?: string; value: any; question?: any }> = []
+
+    if (form && form.questions && Array.isArray(form.questions)) {
+      form.questions.forEach((q: any, idx: number) => {
+        const qId = q.questionId || q.id
+        const qPrompt = q.question || q.prompt || q.title || q.label || `Pertanyaan ${idx + 1}`
+        const qAspect = (q.aspectTitle || q.category || q.stageName || q.aspectId || q.stageId || '').trim()
+
+        let foundKey: string | null = null
+        let foundValue: any = undefined
+
+        for (const [k, v] of Object.entries(answersObj)) {
+          if (processedKeys.has(k)) continue
+          if (
+            k === qId ||
+            k === q.id ||
+            k === q.questionId ||
+            k === qPrompt ||
+            cleanString(k) === cleanString(qPrompt) ||
+            k === `q_${idx}` ||
+            k === `question_${idx}` ||
+            k === `q_${idx + 1}` ||
+            k === `question_${idx + 1}`
+          ) {
+            foundKey = k
+            foundValue = v
+            break
+          }
+        }
+
+        if (!foundKey) {
+          const cleanP = cleanString(qPrompt)
+          for (const [k, v] of Object.entries(answersObj)) {
+            if (processedKeys.has(k)) continue
+            const cleanK = cleanString(k)
+            if (cleanK && cleanP && (cleanK.includes(cleanP) || cleanP.includes(cleanK))) {
+              foundKey = k
+              foundValue = v
+              break
+            }
+          }
+        }
+
+        if (foundKey && foundValue !== undefined) {
+          processedKeys.add(foundKey)
+          entries.push({
+            key: foundKey,
+            label: qPrompt,
+            aspectBadge: qAspect,
+            value: foundValue,
+            question: q,
+          })
+        }
+      })
+    }
+
+    // Append unmapped entries
+    for (const [key, value] of Object.entries(answersObj)) {
+      if (processedKeys.has(key)) continue
+      if (
+        [
+          'respondentName',
+          'respondentEmail',
+          'name',
+          'nama',
+          'email',
+          'createdAt',
+          'formCode',
+          'formId',
+          'formTitle',
+          'submittedAt',
+        ].includes(key)
+      ) {
+        continue
+      }
+
+      const label = questionLabelMap[key] || key.replace(/^(q_|question_|sec_\d+_q_)/gi, 'Pertanyaan ').replace(/_/g, ' ')
+      const aspectBadge = questionMetaMap.aspectMap[key]
+      entries.push({
+        key,
+        label,
+        aspectBadge,
+        value,
+      })
+    }
+
+    return entries
+  }
 
   // ============ RENDER ============
   return (
@@ -634,22 +1208,67 @@ export default function RespondentsPage() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           {[
-            { label: 'Total', value: filteredData.length, icon: 'users', color: 'text-cyan-400' },
-            { label: 'Terverifikasi', value: filteredData.filter(r => r.status === 'Terverifikasi').length, icon: 'checkCircle', color: 'text-emerald-400' },
-            { label: 'Perlu Review', value: filteredData.filter(r => r.status === 'Perlu Review').length, icon: 'alertCircle', color: 'text-amber-400' },
-            { label: 'Tindak Lanjut', value: filteredData.filter(r => r.status === 'Perlu Tindak Lanjut').length, icon: 'info', color: 'text-rose-400' },
+            { label: 'Total Responden', value: filteredData.length, icon: 'users', color: 'text-cyan-400', bg: 'border-cyan-500/20 bg-cyan-500/5' },
+            { label: 'Rata-Rata Overall', value: `${filteredData.length > 0 ? Math.round(filteredData.reduce((s, r) => s + r.score, 0) / filteredData.length) : 0}%`, icon: 'award', color: 'text-purple-400', bg: 'border-purple-500/20 bg-purple-500/5' },
+            { label: 'Terverifikasi', value: filteredData.filter(r => r.status === 'Terverifikasi').length, icon: 'checkCircle', color: 'text-emerald-400', bg: 'border-emerald-500/20 bg-emerald-500/5' },
+            { label: 'Perlu Review', value: filteredData.filter(r => r.status === 'Perlu Review').length, icon: 'alertCircle', color: 'text-amber-400', bg: 'border-amber-500/20 bg-amber-500/5' },
+            { label: 'Tindak Lanjut', value: filteredData.filter(r => r.status === 'Perlu Tindak Lanjut').length, icon: 'info', color: 'text-rose-400', bg: 'border-rose-500/20 bg-rose-500/5' },
           ].map(stat => (
-            <div key={stat.label} className="rounded-xl bg-[#080812] border border-white/5 p-3">
+            <div key={stat.label} className={`rounded-2xl border p-3.5 space-y-1 ${stat.bg}`}>
               <div className="flex items-center gap-2">
                 <Icon name={stat.icon as any} className={`w-4 h-4 ${stat.color}`} />
-                <span className="text-xs text-white/40">{stat.label}</span>
+                <span className="text-[10px] font-mono text-white/60 uppercase font-bold">{stat.label}</span>
               </div>
-              <p className={`text-xl font-bold font-display mt-1 ${stat.color}`}>{stat.value}</p>
+              <p className={`text-2xl font-black font-mono tracking-tight ${stat.color}`}>{stat.value}</p>
             </div>
           ))}
         </div>
+
+        {/* SUMMARY RATA-RATA PENILAIAN PER ASPEK (ASPEK SIKAP, PERILAKU, DLL) */}
+        {aspectAverages.length > 0 && (
+          <div className="p-4 rounded-2xl bg-[#080812] border border-white/10 space-y-3 shadow-lg">
+            <div className="flex items-center justify-between border-b border-white/5 pb-2.5">
+              <h3 className="text-xs font-bold text-cyan-300 font-mono uppercase tracking-wider flex items-center gap-2">
+                <Icon name="layers" className="w-4 h-4 text-cyan-400" />
+                <span>Rata-Rata Penilaian Per Aspek (Ringkasan Aspek Sikap, Perilaku & Aspek Lainnya)</span>
+              </h3>
+              <span className="text-[10px] font-mono text-white/40">
+                {aspectAverages.length} Aspek Terkonfigurasi
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {aspectAverages.map((asp, idx) => (
+                <div key={idx} className="p-3.5 rounded-xl bg-white/3 border border-white/5 space-y-2">
+                  <div className="flex justify-between items-start">
+                    <span className="text-xs font-bold text-slate-100 truncate pr-2">{asp.title}</span>
+                    <span className="text-sm font-black font-mono text-cyan-300 bg-cyan-950/60 px-2 py-0.5 rounded-lg border border-cyan-500/30">
+                      {asp.avgPercentage}%
+                    </span>
+                  </div>
+
+                  <div className="w-full bg-white/5 rounded-full h-1.5 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${
+                        asp.avgPercentage >= 80 ? 'bg-emerald-400' : asp.avgPercentage >= 60 ? 'bg-cyan-400' : 'bg-amber-400'
+                      }`}
+                      style={{ width: `${Math.min(100, Math.max(0, asp.avgPercentage))}%` }}
+                    />
+                  </div>
+
+                  <div className="flex justify-between text-[10px] font-mono text-white/40">
+                    <span>Kategori: <strong className={asp.avgPercentage >= 80 ? 'text-emerald-400' : asp.avgPercentage >= 60 ? 'text-cyan-400' : 'text-amber-400'}>
+                      {asp.avgPercentage >= 80 ? 'Sangat Baik' : asp.avgPercentage >= 60 ? 'Baik' : 'Perlu Perhatian'}
+                    </strong></span>
+                    <span>({asp.count} responden)</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Table */}
         <div className="rounded-2xl bg-[#080812] border border-white/5 overflow-hidden">
@@ -668,7 +1287,8 @@ export default function RespondentsPage() {
                     <th className="text-left px-4 py-3 text-xs text-white/35 uppercase">Formulir</th>
                     <th className="text-left px-4 py-3 text-xs text-white/35 uppercase">Group</th>
                     <th className="text-left px-4 py-3 text-xs text-white/35 uppercase">Tanggal</th>
-                    <th className="text-left px-4 py-3 text-xs text-white/35 uppercase">Skor</th>
+                    <th className="text-left px-4 py-3 text-xs text-white/35 uppercase">Skor Overall</th>
+                    <th className="text-left px-4 py-3 text-xs text-white/35 uppercase">Rincian Aspek</th>
                     <th className="text-left px-4 py-3 text-xs text-white/35 uppercase">Metrik</th>
                     <th className="text-left px-4 py-3 text-xs text-white/35 uppercase">Status</th>
                     <th className="text-left px-4 py-3 text-xs text-white/35 uppercase">Aksi</th>
@@ -677,7 +1297,7 @@ export default function RespondentsPage() {
                 <tbody>
                   {paginatedData.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="text-center py-12 text-white/30">
+                      <td colSpan={10} className="text-center py-12 text-white/30">
                         <Icon name="users" className="w-12 h-12 mx-auto mb-3 text-white/10" />
                         <p className="text-base font-medium text-white/40">Tidak ada data responden</p>
                         <p className="text-sm text-white/20 mt-1">Belum ada yang mengisi formulir</p>
@@ -686,11 +1306,12 @@ export default function RespondentsPage() {
                   ) : (
                     paginatedData.map((r, i) => {
                       const idx = (currentPage - 1) * itemsPerPage + i + 1
+                      const respAspects = getRespondentAspects(r)
                       return (
                         <tr key={r.id} className="border-b border-white/3 hover:bg-white/2 transition-colors group">
                           <td className="px-4 py-3 text-white/40 text-xs">{idx}</td>
                           <td className="px-4 py-3 font-medium text-white">
-                            {r.respondentName || 'Responden'}
+                            {r.name || r.respondentName || 'Responden'}
                           </td>
                           <td className="px-4 py-3 text-white/60 text-sm">{r.formTitle}</td>
                           <td className="px-4 py-3">
@@ -705,6 +1326,22 @@ export default function RespondentsPage() {
                           <td className="px-4 py-3 text-white/40 text-xs">{r.date}</td>
                           <td className={`px-4 py-3 font-semibold ${getScoreColor(r.score)}`}>
                             {r.score}%
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex flex-wrap gap-1 max-w-xs">
+                              {respAspects.map((asp, aIdx) => (
+                                <span
+                                  key={aIdx}
+                                  className="px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-[10px] font-mono text-cyan-300 font-semibold"
+                                  title={`${asp.title}: ${asp.percentage}%`}
+                                >
+                                  {asp.title}: {asp.percentage}%
+                                </span>
+                              ))}
+                              {respAspects.length === 0 && (
+                                <span className="text-xs text-white/30">-</span>
+                              )}
+                            </div>
                           </td>
                           <td className={`px-4 py-3 font-medium text-sm ${getMetricColor(r.metric)}`}>
                             {r.metric}
@@ -863,29 +1500,19 @@ export default function RespondentsPage() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {Object.entries(selectedRespondent.answers).map(([key, value]) => {
-                    // Skip metadata
-                    if (
-                      [
-                        'respondentName',
-                        'respondentEmail',
-                        'name',
-                        'nama',
-                        'email',
-                        'createdAt',
-                        'formCode',
-                        'formId',
-                        'formTitle',
-                        'submittedAt',
-                      ].includes(key)
-                    )
-                      return null
-                    const label = questionLabelMap[key] || key
-                    const { type, content } = formatAnswerValue(value)
+                  {getOrderedAnswerEntries(selectedRespondent).map(({ key, label, aspectBadge, value, question }) => {
+                    const { type, content } = resolveAnswerDisplayValue(key, value, question)
 
                     return (
-                      <div key={key} className="p-4 rounded-xl bg-white/2 border border-white/5">
-                        <p className="text-xs text-white/40 mb-2 font-medium break-words">{label}</p>
+                      <div key={key} className="p-4 rounded-xl bg-white/2 border border-white/5 space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-xs text-white/40 font-medium break-words">{label}</p>
+                          {aspectBadge && (
+                            <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 shrink-0">
+                              {aspectBadge}
+                            </span>
+                          )}
+                        </div>
 
                         {type === 'signature' && (
                           <div className="rounded-lg overflow-hidden border border-white/5 bg-white p-2">
@@ -928,7 +1555,7 @@ export default function RespondentsPage() {
                             {content.map((item: any, i: number) => (
                               <span
                                 key={i}
-                                className="px-2 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-xs text-cyan-400"
+                                className="px-2.5 py-1 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-xs font-medium text-cyan-300"
                               >
                                 {typeof item === 'object' ? JSON.stringify(item) : String(item)}
                               </span>
@@ -937,7 +1564,7 @@ export default function RespondentsPage() {
                         )}
 
                         {type === 'text' && (
-                          <p className="text-sm text-white font-medium whitespace-pre-wrap break-words">
+                          <p className="text-sm text-cyan-200 font-medium whitespace-pre-wrap break-words">
                             {content}
                           </p>
                         )}

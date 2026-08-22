@@ -8,7 +8,10 @@ export interface RespondentInfo {
   name?: string
   email?: string
   phone?: string
+  address?: string
+  institution?: string
   externalId?: string
+  [key: string]: any
 }
 
 export interface ResponseDoc {
@@ -22,6 +25,7 @@ export interface ResponseDoc {
   ownerId: string
   respondent: RespondentInfo
   answers: Record<string, any>
+  biodata?: Array<{ label: string; value: string }>
   status: ResponseStatus
   startedAt: string
   updatedAt: string

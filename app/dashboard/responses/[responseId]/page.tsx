@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { Topbar } from '@/components/dashboard/Topbar'
 import { Icon } from '@/components/ui/Icons'
 import type { ResponseDoc } from '@/lib/forms/v1_5/responseTypes'
+import { isBiodataAspect } from '@/lib/forms/v1_5/scoring/scoringEngine'
+import { extractRespondentName, extractRespondentEmail } from '@/lib/forms/v1_5/respondentUtils'
 
 interface PageProps {
   params: Promise<{ responseId: string }>
@@ -18,6 +20,8 @@ export default function ResponseDetailPage({ params }: PageProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [filterType, setFilterType] = useState<'all' | 'low_score' | 'indicators'>('all')
 
+  const [formDoc, setFormDoc] = useState<any>(null)
+
   const loadResponse = async () => {
     setIsLoading(true)
     setError(null)
@@ -28,6 +32,18 @@ export default function ResponseDetailPage({ params }: PageProps) {
       if (data.success && data.response) {
         const resp = data.response
         setResponseDoc(resp)
+
+        if (resp.formId) {
+          try {
+            const formRes = await fetch(`/api/v1_5/forms/${resp.formId}`)
+            const formData = await formRes.json()
+            if (formData.success && formData.form) {
+              setFormDoc(formData.form)
+            }
+          } catch {
+            // Optional form definition load
+          }
+        }
       } else {
         setError(data.message || 'Gagal memuat detail respon.')
       }
@@ -77,6 +93,67 @@ export default function ResponseDetailPage({ params }: PageProps) {
 
   const { answers, result } = responseDoc
   const answerEntries = Object.entries(answers || {})
+
+  // Helper to map raw question ID & option ID to human-readable text
+  const resolveQuestionMeta = (key: string) => {
+    if (!formDoc?.questions) return { prompt: key, options: null }
+    const strKey = String(key).trim()
+    const cleanKey = strKey.toLowerCase().replace(/[^a-z0-9]/g, '')
+    const q = formDoc.questions.find(
+      (item: any) =>
+        item.questionId === strKey ||
+        item.id === strKey ||
+        item.prompt === strKey ||
+        item.title === strKey ||
+        item.question === strKey ||
+        item.label === strKey ||
+        (cleanKey && cleanKey === (item.prompt || item.title || item.question || item.label || '').toLowerCase().replace(/[^a-z0-9]/g, ''))
+    )
+    if (q) {
+      return {
+        prompt: q.prompt || q.title || q.question || q.label || key,
+        options: q.options || q.presentation?.options || q.config?.options || null,
+      }
+    }
+    return { prompt: key, options: null }
+  }
+
+  const resolveAnswerDisplay = (key: string, val: any) => {
+    const meta = resolveQuestionMeta(key)
+    let displayVal = val
+    if (meta.options && Array.isArray(meta.options)) {
+      if (typeof val === 'string' || typeof val === 'number') {
+        const strVal = String(val).trim()
+        const cleanVal = strVal.toLowerCase().replace(/[^a-z0-9]/g, '')
+        const opt = meta.options.find((o: any) => {
+          if (typeof o === 'string') return o === strVal || (cleanVal && o.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanVal)
+          if (o && typeof o === 'object') {
+            const oId = String(o.optionId || o.id || o.value || o.val || '')
+            const oLbl = String(o.label || o.text || o.title || '')
+            return oId === strVal || oLbl === strVal || (cleanVal && (oId.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanVal || oLbl.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanVal))
+          }
+          return false
+        })
+        if (opt) displayVal = typeof opt === 'object' ? (opt.label || opt.text || opt.title || val) : opt
+      } else if (Array.isArray(val)) {
+        displayVal = val.map((vItem) => {
+          const strVal = String(vItem).trim()
+          const cleanVal = strVal.toLowerCase().replace(/[^a-z0-9]/g, '')
+          const opt = meta.options.find((o: any) => {
+            if (typeof o === 'string') return o === strVal || (cleanVal && o.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanVal)
+            if (o && typeof o === 'object') {
+              const oId = String(o.optionId || o.id || o.value || o.val || '')
+              const oLbl = String(o.label || o.text || o.title || '')
+              return oId === strVal || oLbl === strVal || (cleanVal && (oId.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanVal || oLbl.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanVal))
+            }
+            return false
+          })
+          return opt ? (typeof opt === 'object' ? (opt.label || opt.text || vItem) : opt) : vItem
+        }).join(', ')
+      }
+    }
+    return { prompt: meta.prompt, displayVal }
+  }
 
   // Low score indicators
   const lowScoreQuestions = result?.questions?.filter((q: any) => q.includedInTotal && q.percentage < 60) || []
@@ -189,10 +266,12 @@ export default function ResponseDetailPage({ params }: PageProps) {
               </div>
 
               <h2 className="text-lg font-extrabold text-slate-100 print:text-black">
-                Responden: {responseDoc.respondent?.name || 'Anonim / Publik'}
+                Responden: {extractRespondentName(responseDoc, formDoc)}
               </h2>
               <div className="flex items-center gap-4 text-xs text-slate-400 font-mono flex-wrap print:text-gray-700">
-                {responseDoc.respondent?.email && <span>Email: {responseDoc.respondent.email}</span>}
+                {(extractRespondentEmail(responseDoc, formDoc) || responseDoc.respondent?.email) && (
+                  <span>Email: {extractRespondentEmail(responseDoc, formDoc) || responseDoc.respondent?.email}</span>
+                )}
                 {responseDoc.respondent?.phone && <span>Telp: {responseDoc.respondent.phone}</span>}
                 {(responseDoc.respondent as any)?.address && <span>Lokasi: {(responseDoc.respondent as any).address}</span>}
               </div>
@@ -264,7 +343,7 @@ export default function ResponseDetailPage({ params }: PageProps) {
         </div>
 
         {/* ASPECT BREAKDOWN CARDS IF PRESENT */}
-        {result?.aspects && result.aspects.length > 0 && (
+        {result?.aspects && result.aspects.filter((a: any) => !isBiodataAspect(a.title)).length > 0 && (
           <div className="p-6 rounded-3xl bg-slate-900 border border-slate-800 space-y-4 shadow-xl print:border-black print:bg-white">
             <h3 className="text-xs font-bold text-cyan-300 font-mono uppercase tracking-wider flex items-center gap-2 print:text-black">
               <Icon name="layers" className="w-4 h-4" />
@@ -272,7 +351,9 @@ export default function ResponseDetailPage({ params }: PageProps) {
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {result.aspects.map((asp: any, idx: number) => (
+              {result.aspects
+                .filter((asp: any) => !isBiodataAspect(asp.title))
+                .map((asp: any, idx: number) => (
                 <div key={asp.aspectId || idx} className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3 print:border-black print:bg-gray-50">
                   <div className="flex justify-between items-start gap-2">
                     <div>
@@ -304,6 +385,55 @@ export default function ResponseDetailPage({ params }: PageProps) {
           </div>
         )}
 
+        {/* INFORMASI BIODATA RESPONDEN CARD SECTION */}
+        {((responseDoc.biodata && responseDoc.biodata.length > 0) || responseDoc.respondent?.institution || responseDoc.respondent?.email || responseDoc.respondent?.phone) && (
+          <div className="p-6 rounded-3xl bg-slate-900 border border-slate-800 space-y-4 shadow-xl print:border-black print:bg-white">
+            <h3 className="text-xs font-bold text-purple-300 font-mono uppercase tracking-wider flex items-center gap-2 print:text-black">
+              <Icon name="user" className="w-4 h-4 text-purple-400" />
+              <span>Informasi & Profil Biodata Diri Responden</span>
+            </h3>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+              {responseDoc.respondent?.name && (
+                <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-1 print:border-black print:bg-gray-50">
+                  <span className="text-[10px] font-mono font-bold text-slate-400 uppercase">Nama Responden</span>
+                  <div className="text-xs font-bold text-slate-100 print:text-black">{responseDoc.respondent.name}</div>
+                </div>
+              )}
+              {responseDoc.respondent?.email && (
+                <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-1 print:border-black print:bg-gray-50">
+                  <span className="text-[10px] font-mono font-bold text-slate-400 uppercase">Alamat Email</span>
+                  <div className="text-xs font-bold text-cyan-300 print:text-black">{responseDoc.respondent.email}</div>
+                </div>
+              )}
+              {responseDoc.respondent?.phone && (
+                <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-1 print:border-black print:bg-gray-50">
+                  <span className="text-[10px] font-mono font-bold text-slate-400 uppercase">No. HP / WhatsApp</span>
+                  <div className="text-xs font-bold text-emerald-300 print:text-black">{responseDoc.respondent.phone}</div>
+                </div>
+              )}
+              {responseDoc.respondent?.institution && (
+                <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-1 print:border-black print:bg-gray-50">
+                  <span className="text-[10px] font-mono font-bold text-slate-400 uppercase">Instansi / Sekolah</span>
+                  <div className="text-xs font-bold text-purple-300 print:text-black">{responseDoc.respondent.institution}</div>
+                </div>
+              )}
+              {responseDoc.respondent?.address && (
+                <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-1 print:border-black print:bg-gray-50">
+                  <span className="text-[10px] font-mono font-bold text-slate-400 uppercase">Alamat / Lokasi</span>
+                  <div className="text-xs font-bold text-slate-200 print:text-black">{responseDoc.respondent.address}</div>
+                </div>
+              )}
+              {responseDoc.biodata?.map((item, idx) => (
+                <div key={idx} className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-1 print:border-black print:bg-gray-50">
+                  <span className="text-[10px] font-mono font-bold text-slate-400 uppercase truncate block">{item.label}</span>
+                  <div className="text-xs font-bold text-cyan-300 print:text-black">{item.value || '-'}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* DETAILED RESPONDENT ANSWERS DATA WORKSPACE (SAMA DENGAN DOKUMEN RESPONDEN LAMA) */}
         <div className="p-6 rounded-3xl bg-slate-900 border border-slate-800 space-y-5 shadow-xl print:border-black print:bg-white">
           <div className="flex items-center justify-between border-b border-slate-800 pb-4 print:border-black">
@@ -324,8 +454,9 @@ export default function ResponseDetailPage({ params }: PageProps) {
           ) : (
             <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1 print:max-h-none print:overflow-visible">
               {answerEntries.map(([key, val], idx) => {
-                const isTableObj = typeof val === 'object' && val !== null && !Array.isArray(val)
-                const isArrayVal = Array.isArray(val)
+                const { prompt, displayVal } = resolveAnswerDisplay(key, val)
+                const isTableObj = typeof displayVal === 'object' && displayVal !== null && !Array.isArray(displayVal)
+                const isArrayVal = Array.isArray(displayVal)
 
                 return (
                   <div key={key || idx} className="p-4 rounded-2xl bg-slate-950 border border-slate-800/80 space-y-2 print:border-black print:bg-gray-50">
@@ -333,7 +464,7 @@ export default function ResponseDetailPage({ params }: PageProps) {
                       <span>Pertanyaan #{String(idx + 1).padStart(2, '0')}</span>
                     </div>
 
-                    <h4 className="text-xs font-bold text-slate-100 font-sans print:text-black">{key}</h4>
+                    <h4 className="text-xs font-bold text-slate-100 font-sans print:text-black">{prompt}</h4>
 
                     {isTableObj ? (
                       <div className="overflow-x-auto rounded-xl border border-slate-800/80 print:border-black mt-2">
@@ -345,7 +476,7 @@ export default function ResponseDetailPage({ params }: PageProps) {
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-800/80 bg-slate-950 print:bg-white print:divide-gray-300">
-                            {Object.entries(val).map(([indLabel, indVal]) => (
+                            {Object.entries(displayVal).map(([indLabel, indVal]) => (
                               <tr key={indLabel}>
                                 <td className="p-2.5 px-3.5 font-sans font-medium text-slate-200 print:text-black">{indLabel}</td>
                                 <td className="p-2.5 text-right font-bold text-cyan-300 print:text-black">
@@ -358,7 +489,7 @@ export default function ResponseDetailPage({ params }: PageProps) {
                       </div>
                     ) : isArrayVal ? (
                       <div className="flex flex-wrap gap-1.5 pt-1">
-                        {val.map((item: any, i: number) => (
+                        {displayVal.map((item: any, i: number) => (
                           <span
                             key={i}
                             className="px-3 py-1 rounded-xl bg-cyan-950 border border-cyan-500/40 text-xs font-mono text-cyan-300 font-semibold print:border-black print:bg-gray-200 print:text-black"
@@ -369,7 +500,7 @@ export default function ResponseDetailPage({ params }: PageProps) {
                       </div>
                     ) : (
                       <div className="p-3 rounded-xl bg-slate-900 border border-slate-800/60 text-xs font-mono font-semibold text-slate-200 print:border-black print:bg-white print:text-black">
-                        {String(val)}
+                        {String(displayVal)}
                       </div>
                     )}
                   </div>
