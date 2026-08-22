@@ -1,13 +1,13 @@
-'use client'
-
 import React, { useState } from 'react'
 import type { BuilderState } from '@/lib/forms/v1_5/builderState'
+import { computeBalancedAspectWeights, updateScoring } from '@/lib/forms/v1_5/builderState'
 import { Icon } from '@/components/ui/Icons'
 import { calculateQuestionScore } from '@/lib/forms/v1_5/scoring/scoringEngine'
 
 interface Step4PublishProps {
   state: BuilderState
   activeVersionNumber?: number
+  onChangeState?: (state: BuilderState) => void
   onPublishVersion?: () => Promise<void>
   onNavigateToStep?: (step: 1 | 2 | 3 | 4) => void
   onBack: () => void
@@ -16,6 +16,7 @@ interface Step4PublishProps {
 export function Step4Publish({
   state,
   activeVersionNumber = 1,
+  onChangeState,
   onPublishVersion,
   onNavigateToStep,
   onBack,
@@ -40,18 +41,19 @@ export function Step4Publish({
       const indicators = (q as any).presentation?.indicators || (q as any).config?.indicators || []
       return indicators.length === 0
     }
-    const isNonScoring = ['biodata-name', 'biodata-email', 'biodata-phone', 'biodata-address', 'biodata-institution', 'short-text', 'long-text', 'text', 'textarea', 'file-upload', 'image', 'signature', 'date'].includes(q.type)
+    const targetAspect = state.aspects.find((a) => a.aspectId === (q.aspectId || state.aspects[0]?.aspectId))
+    const isNonScoring = targetAspect?.isScored === false || ['biodata-name', 'biodata-email', 'biodata-phone', 'biodata-address', 'biodata-institution', 'short-text', 'long-text', 'text', 'textarea', 'file-upload', 'image', 'signature', 'date'].includes(q.type)
     if (isNonScoring) return false
     return q.answerKey?.kind === 'none' || !(q.answerKey as any)?.correctOptionIds?.length
   })
   const isAnswerKeysValid = missingKeyQuestions.length === 0
 
   // 3. Scoring Config & Weight Distribution Readiness Check
-  const totalWeightPct = state.aspects.reduce((sum, asp) => {
-    if (asp.isScored === false) return sum
+  const scoredAspects = state.aspects.filter((a) => a.isScored !== false)
+  const totalWeightPct = scoredAspects.reduce((sum, asp) => {
     return sum + (state.scoring.stagePointDistribution?.[asp.aspectId] ?? 0)
   }, 0)
-  const isScoringConfigValid = outputMode === 'per_aspect' ? true : totalWeightPct === 100
+  const isScoringConfigValid = outputMode === 'per_aspect' || scoredAspects.length === 0 ? true : Math.round(totalWeightPct) === 100
 
   // 4. Security & Metadata Projection Check
   const isSecurityProjectionValid = Boolean(state.metadata.title && state.metadata.title.trim().length > 0)
@@ -60,9 +62,28 @@ export function Step4Publish({
   const isFormReadyForPublish = isStructureValid && isAnswerKeysValid && isScoringConfigValid && isSecurityProjectionValid
 
   const handlePublish = async () => {
-    if (!isFormReadyForPublish) {
-      setErrorMsg('Formulir belum memenuhi kelayakan publikasi. Selesaikan kriteria pemeriksaan yang belum lengkap.')
-      return
+    let currentState = state
+    const currentScoredAspects = currentState.aspects.filter((a) => a.isScored !== false)
+    const currentWeightSum = currentScoredAspects.reduce((sum, asp) => {
+      return sum + (currentState.scoring.stagePointDistribution?.[asp.aspectId] ?? 0)
+    }, 0)
+
+    if (outputMode !== 'per_aspect' && currentScoredAspects.length > 0 && Math.round(currentWeightSum) !== 100) {
+      const stageDist = computeBalancedAspectWeights(currentState.aspects)
+      currentState = updateScoring(currentState, { stagePointDistribution: stageDist })
+      onChangeState?.(currentState)
+    }
+
+    if (!isFormReadyForPublish && Math.round(currentWeightSum) !== 100) {
+      // Recheck after auto balance
+      const newScoredAspects = currentState.aspects.filter((a) => a.isScored !== false)
+      const newWeightSum = newScoredAspects.reduce((sum, asp) => {
+        return sum + (currentState.scoring.stagePointDistribution?.[asp.aspectId] ?? 0)
+      }, 0)
+      if (Math.round(newWeightSum) !== 100) {
+        setErrorMsg('Formulir belum memenuhi kelayakan publikasi. Selesaikan kriteria pemeriksaan yang belum lengkap.')
+        return
+      }
     }
 
     if (!onPublishVersion) {
@@ -298,14 +319,31 @@ export function Step4Publish({
                     : `Bobot Total ${totalWeightPct}% (Harus 100%)`}
                 </span>
               </div>
-              {!isScoringConfigValid && onNavigateToStep && (
-                <button
-                  type="button"
-                  onClick={() => onNavigateToStep(1)}
-                  className="text-[10px] font-bold underline shrink-0 hover:text-white"
-                >
-                  Atur Bobot →
-                </button>
+              {!isScoringConfigValid && (
+                <div className="flex items-center gap-2 shrink-0">
+                  {onChangeState && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const stageDist = computeBalancedAspectWeights(state.aspects)
+                        onChangeState(updateScoring(state, { stagePointDistribution: stageDist }))
+                      }}
+                      className="text-[10px] font-bold px-2 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 shrink-0 transition-colors"
+                      title="Klik untuk menyeimbangkan bobot aspek secara otomatis menjadi 100%"
+                    >
+                      ⚡ Seimbangkan (100%)
+                    </button>
+                  )}
+                  {onNavigateToStep && (
+                    <button
+                      type="button"
+                      onClick={() => onNavigateToStep(1)}
+                      className="text-[10px] font-bold underline shrink-0 hover:text-white"
+                    >
+                      Atur Bobot →
+                    </button>
+                  )}
+                </div>
               )}
             </div>
 

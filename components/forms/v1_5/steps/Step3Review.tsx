@@ -523,7 +523,8 @@ export function Step3Review({
                           const indicators = (q as any).presentation?.indicators || (q as any).config?.indicators || []
                           return indicators.length === 0
                         }
-                        const isNonScoring = ['biodata-name', 'biodata-email', 'biodata-phone', 'biodata-address', 'biodata-institution', 'short-text', 'long-text', 'text', 'textarea', 'file-upload', 'image', 'signature', 'date'].includes(q.type)
+                        const targetAspect = state.aspects.find((a) => a.aspectId === (q.aspectId || state.aspects[0]?.aspectId))
+                        const isNonScoring = targetAspect?.isScored === false || ['biodata-name', 'biodata-email', 'biodata-phone', 'biodata-address', 'biodata-institution', 'short-text', 'long-text', 'text', 'textarea', 'file-upload', 'image', 'signature', 'date'].includes(q.type)
                         if (isNonScoring) return false
                         return q.answerKey?.kind === 'none' || !(q.answerKey as any)?.correctOptionIds?.length
                       })
@@ -734,15 +735,33 @@ export function Step3Review({
                     </div>
 
                     {/* Image Attachment */}
-                    {q.presentation?.media?.url && (
-                      <div className="pl-5">
-                        <img
-                          src={q.presentation.media.url}
-                          alt={q.presentation.media.caption || 'Lampiran'}
-                          className="max-h-48 object-cover rounded-lg border border-slate-800"
-                        />
-                      </div>
-                    )}
+                    {(() => {
+                      const mediaUrl =
+                        q.presentation?.media?.url ||
+                        (q as any).imageUrl ||
+                        (q as any).image ||
+                        (q as any).mediaUrl ||
+                        (q as any).photoURL ||
+                        (q as any).config?.imageUrl ||
+                        (q as any).config?.media?.url
+                      const caption = q.presentation?.media?.caption || (q as any).imageCaption || (q as any).caption
+                      if (!mediaUrl) return null
+                      return (
+                        <div className="pl-5 my-2">
+                          <img
+                            src={mediaUrl}
+                            alt={caption || 'Lampiran Gambar Pertanyaan'}
+                            className="max-h-64 object-contain rounded-xl border border-slate-800 bg-slate-950 p-2 shadow-sm"
+                            loading="lazy"
+                          />
+                          {caption && (
+                            <p className="text-xs text-slate-400 mt-1 italic font-medium">
+                              {caption}
+                            </p>
+                          )}
+                        </div>
+                      )
+                    })()}
 
                     {/* INDICATOR TABLE / LIKERT GRID RENDERING */}
                     {isTable ? (

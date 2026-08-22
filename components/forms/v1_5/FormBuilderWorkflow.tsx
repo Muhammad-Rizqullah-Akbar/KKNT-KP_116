@@ -247,6 +247,7 @@ export function FormBuilderWorkflow({
           <Step4Publish
             state={state}
             activeVersionNumber={activeVersionNumber}
+            onChangeState={setState}
             onPublishVersion={onPublishVersion}
             onNavigateToStep={(s) => setCurrentStep(s)}
             onBack={handleStepBack}
