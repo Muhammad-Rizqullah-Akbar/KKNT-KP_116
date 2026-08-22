@@ -139,6 +139,9 @@ export interface FormResponse {
   formId: string
   formCode: string
   formTitle: string
+  distributionCode?: string
+  distributionId?: string
+  respondent?: any
   answers: Record<string, any>
   respondentName?: string
   respondentEmail?: string
@@ -306,16 +309,21 @@ const cleanFormData = (data: any): any => {
 
 const deserializeFormData = (doc: any): FormData => {
   const data = doc.data ? doc.data() : doc
-  const docId = doc.id || data.id
-  
+  const docId = doc.id || data.id || data.formId
+
+  let rawTitle = data.title || data.metadata?.title || data.formTitle || data.name || (docId ? `Formulir ${docId}` : 'Formulir Tanpa Judul')
+  if (rawTitle.startsWith('[Salinan') || rawTitle.startsWith('Salinan')) {
+    rawTitle = rawTitle.replace(/^\[Salinan[^\]]*\]\s*/i, '').replace(/^Salinan\s*(?:V1\.5)?\s*[-–:]\s*/i, '').trim()
+  }
+
   return {
     id: docId,
-    title: data.title || '',
-    code: data.code || '',
-    description: data.description || '',
-    target: data.target || '',
-    category: data.category || '',
-    status: data.status || 'draft',
+    title: rawTitle,
+    code: data.code || data.formCode || data.metadata?.code || '',
+    description: data.description || data.metadata?.description || '',
+    target: data.target || data.metadata?.target || '',
+    category: data.category || data.metadata?.category || '',
+    status: data.status || data.metadata?.status || 'draft',
     groupId: data.groupId || null,
     groupCode: data.groupCode || null,
     questions: (data.questions || []).map((q: any) => deserializeQuestion(q)),
@@ -338,7 +346,21 @@ export const getForms = async (): Promise<FormData[]> => {
   try {
     const formsRef = collection(firestore, 'forms')
     const snapshot = await getDocs(formsRef)
-    return snapshot.docs.map((doc) => deserializeFormData(doc))
+    const legacyForms = snapshot.docs.map((doc) => deserializeFormData(doc))
+
+    try {
+      const v15Ref = collection(firestore, 'v1_5_forms')
+      const v15Snap = await getDocs(v15Ref)
+      v15Snap.docs.forEach((docSnap) => {
+        if (!legacyForms.some((f) => f.id === docSnap.id)) {
+          legacyForms.push(deserializeFormData(docSnap))
+        }
+      })
+    } catch {
+      // Gracefully ignore if v1_5_forms collection does not exist
+    }
+
+    return legacyForms
   } catch (error) {
     console.error('Error getting forms:', error)
     throw error
@@ -364,6 +386,11 @@ export const getFormById = async (formId: string): Promise<FormData | null> => {
     if (docSnap.exists()) {
       return deserializeFormData(docSnap)
     }
+    const v15Ref = doc(firestore, 'v1_5_forms', formId)
+    const v15Snap = await getDoc(v15Ref)
+    if (v15Snap.exists()) {
+      return deserializeFormData(v15Snap)
+    }
     return null
   } catch (error) {
     console.error('Error getting form by id:', error)
@@ -378,6 +405,12 @@ export const getFormByCode = async (code: string): Promise<FormData | null> => {
     const snapshot = await getDocs(q)
     if (!snapshot.empty) {
       return deserializeFormData(snapshot.docs[0])
+    }
+    const v15Ref = collection(firestore, 'v1_5_forms')
+    const q15 = query(v15Ref, where('code', '==', code))
+    const snap15 = await getDocs(q15)
+    if (!snap15.empty) {
+      return deserializeFormData(snap15.docs[0])
     }
     return null
   } catch (error) {
@@ -397,6 +430,16 @@ export const getPublishedFormByCode = async (code: string): Promise<FormData | n
     const snapshot = await getDocs(q)
     if (!snapshot.empty) {
       return deserializeFormData(snapshot.docs[0])
+    }
+    const v15Ref = collection(firestore, 'v1_5_forms')
+    const q15 = query(
+      v15Ref, 
+      where('code', '==', code),
+      where('status', '==', 'published')
+    )
+    const snap15 = await getDocs(q15)
+    if (!snap15.empty) {
+      return deserializeFormData(snap15.docs[0])
     }
     return null
   } catch (error) {
@@ -710,10 +753,30 @@ export const getAllResponses = async (): Promise<FormResponse[]> => {
     const responsesRef = collection(firestore, 'responses')
     const q = query(responsesRef, orderBy('submittedAt', 'desc'))
     const snapshot = await getDocs(q)
-    return snapshot.docs.map((doc) => ({
+    const list = snapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
     })) as FormResponse[]
+
+    try {
+      const v15Ref = collection(firestore, 'v1_5_responses')
+      const v15Snap = await getDocs(query(v15Ref, orderBy('submittedAt', 'desc')))
+      v15Snap.docs.forEach((docSnap) => {
+        if (!list.some((r) => r.id === docSnap.id)) {
+          list.push({ id: docSnap.id, ...docSnap.data() } as any)
+        }
+      })
+    } catch {
+      // Gracefully ignore if v1_5_responses does not exist
+    }
+
+    list.sort((a, b) => {
+      const tA = new Date(a.submittedAt || (a as any).createdAt || 0).getTime()
+      const tB = new Date(b.submittedAt || (b as any).createdAt || 0).getTime()
+      return tB - tA
+    })
+
+    return list
   } catch (error) {
     console.error('Error getting all responses:', error)
     throw error

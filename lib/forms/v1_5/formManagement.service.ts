@@ -74,6 +74,53 @@ export async function createFormWorkflow(
   return await saveFormAggregateToDb(formId, initialPayload, sessionUid)
 }
 
+import { safeSetDoc } from '@/lib/firebase/repositories/v1_5/safeFirestore'
+
+export async function updateFormMetadataWorkflow(
+  formId: string,
+  metadataUpdate: Partial<FormMetadata>,
+  sessionUid: string
+): Promise<FormAggregateDoc> {
+  const existing = await getFormAggregateFromDb(formId)
+  if (!existing) {
+    throw new Error(`Formulir dengan ID "${formId}" tidak ditemukan.`)
+  }
+
+  const updatedMetadata: FormMetadata = {
+    ...existing.metadata,
+    ...metadataUpdate,
+    title: (metadataUpdate.title || existing.metadata.title || 'Formulir').trim(),
+  }
+
+  if (!updatedMetadata.title) {
+    throw new Error('Judul formulir wajib diisi.')
+  }
+
+  await registerNewMetadataEntry(updatedMetadata.category, updatedMetadata.target)
+
+  const updatedAggregate = await saveFormAggregateToDb(
+    formId,
+    {
+      ...existing,
+      metadata: updatedMetadata,
+    },
+    sessionUid
+  )
+
+  // If published, update active version snapshot title as well without changing version number
+  if (existing.activeVersionId && existing.status === 'published') {
+    try {
+      await safeSetDoc(`forms/${formId}/versions`, existing.activeVersionId, {
+        metadata: updatedMetadata,
+      })
+    } catch (err) {
+      console.warn('[updateFormMetadataWorkflow] Failed to update snapshot version metadata:', err)
+    }
+  }
+
+  return updatedAggregate
+}
+
 export async function saveDraftWorkflow(
   formId: string,
   state: BuilderState,
@@ -85,7 +132,8 @@ export async function saveDraftWorkflow(
   }
 
   if (existing.status === 'published') {
-    throw new Error('Formulir terpublikasi tidak dapat diubah secara langsung. Buat versi baru terlebih dahulu.')
+    // If published, update metadata (title/description/category/target) without changing version number
+    return await updateFormMetadataWorkflow(formId, state.metadata, sessionUid)
   }
 
   await registerNewMetadataEntry(state.metadata.category, state.metadata.target)
@@ -150,7 +198,15 @@ export async function duplicateFormWorkflow(
     throw new Error(`Formulir asal dengan ID "${sourceFormId}" tidak ditemukan.`)
   }
 
-  const cleanTitle = `[Salinan V1.5] ${existing.metadata.title}`
+  const rawTitle = existing.metadata.title || 'Formulir'
+  let baseTitle = rawTitle.replace(/^\[Salinan[^\]]*\]\s*/i, '').replace(/^Salinan\s*(?:V1\.5)?\s*[-–:]\s*/i, '').trim()
+  let cleanTitle = baseTitle
+  if (/pre[-_\s]*test/i.test(baseTitle)) {
+    cleanTitle = baseTitle.replace(/pre[-_\s]*test/gi, 'Post-Test')
+  } else if (!/post[-_\s]*test/i.test(baseTitle)) {
+    cleanTitle = `${baseTitle} (Post-Test)`
+  }
+
   const slug = cleanTitle.toLowerCase().replace(/[^a-z0-9]/g, '_') || 'form'
   const newFormId = `form_${slug}_${crypto.randomUUID().substring(0, 6)}`
 
