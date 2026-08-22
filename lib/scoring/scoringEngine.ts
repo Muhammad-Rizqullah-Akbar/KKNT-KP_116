@@ -57,12 +57,20 @@ export class ScoringEngine {
   /**
    * Dapatkan stage yang masuk penilaian
    */
+  /**
+   * Dapatkan stage yang masuk penilaian
+   */
   private getScoredStages(): FormStage[] {
     const distributionMap = this.scoring?.distribution || (this.scoring as any)?.stagePointDistribution || {}
+    const hasExplicitDist = Object.keys(distributionMap).some(k => Number(distributionMap[k]) > 0)
+
     return this.stages.filter((s) => {
       if (s.includeInScoring === false || (s as any).isScored === false) return false
-      const allocated = Number(distributionMap[s.id]) || 0
-      return allocated > 0
+      if (hasExplicitDist) {
+        const allocated = Number(distributionMap[s.id]) || 0
+        return allocated > 0
+      }
+      return true
     })
   }
 
@@ -108,7 +116,7 @@ export class ScoringEngine {
       }
       
       // Akumulasi ke stage (RAW)
-      const stageId = q.stageId || this.stages[0]?.id
+      const stageId = q.stageId || q.aspectId || (this.stages.find(s => s.questionIds?.includes(q.id))?.id) || this.stages[0]?.id
       if (stageId && perStage[stageId]) {
         perStage[stageId].rawEarned += result.earned
         perStage[stageId].rawPossible += result.possible
@@ -142,23 +150,27 @@ export class ScoringEngine {
     let totalEarnedPoints = 0
     let totalPossiblePoints = 0
     const scoredStages = this.getScoredStages()
-
     const distributionMap = this.scoring?.distribution || (this.scoring as any)?.stagePointDistribution || {}
+    const hasExplicitDist = Object.keys(distributionMap).some(k => Number(distributionMap[k]) > 0)
 
     scoredStages.forEach(stage => {
       const stageData = perStage[stage.id] || { rawEarned: 0, rawPossible: 0, percentage: 0, name: stage.name || 'Aspect', earned: 0, possible: 0 }
-      const allocatedPoints = Number(distributionMap[stage.id]) || 0
       
-      // Normalisasi: (percentage / 100) * allocatedPoints
-      const stagePct = Number(stageData.percentage) || 0
-      const normalizedEarned = (stagePct / 100) * allocatedPoints
-      
-      stageData.earned = Math.round(normalizedEarned * 100) / 100
-      stageData.possible = allocatedPoints
+      if (hasExplicitDist) {
+        const allocatedPoints = Number(distributionMap[stage.id]) || 0
+        const stagePct = Number(stageData.percentage) || 0
+        const normalizedEarned = (stagePct / 100) * allocatedPoints
+        stageData.earned = Math.round(normalizedEarned * 100) / 100
+        stageData.possible = allocatedPoints
+      } else {
+        stageData.earned = stageData.rawEarned
+        stageData.possible = stageData.rawPossible
+        stageData.percentage = stageData.rawPossible > 0 ? Math.round((stageData.rawEarned / stageData.rawPossible) * 100) : 0
+      }
+
       perStage[stage.id] = stageData
-      
       totalEarnedPoints += stageData.earned
-      totalPossiblePoints += allocatedPoints
+      totalPossiblePoints += stageData.possible
     })
 
     // ===== UNSCORED STAGES =====

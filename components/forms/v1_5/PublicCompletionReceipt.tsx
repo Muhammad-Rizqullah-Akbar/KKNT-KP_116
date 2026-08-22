@@ -3,6 +3,7 @@
 import React from 'react'
 import Link from 'next/link'
 import { Icon } from '@/components/ui/Icons'
+import { isBiodataAspect } from '@/lib/forms/v1_5/scoring/scoringEngine'
 
 interface PublicCompletionReceiptProps {
   responseId?: string
@@ -108,37 +109,46 @@ export function PublicCompletionReceipt({
               )}
             </div>
 
-            {/* Aspect Score Breakdown */}
-            {result.aspects && result.aspects.length > 0 && (
-              <div className="space-y-3 pt-2">
-                <h4 className="text-xs font-bold text-cyan-300 uppercase tracking-wider font-mono flex items-center gap-2">
-                  <Icon name="layers" className="w-4 h-4 text-cyan-400" />
-                  <span>Rincian Nilai per Aspek Penilaian</span>
-                </h4>
+            {/* Aspect Score Breakdown (Excludes Biodata Aspects like Data Responden & Sumber Informasi) */}
+            {(() => {
+              const scoredAspects = (result.aspects || []).filter((asp) => {
+                const title = asp.aspectTitle || asp.title || ''
+                return title && !isBiodataAspect(title)
+              })
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {result.aspects.map((asp, idx) => {
-                    const aspectTitle = asp.aspectTitle || asp.title || `Aspek Penilaian ${idx + 1}`
-                    return (
-                      <div key={asp.aspectId || idx} className="p-3.5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-2">
-                        <div className="flex justify-between items-start gap-2">
-                          <span className="text-xs font-bold text-slate-200 line-clamp-1">{aspectTitle}</span>
-                          <span className="text-xs font-mono font-extrabold text-cyan-400 flex-shrink-0">
-                            {asp.percentage}%
-                          </span>
+              if (scoredAspects.length === 0) return null
+
+              return (
+                <div className="space-y-3 pt-2">
+                  <h4 className="text-xs font-bold text-cyan-300 uppercase tracking-wider font-mono flex items-center gap-2">
+                    <Icon name="layers" className="w-4 h-4 text-cyan-400" />
+                    <span>Rincian Nilai per Aspek Penilaian</span>
+                  </h4>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {scoredAspects.map((asp, idx) => {
+                      const aspectTitle = asp.aspectTitle || asp.title || `Aspek Penilaian ${idx + 1}`
+                      return (
+                        <div key={asp.aspectId || idx} className="p-3.5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-2">
+                          <div className="flex justify-between items-start gap-2">
+                            <span className="text-xs font-bold text-slate-200 line-clamp-1">{aspectTitle}</span>
+                            <span className="text-xs font-mono font-extrabold text-cyan-400 flex-shrink-0">
+                              {asp.percentage}%
+                            </span>
+                          </div>
+                          <div className="w-full bg-slate-950 rounded-full h-1.5 overflow-hidden border border-slate-800">
+                            <div
+                              className="bg-cyan-400 h-full rounded-full transition-all duration-500"
+                              style={{ width: `${Math.min(100, Math.max(0, asp.percentage))}%` }}
+                            />
+                          </div>
                         </div>
-                        <div className="w-full bg-slate-950 rounded-full h-1.5 overflow-hidden border border-slate-800">
-                          <div
-                            className="bg-cyan-400 h-full rounded-full transition-all duration-500"
-                            style={{ width: `${Math.min(100, Math.max(0, asp.percentage))}%` }}
-                          />
-                        </div>
-                      </div>
-                    )
-                  })}
+                      )
+                    })}
+                  </div>
                 </div>
-              </div>
-            )}
+              )
+            })()}
           </div>
         )}
 

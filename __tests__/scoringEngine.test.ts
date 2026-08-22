@@ -136,4 +136,92 @@ describe('ScoringEngine Regression Matrix', () => {
     assert.equal(scoreResult.maximumScore, 5, 'Maximum score should be 5')
     assert.equal(scoreResult.percentage, 100, 'Percentage should be 100%')
   })
+
+  test('Calculate V1.5 score for legacy Pengetahuan (Knowledge) single-choice with config.correctAnswer label', () => {
+    const { calculateQuestionScore } = require('../lib/forms/v1_5/scoring/scoringEngine')
+
+    const question = {
+      questionId: 'q_peng_1',
+      id: 'q_peng_1',
+      type: 'single-choice',
+      prompt: 'Berapakah suhu aman penyimpanan pangan matang?',
+      config: {
+        options: ['A. < 5°C atau > 60°C', 'B. 20°C - 40°C', 'C. 100°C', 'D. Semua salah'],
+        correctAnswer: 'A. < 5°C atau > 60°C',
+      },
+    }
+
+    // Respondent selects optionId generated from string option
+    const answers1 = { q_peng_1: 'opt_q_peng_1_0' }
+    const res1 = calculateQuestionScore(question as any, answers1.q_peng_1)
+    assert.equal(res1.percentage, 100, 'Should score 100% when option ID matches correct label')
+
+    // Respondent selects option label string directly
+    const answers2 = { q_peng_1: 'A. < 5°C atau > 60°C' }
+    const res2 = calculateQuestionScore(question as any, answers2.q_peng_1)
+    assert.equal(res2.percentage, 100, 'Should score 100% when string label matches correct label')
+
+    // Respondent selects wrong option
+    const answersWrong = { q_peng_1: 'B. 20°C - 40°C' }
+    const resWrong = calculateQuestionScore(question as any, answersWrong.q_peng_1)
+    assert.equal(resWrong.percentage, 0, 'Should score 0% for wrong answer')
+  })
+
+  test('Calculate V1.5 score for legacy Pengetahuan question with numeric index correctAnswer', () => {
+    const { calculateQuestionScore } = require('../lib/forms/v1_5/scoring/scoringEngine')
+
+    const question = {
+      questionId: 'q_peng_idx',
+      id: 'q_peng_idx',
+      type: 'single-choice',
+      prompt: 'Bakteri penyebab keracunan makanan adalah?',
+      config: {
+        options: ['Escherichia coli', 'Lactobacillus', 'Saccharomyces'],
+        correctAnswer: 0, // 0-based index pointing to 'Escherichia coli'
+      },
+    }
+
+    const res1 = calculateQuestionScore(question as any, 'Escherichia coli')
+    assert.equal(res1.percentage, 100, 'Should score 100% when selected label matches index 0')
+
+    const res2 = calculateQuestionScore(question as any, 'opt_q_peng_idx_0')
+    assert.equal(res2.percentage, 100, 'Should score 100% when selected optionId matches index 0')
+
+    const resWrong = calculateQuestionScore(question as any, 'Lactobacillus')
+    assert.equal(resWrong.percentage, 0, 'Should score 0% for incorrect option')
+  })
+
+  test('Exclude Data Responden & Sumber Informasi biodata aspects from scoring summary', () => {
+    const { isBiodataAspect, calculateResponseScore } = require('../lib/forms/v1_5/scoring/scoringEngine')
+
+    assert.equal(isBiodataAspect('Data Responden'), true, 'Data Responden should be recognized as biodata')
+    assert.equal(isBiodataAspect('Sumber Informasi & Media'), true, 'Sumber Informasi should be recognized as biodata')
+    assert.equal(isBiodataAspect('Aspek Pengetahuan'), false, 'Aspek Pengetahuan is NOT biodata')
+
+    const snapshot = {
+      aspects: [
+        { aspectId: 'asp_bio', title: 'Data Responden', questionIds: ['q_bio_1'] },
+        { aspectId: 'asp_know', title: 'Aspek Pengetahuan', questionIds: ['q_know_1'] },
+      ],
+      questions: [
+        { questionId: 'q_bio_1', aspectId: 'asp_bio', answerType: 'short-text', prompt: 'Nama' },
+        { questionId: 'q_know_1', aspectId: 'asp_know', answerType: 'single-choice', prompt: 'Pertanyaan', options: ['A', 'B'], config: { correctAnswer: 'A' } },
+      ],
+      scoring: { totalPoints: 100, mode: 'auto', stagePointDistribution: {} },
+      thresholds: [],
+      recommendations: { mode: 'automatic', gradeArticleMap: {} },
+    }
+
+    const answers = {
+      q_bio_1: 'Budi',
+      q_know_1: 'A',
+    }
+
+    const result = calculateResponseScore(snapshot as any, answers)
+    assert.equal(result.percentage, 100, 'Overall score should be 100% based ONLY on Pengetahuan')
+
+    const bioAspect = result.aspectResults.find(a => a.aspectId === 'asp_bio')
+    assert.equal(bioAspect?.weightPercentage, 0, 'Data Responden weight should be 0%')
+    assert.equal(bioAspect?.weightedContribution, 0, 'Data Responden weighted contribution should be 0')
+  })
 })
