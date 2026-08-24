@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect, useRef } from 'react'
 import { Topbar } from '@/components/dashboard/Topbar'
 import { Icon } from '@/components/ui/Icons'
 import { useAuth } from '@/context/AuthContext'
+import { SkeletonTable } from '@/components/ui/Skeleton'
 import { 
   getArticles, 
   createArticle, 
@@ -154,6 +155,61 @@ export default function ArticlesAdminPage() {
     gallery: [] as GalleryImage[],
     blocks: [] as ContentBlock[],
   })
+
+  // Auto-Save Draft & Accidental Close Guard State
+  const DRAFT_STORAGE_KEY = 'cms_article_temp_draft'
+  const [isConfirmCloseOpen, setIsConfirmCloseOpen] = useState(false)
+
+  // Real-time Auto-Save Draft Persistence to localStorage
+  useEffect(() => {
+    if (isModalOpen && (formData.title || formData.excerpt || formData.blocks.length > 0)) {
+      try {
+        localStorage.setItem(
+          DRAFT_STORAGE_KEY,
+          JSON.stringify({
+            formData,
+            isEditing,
+            selectedArticleId: selectedArticle?.id || null,
+            savedAt: new Date().toISOString(),
+          })
+        )
+      } catch (err) {
+        console.warn('[CMS Draft] Failed to auto-save draft:', err)
+      }
+    }
+  }, [formData, isModalOpen, isEditing, selectedArticle])
+
+  const handleAttemptCloseModal = () => {
+    const hasUnsavedContent = Boolean(
+      formData.title.trim() !== '' ||
+      formData.excerpt.trim() !== '' ||
+      formData.blocks.length > 0 ||
+      formData.featuredImage !== ''
+    )
+
+    if (hasUnsavedContent) {
+      setIsConfirmCloseOpen(true)
+    } else {
+      setIsModalOpen(false)
+      setIsConfirmCloseOpen(false)
+    }
+  }
+
+  const handleConfirmCloseSaveDraft = () => {
+    setIsConfirmCloseOpen(false)
+    setIsModalOpen(false)
+    setSuccessMessage('Draft artikel sementara Anda aman tersimpan di browser!')
+    setShowSuccess(true)
+    setTimeout(() => setShowSuccess(false), 3000)
+  }
+
+  const handleConfirmCloseDiscardDraft = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(DRAFT_STORAGE_KEY)
+    }
+    setIsConfirmCloseOpen(false)
+    setIsModalOpen(false)
+  }
 
   // Debounce & Request Submission Guards
   const [isSavingArticle, setIsSavingArticle] = useState(false)
@@ -730,6 +786,26 @@ export default function ArticlesAdminPage() {
   const handleCreate = () => {
     setIsEditing(false)
     setSelectedArticle(null)
+
+    if (typeof window !== 'undefined') {
+      const savedRaw = localStorage.getItem(DRAFT_STORAGE_KEY)
+      if (savedRaw) {
+        try {
+          const parsed = JSON.parse(savedRaw)
+          if (parsed && parsed.formData && !parsed.isEditing) {
+            setFormData(parsed.formData)
+            setIsModalOpen(true)
+            setSuccessMessage('Draft artikel sementara sebelumnya berhasil dipulihkan!')
+            setShowSuccess(true)
+            setTimeout(() => setShowSuccess(false), 3000)
+            return
+          }
+        } catch (e) {
+          console.warn('[CMS Draft] Error parsing draft:', e)
+        }
+      }
+    }
+
     setFormData({
       title: 'Judul Artikel Edukasi Baru', category: 'Teknologi', author: userData?.displayName || user?.email || 'Kader Edukator', authorBio: (userData as any)?.organization || 'Kader Edukator BPOM', status: 'Draft',
       readTime: 5, featuredImage: '', excerpt: 'Tuliskan ringkasan singkat artikel edukasi di sini...', tags: '#Pangan, #Edukasi', embeddedDistributionCode: '', pretestCode: '', posttestCode: '', gallery: [],
@@ -744,6 +820,26 @@ export default function ArticlesAdminPage() {
   const handleEdit = (article: Article) => {
     setIsEditing(true)
     setSelectedArticle(article)
+
+    if (typeof window !== 'undefined') {
+      const savedRaw = localStorage.getItem(DRAFT_STORAGE_KEY)
+      if (savedRaw) {
+        try {
+          const parsed = JSON.parse(savedRaw)
+          if (parsed && parsed.formData && parsed.isEditing && parsed.selectedArticleId === article.id) {
+            setFormData(parsed.formData)
+            setIsModalOpen(true)
+            setSuccessMessage('Draft editan artikel sementara berhasil dipulihkan!')
+            setShowSuccess(true)
+            setTimeout(() => setShowSuccess(false), 3000)
+            return
+          }
+        } catch (e) {
+          console.warn('[CMS Draft] Error parsing draft:', e)
+        }
+      }
+    }
+
     setFormData({
       title: article.title,
       category: article.category,
@@ -805,6 +901,9 @@ export default function ArticlesAdminPage() {
         setSuccessMessage('Artikel baru berhasil dibuat!')
       }
 
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(DRAFT_STORAGE_KEY)
+      }
       setIsModalOpen(false)
       setIsPreviewOpen(false)
       setShowSuccess(true)
@@ -1053,7 +1152,9 @@ export default function ArticlesAdminPage() {
         {/* TABEL DATA */}
         <div className="rounded-2xl bg-[#080812] border border-white/[0.05] overflow-hidden">
           {loading ? (
-            <div className="py-12 text-center text-white/40">Memuat data dari database...</div>
+            <div className="p-4">
+              <SkeletonTable rows={6} cols={6} />
+            </div>
           ) : (
             <table className="w-full text-sm">
               <thead>
@@ -1170,7 +1271,7 @@ export default function ArticlesAdminPage() {
 
       {/* ============ MODAL FORM EDIT (RICH 3-TAB BUILDER) ============ */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center pt-8 pb-8 px-4 overflow-y-auto" style={{ backgroundColor: 'rgba(0, 0, 0, 0.85)' }} onClick={() => setIsModalOpen(false)}>
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-8 pb-8 px-4 overflow-y-auto" style={{ backgroundColor: 'rgba(0, 0, 0, 0.85)' }} onClick={handleAttemptCloseModal}>
           <div className="relative w-full max-w-4xl bg-[#0e0e1a] border border-white/[0.1] rounded-3xl shadow-2xl animate-slideUp my-auto overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
             
             {/* Modal Header & Title */}
@@ -1183,11 +1284,11 @@ export default function ArticlesAdminPage() {
                   <h3 className="font-display text-base font-bold text-white">
                     {isEditing ? `Edit: ${formData.title || 'Artikel'}` : 'Buat Artikel Edukasi Baru'}
                   </h3>
-                  <p className="text-xs text-white/40">Sistem manajemen konten terintegrasi dengan Storage & Live Preview</p>
+                  <p className="text-xs text-white/40">Sistem manajemen konten terintegrasi dengan Auto-Save Draft & Live Preview</p>
                 </div>
               </div>
 
-              <button onClick={() => setIsModalOpen(false)} className="w-8 h-8 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] flex items-center justify-center transition-colors">
+              <button onClick={handleAttemptCloseModal} className="w-8 h-8 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] flex items-center justify-center transition-colors">
                 <Icon name="x" className="w-4 h-4 text-white/60" />
               </button>
             </div>
@@ -1659,7 +1760,7 @@ export default function ArticlesAdminPage() {
 
             {/* Modal Footer Controls */}
             <div className="flex items-center justify-between px-6 py-4 border-t border-white/[0.08] bg-slate-950/80">
-              <button onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 rounded-xl text-xs font-semibold text-white/50 hover:bg-white/[0.05] transition-colors">
+              <button onClick={handleAttemptCloseModal} className="px-5 py-2.5 rounded-xl text-xs font-semibold text-white/50 hover:bg-white/[0.05] transition-colors">
                 Batal
               </button>
 
@@ -1694,6 +1795,56 @@ export default function ArticlesAdminPage() {
                   <span>{isSavingArticle ? 'Mempublikasikan...' : 'Publish Sekarang'}</span>
                 </button>
               </div>
+
+              {/* ============ CONFIRMATION MODAL BEFORE CLOSING EDIT CARD ============ */}
+              {isConfirmCloseOpen && (
+                <div
+                  className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="w-full max-w-md bg-[#0e0e1a] border border-amber-500/30 rounded-3xl p-6 space-y-5 shadow-2xl">
+                    <div className="flex items-center gap-3 border-b border-white/[0.08] pb-3">
+                      <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+                        <Icon name="bookOpen" className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-sm text-white">Draft Artikel Tersimpan Otomatis</h4>
+                        <p className="text-xs text-white/40 mt-0.5">Perubahan Anda aman dan tidak akan hilang.</p>
+                      </div>
+                    </div>
+
+                    <p className="text-xs text-white/70 leading-relaxed bg-white/[0.03] p-3.5 rounded-2xl border border-white/[0.06]">
+                      Seluruh ketikan & perubahan artikel telah tersimpan secara otomatis di memori browser (draft sementara). Pilih opsi di bawah:
+                    </p>
+
+                    <div className="flex flex-col gap-2.5">
+                      <button
+                        type="button"
+                        onClick={handleConfirmCloseSaveDraft}
+                        className="w-full py-2.5 px-4 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs shadow-lg transition-all cursor-pointer"
+                      >
+                        Simpan Draft & Tutup Editor
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setIsConfirmCloseOpen(false)}
+                        className="w-full py-2.5 px-4 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] text-white/80 font-semibold text-xs border border-white/[0.08] transition-all cursor-pointer"
+                      >
+                        Batal (Tetap Lanjutkan Mengedit)
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleConfirmCloseDiscardDraft}
+                        className="w-full py-2.5 px-4 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 font-semibold text-xs border border-rose-500/30 transition-all text-center cursor-pointer"
+                      >
+                        Hapus Draft & Keluar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-3 p-4 rounded-2xl bg-cyan-950/20 border border-cyan-500/30 font-mono text-xs">
                 <label className="text-xs text-cyan-400 font-bold uppercase tracking-wider flex items-center gap-1.5 font-mono">

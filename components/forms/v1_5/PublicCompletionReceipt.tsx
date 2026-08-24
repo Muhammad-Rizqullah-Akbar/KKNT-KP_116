@@ -2,6 +2,7 @@
 
 import React from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { Icon } from '@/components/ui/Icons'
 import { isBiodataAspect } from '@/lib/forms/v1_5/scoring/scoringEngine'
 
@@ -42,6 +43,19 @@ export function PublicCompletionReceipt({
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4 sm:p-6 font-sans">
       <div className="max-w-2xl w-full p-6 sm:p-8 rounded-3xl bg-slate-900 border border-slate-800 space-y-6 shadow-2xl animate-in zoom-in-95 duration-200">
+        {/* Top Logo Header Bar */}
+        <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="relative w-8 h-8 rounded-xl overflow-hidden flex items-center justify-center bg-white/5 border border-white/10 p-1">
+              <Image src="/logo.png" alt="Logo KKNT-KP" width={24} height={24} className="object-contain" priority />
+            </div>
+            <span className="font-display font-bold text-sm tracking-tight text-white">
+              KKNT-KP<span className="text-cyan-400"> UH</span>
+            </span>
+          </div>
+          <span className="text-[10px] font-mono text-slate-500 uppercase tracking-widest">Sertifikat Evaluasi</span>
+        </div>
+
         <div className="flex items-center gap-4 border-b border-slate-800 pb-5">
           <div className="w-14 h-14 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center flex-shrink-0 shadow-lg shadow-emerald-500/10">
             <Icon name="checkCircle" className="w-7 h-7" />

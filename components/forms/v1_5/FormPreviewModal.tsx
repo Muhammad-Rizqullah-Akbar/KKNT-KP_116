@@ -75,7 +75,7 @@ export function FormPreviewModal({ isOpen, canonicalForm, onClose }: FormPreview
             Navigasi Soal:
           </span>
           <div className="flex items-center gap-2">
-            {publicForm.version.questions.map((q, idx) => {
+            {(publicForm.version.questions || []).map((q, idx) => {
               const isAnswered = userAnswers[q.questionId] !== undefined && userAnswers[q.questionId] !== ''
               return (
                 <button

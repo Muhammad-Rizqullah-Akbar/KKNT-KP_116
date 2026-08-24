@@ -27,7 +27,7 @@ export function builderStateToFormAggregate(
  */
 export function formAggregateToBuilderState(doc: FormAggregateDoc): BuilderState {
   return {
-    metadata: doc.metadata,
+    metadata: doc.metadata || { title: 'Formulir Tanpa Judul', description: '', category: 'Umum', target: 'Umum' },
     aspects: doc.aspects || [],
     questions: doc.questions || [],
     scoring: doc.scoring || { totalPoints: 100, mode: 'auto', stagePointDistribution: {} },
@@ -44,22 +44,22 @@ export function formAggregateToBuilderState(doc: FormAggregateDoc): BuilderState
 export function formAggregateToCanonicalForm(doc: FormAggregateDoc): CanonicalForm {
   return {
     form: {
-      formId: doc.formId,
-      metadata: doc.metadata,
-      activeVersionId: doc.activeVersionId,
-      createdAt: doc.createdAt,
-      updatedAt: doc.updatedAt,
+      formId: doc.formId || 'form-draft',
+      metadata: doc.metadata || { title: 'Formulir Tanpa Judul', description: '', category: 'Umum', target: 'Umum' },
+      activeVersionId: doc.activeVersionId || 'v1',
+      createdAt: doc.createdAt || new Date().toISOString(),
+      updatedAt: doc.updatedAt || new Date().toISOString(),
     },
     version: {
-      versionId: doc.activeVersionId,
-      formId: doc.formId,
-      versionNumber: doc.activeVersionNumber,
-      status: doc.status,
+      versionId: doc.activeVersionId || 'v1',
+      formId: doc.formId || 'form-draft',
+      versionNumber: doc.activeVersionNumber || 1,
+      status: doc.status || 'draft',
       aspects: doc.aspects || [],
-      questions: doc.questions,
-      scoring: doc.scoring,
-      validation: doc.validation,
-      createdAt: doc.createdAt,
+      questions: doc.questions || [],
+      scoring: doc.scoring || { totalPoints: 100, mode: 'auto', stagePointDistribution: {} },
+      validation: doc.validation || { mode: 'all_required', allowOverride: true },
+      createdAt: doc.createdAt || new Date().toISOString(),
     },
   }
 }

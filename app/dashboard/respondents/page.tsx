@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { Topbar } from '@/components/dashboard/Topbar'
 import { Icon } from '@/components/ui/Icons'
+import { SkeletonTable } from '@/components/ui/Skeleton'
 import {
   getAllResponses,
   getForms,
@@ -1273,9 +1274,8 @@ export default function RespondentsPage() {
         {/* Table */}
         <div className="rounded-2xl bg-[#080812] border border-white/5 overflow-hidden">
           {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <Icon name="loader" className="w-8 h-8 text-cyan-400 animate-spin" />
-              <span className="ml-3 text-white/40">Memuat data...</span>
+            <div className="p-4">
+              <SkeletonTable rows={6} cols={6} />
             </div>
           ) : (
             <div className="overflow-x-auto custom-scrollbar">

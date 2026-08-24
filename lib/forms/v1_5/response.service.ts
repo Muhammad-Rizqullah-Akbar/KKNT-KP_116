@@ -233,6 +233,17 @@ export async function submitResponseWorkflow(
     }
   }
 
+  // Verify underlying distribution is still active (not paused/archived)
+  if (existing.distributionCode) {
+    const dist = await getDistributionByCodeDoc(existing.distributionCode)
+    if (dist && dist.status !== 'active') {
+      if (dist.status === 'paused') {
+        throw new Error('Pengiriman ditolak: Formulir ini sedang dijeda sementara oleh penyelenggara.')
+      }
+      throw new Error('Pengiriman ditolak: Kode distribusi formulir tidak lagi aktif.')
+    }
+  }
+
   // 1. Load authoritative version snapshot (strictly matching existing.versionId)
   let versionSnapshot: any = null
 

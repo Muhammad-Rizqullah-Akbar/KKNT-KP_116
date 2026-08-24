@@ -28,7 +28,7 @@ export type FormDistributionConfig = {
   distributionCodePrefix?: string
 }
 
-export type BuilderQuestion = Question & { aspectId?: string; answerType?: string; config?: any }
+export type BuilderQuestion = Question & { aspectId?: string; answerType?: string; config?: any; imageUrl?: string; mediaUrl?: string }
 
 export type BuilderState = {
   metadata: FormMetadata

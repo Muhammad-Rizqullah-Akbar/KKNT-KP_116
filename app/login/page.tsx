@@ -3,6 +3,7 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import Image from 'next/image'
 import { Icon } from '@/components/ui/Icons'
 import { useAuth } from '@/context/AuthContext'
 
@@ -58,8 +59,15 @@ function LoginFormContent() {
     <div className="w-full max-w-md">
       {/* Logo Header */}
       <div className="text-center mb-8">
-        <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-cyan-500 to-violet-500 flex items-center justify-center shadow-lg shadow-cyan-500/20">
-          <Icon name="hexagon" className="w-8 h-8 text-white" />
+        <div className="w-20 h-20 mx-auto rounded-2xl bg-white/[0.04] border border-white/10 p-2.5 flex items-center justify-center shadow-xl shadow-cyan-500/20 backdrop-blur-xl relative">
+          <Image
+            src="/logo.png"
+            alt="Logo KKNT-KP UH"
+            width={64}
+            height={64}
+            className="w-full h-full object-contain filter drop-shadow-md"
+            priority
+          />
         </div>
         <h1 className="font-display text-2xl font-bold text-white mt-4">KKNT-KP UH</h1>
         <p className="text-white/40 text-sm">Masuk ke Dashboard Admin / Mitra / Kader</p>

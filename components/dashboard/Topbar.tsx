@@ -16,7 +16,7 @@ export function Topbar({ title, subtitle }: TopbarProps) {
 
   return (
     <>
-      <header className="sticky top-0 z-30 bg-[#06060E]/80 backdrop-blur-xl border-b border-white/[0.04] px-6 py-4 flex items-center justify-between">
+      <header className="sticky top-0 z-30 bg-[#06060E]/95 backdrop-blur-2xl border-b border-white/[0.08] shadow-lg shadow-black/40 px-6 py-4 flex items-center justify-between">
         <div>
           <h1 className="font-display text-lg font-semibold">{title}</h1>
           {subtitle && <p className="text-sm text-white/40">{subtitle}</p>}

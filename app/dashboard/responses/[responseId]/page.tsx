@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, use } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { Topbar } from '@/components/dashboard/Topbar'
 import { Icon } from '@/components/ui/Icons'
 import type { ResponseDoc } from '@/lib/forms/v1_5/responseTypes'
@@ -243,7 +244,10 @@ export default function ResponseDetailPage({ params }: PageProps) {
         </div>
 
         {/* PRINT-ONLY OFFICIAL HEADER */}
-        <div className="hidden print:block mb-6 text-center border-b-2 border-black pb-4 space-y-1">
+        <div className="hidden print:flex flex-col items-center mb-6 text-center border-b-2 border-black pb-4 space-y-1">
+          <div className="relative w-12 h-12 mb-1">
+            <Image src="/logo.png" alt="Logo KKNT-KP UH" width={48} height={48} className="object-contain" priority />
+          </div>
           <h1 className="text-xl font-black uppercase tracking-wide">BADAN PENGAWAS OBAT DAN MAKANAN (BPOM)</h1>
           <h2 className="text-sm font-bold uppercase">LAPORAN HASIL EVALUASI PANGAN & KEBIASAAN SEHAT</h2>
           <p className="text-xs italic">Dokumen Hasil Penilaian Resmi — Nomor Respon: {responseDoc.responseId}</p>

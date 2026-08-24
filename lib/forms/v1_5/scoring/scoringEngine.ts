@@ -365,21 +365,31 @@ export function calculateQuestionScore(
           const cleanCid = cid.toLowerCase().replace(/[^a-z0-9]/g, '')
           return (
             cid === strVal ||
-            (optObj && (cid === optObj.optionId || cid === optObj.id || cid === optObj.label)) ||
+            (optObj && (cid === optObj.optionId || cid === (optObj as any).id || cid === optObj.label)) ||
             (cleanCid && (cleanCid === cleanVal || (optObj && (cleanCid === optObj.label.toLowerCase().replace(/[^a-z0-9]/g, '') || cleanCid === optObj.optionId.toLowerCase().replace(/[^a-z0-9]/g, '')))))
           )
         })
 
+        const resolvedOptScore =
+          optionScores[strVal] ??
+          (optObj?.optionId ? optionScores[optObj.optionId] : undefined) ??
+          (optObj?.label ? optionScores[optObj.label] : undefined)
+
         if (isItemCorrect) {
-          score += optObj?.score ?? optionScores[strVal] ?? (maxScore / Math.max(1, correctOptionIds.length))
+          score += optObj?.score ?? resolvedOptScore ?? (maxScore / Math.max(1, correctOptionIds.length))
         } else {
-          score += optionScores[strVal] ?? 0
+          score += resolvedOptScore ?? 0
         }
       } else {
+        const resolvedOptScore =
+          optionScores[strVal] ??
+          (optObj?.optionId ? optionScores[optObj.optionId] : undefined) ??
+          (optObj?.label ? optionScores[optObj.label] : undefined)
+
         if (optObj && typeof optObj.score === 'number') {
           score += optObj.score
-        } else if (optionScores[strVal] !== undefined) {
-          score += optionScores[strVal]
+        } else if (resolvedOptScore !== undefined) {
+          score += resolvedOptScore
         }
       }
     })
@@ -653,7 +663,7 @@ export function isBiodataAspect(title: string): boolean {
     'sumber informasi kader',
     'sumber data',
   ]
-  return biodataKeywords.some((k) => clean === k || clean.includes(k))
+  return biodataKeywords.some((k) => clean === k || clean.startsWith(`${k}:`) || clean.startsWith(`${k} -`))
 }
 
 export function calculateAspectScores(
@@ -705,7 +715,7 @@ export function calculateAspectScores(
   })
 
   // Equal weight distribution fallback calculated only among scored non-biodata aspects
-  const scoredAspectsList = effectiveAspects.filter((a) => a.isScored !== false && !isBiodataAspect(a.title))
+  const scoredAspectsList = effectiveAspects.filter((a: any) => a.isScored !== false && !isBiodataAspect(a.title))
   const autoWeight = scoredAspectsList.length > 0 ? Math.floor(100 / scoredAspectsList.length) : 100
 
   effectiveAspects.forEach((asp, idx) => {
@@ -716,7 +726,7 @@ export function calculateAspectScores(
     let maximumScore = 0
 
     // If aspect is non-evaluated / biodata / sumber informasi, omit from scoring
-    const isScored = asp.isScored !== false && !isBiodataAspect(asp.title)
+    const isScored = (asp as any).isScored !== false && !isBiodataAspect(asp.title)
 
     aspQuestions.forEach((q) => {
       const qIdx = questions.indexOf(q)

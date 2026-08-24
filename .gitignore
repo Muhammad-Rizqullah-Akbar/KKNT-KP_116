@@ -39,3 +39,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# codex & instruction files
+.codex/
+AGENTS.md
+agents.md
+flow.html
+app/flow.html

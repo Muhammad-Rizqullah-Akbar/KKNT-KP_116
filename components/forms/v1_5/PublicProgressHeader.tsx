@@ -1,6 +1,7 @@
 'use client'
 
 import React from 'react'
+import Image from 'next/image'
 import { Icon } from '@/components/ui/Icons'
 
 interface PublicProgressHeaderProps {
@@ -35,6 +36,16 @@ export function PublicProgressHeader({
       <div className="max-w-7xl mx-auto flex flex-col gap-2">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5 min-w-0">
+            <div className="relative w-8 h-8 rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0 bg-white/5 border border-white/10 p-1">
+              <Image
+                src="/logo.png"
+                alt="Logo KKNT-KP"
+                width={24}
+                height={24}
+                className="w-full h-full object-contain"
+                priority
+              />
+            </div>
             <span className="font-mono text-cyan-400 font-extrabold text-xs px-2.5 py-1 rounded-lg bg-cyan-950 border border-cyan-500/40 shadow-sm flex-shrink-0">
               {code}
             </span>

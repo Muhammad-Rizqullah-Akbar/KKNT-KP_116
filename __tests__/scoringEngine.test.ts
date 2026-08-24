@@ -220,7 +220,7 @@ describe('ScoringEngine Regression Matrix', () => {
     const result = calculateResponseScore(snapshot as any, answers)
     assert.equal(result.percentage, 100, 'Overall score should be 100% based ONLY on Pengetahuan')
 
-    const bioAspect = result.aspectResults.find(a => a.aspectId === 'asp_bio')
+    const bioAspect = result.aspectResults.find((a: any) => a.aspectId === 'asp_bio')
     assert.equal(bioAspect?.weightPercentage, 0, 'Data Responden weight should be 0%')
     assert.equal(bioAspect?.weightedContribution, 0, 'Data Responden weighted contribution should be 0')
   })

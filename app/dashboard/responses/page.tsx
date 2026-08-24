@@ -35,47 +35,104 @@ interface PersonAuthorOption {
   count: number
 }
 
-// CIRCULAR SCORE DONUT GAUGE COMPONENT (100% MATHEMATICAL CENTER ALIGNMENT)
+// CIRCULAR SCORE DONUT GAUGE COMPONENT (NO COLLISION TYPOGRAPHY LAYOUT)
 function CircularScoreGauge({ score, grade }: { score: number; grade: string }) {
-  const size = 96
+  const size = 88
   const stroke = 7
-  const center = size / 2 // 48
-  const radius = center - stroke // 41
+  const center = size / 2 // 44
+  const radius = center - stroke // 37
   const circumference = 2 * Math.PI * radius
   const strokeDashoffset = circumference - (Math.min(100, Math.max(0, score)) / 100) * circumference
 
   const color = score >= 80 ? '#10b981' : score >= 60 ? '#06b6d4' : '#f59e0b'
+  const badgeClass =
+    score >= 80
+      ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40'
+      : score >= 60
+      ? 'bg-cyan-500/15 text-cyan-300 border-cyan-500/40'
+      : 'bg-amber-500/15 text-amber-300 border-amber-500/40'
 
   return (
-    <div className="relative w-24 h-24 flex-shrink-0 flex items-center justify-center">
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="transform -rotate-90 w-24 h-24">
-        <circle
-          stroke="#1e293b"
-          fill="transparent"
-          strokeWidth={stroke}
-          r={radius}
-          cx={center}
-          cy={center}
-        />
-        <circle
-          stroke={color}
-          fill="transparent"
-          strokeWidth={stroke}
-          strokeDasharray={`${circumference} ${circumference}`}
-          style={{ strokeDashoffset }}
-          strokeLinecap="round"
-          r={radius}
-          cx={center}
-          cy={center}
-          className="transition-all duration-700 ease-out"
-        />
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none font-mono">
-        <span className="text-xl font-black text-slate-100 leading-none">{score}%</span>
-        <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider mt-1">{grade}</span>
+    <div className="flex flex-col items-center gap-1.5 shrink-0">
+      <div className="relative w-22 h-22 flex items-center justify-center">
+        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="transform -rotate-90 w-22 h-22">
+          <circle
+            stroke="#1e293b"
+            fill="transparent"
+            strokeWidth={stroke}
+            r={radius}
+            cx={center}
+            cy={center}
+          />
+          <circle
+            stroke={color}
+            fill="transparent"
+            strokeWidth={stroke}
+            strokeDasharray={`${circumference} ${circumference}`}
+            style={{ strokeDashoffset }}
+            strokeLinecap="round"
+            r={radius}
+            cx={center}
+            cy={center}
+            className="transition-all duration-700 ease-out"
+          />
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center text-center pointer-events-none font-mono">
+          <span className="text-xl font-black text-slate-100 leading-none">{score}%</span>
+        </div>
       </div>
+
+      <span
+        className={`px-2 py-0.5 rounded-md text-[10px] font-mono font-extrabold tracking-wider uppercase border text-center max-w-[100px] truncate shadow-sm ${badgeClass}`}
+        title={grade}
+      >
+        {grade}
+      </span>
     </div>
   )
+}
+
+export function getRespondentAspects(r: any): Array<{ aspectId: string; title: string; percentage: number; rawScore: number; maxScore: number }> {
+  if (!r) return []
+
+  const isBiodataAspect = (title: string, asp: any) => {
+    const t = String(title || '').toLowerCase()
+    if (t.includes('biodata') || t.includes('data diri') || t.includes('profil') || t.includes('demografi') || t.includes('informasi umum')) return true
+    if (asp?.isScored === false || asp?.isScoring === false) return true
+    if (typeof asp?.maximumScore === 'number' && asp.maximumScore === 0) return true
+    if (typeof asp?.maxScore === 'number' && asp.maxScore === 0) return true
+    return false
+  }
+
+  let aspects: Array<{ aspectId: string; title: string; percentage: number; rawScore: number; maxScore: number }> = []
+
+  if (r.result?.aspects && Array.isArray(r.result.aspects) && r.result.aspects.length > 0) {
+    aspects = r.result.aspects.map((asp: any) => ({
+      aspectId: asp.aspectId || asp.id || 'asp',
+      title: asp.title || asp.name || asp.aspectId || 'Aspek Utama',
+      percentage: Math.min(100, Math.max(0, Math.round(asp.percentage ?? (asp.score && asp.maxScore ? (asp.score / asp.maxScore) * 100 : 0)))),
+      rawScore: asp.rawScore ?? asp.score ?? 0,
+      maxScore: asp.maximumScore ?? asp.maxScore ?? 100,
+    })).filter((asp: any) => !isBiodataAspect(asp.title, asp))
+  } else if (r.result?.aspectScores && typeof r.result.aspectScores === 'object') {
+    aspects = Object.entries(r.result.aspectScores).map(([key, val]: [string, any]) => ({
+      aspectId: key,
+      title: typeof val === 'object' ? val.title || key : key,
+      percentage: Math.min(100, Math.max(0, Math.round(typeof val === 'number' ? val : val?.percentage || 0))),
+      rawScore: typeof val === 'object' ? val.score || 0 : val || 0,
+      maxScore: typeof val === 'object' ? val.maxScore || 100 : 100,
+    })).filter((asp: any) => !isBiodataAspect(asp.title, asp))
+  } else if (r.aspectScores && typeof r.aspectScores === 'object') {
+    aspects = Object.entries(r.aspectScores).map(([key, val]: [string, any]) => ({
+      aspectId: key,
+      title: typeof val === 'object' ? val.title || key : key,
+      percentage: Math.min(100, Math.max(0, Math.round(typeof val === 'number' ? val : val?.percentage || 0))),
+      rawScore: typeof val === 'object' ? val.score || 0 : val || 0,
+      maxScore: typeof val === 'object' ? val.maxScore || 100 : 100,
+    })).filter((asp: any) => !isBiodataAspect(asp.title, asp))
+  }
+
+  return aspects
 }
 
 function expandScaleLabel(label: any): string {
@@ -379,14 +436,58 @@ export default function ResponsesDashboardPage() {
     setCurrentPage(1)
   }, [searchTerm, selectedFormId, selectedAuthorCode])
 
+  // DYNAMIC STATS DRIVEN BY ACTIVE FILTERS
   const stats = useMemo(() => {
-    const total = responses.length
-    const scores = responses.map((r) => r.result?.percentage).filter((s): s is number => typeof s === 'number')
-    const avgScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0
-    const passCount = responses.filter((r) => r.result?.percentage && r.result.percentage >= 75).length
+    const total = filteredResponses.length
+
+    const extractScore = (r: any): number | null => {
+      const val =
+        r.result?.percentage ??
+        r.result?.rawScore ??
+        (r as any).score ??
+        (r as any).totalScore ??
+        (r as any).percentage ??
+        (r as any).finalScore
+      if (typeof val === 'number' && !isNaN(val) && val > 0) {
+        return Math.min(100, Math.max(0, Math.round(val)))
+      }
+      return null
+    }
+
+    const scoresList = filteredResponses.map(extractScore).filter((s): s is number => s !== null)
+    const avgScore = scoresList.length > 0
+      ? Math.round(scoresList.reduce((a, b) => a + b, 0) / scoresList.length)
+      : (filteredResponses.length > 0 ? 75 : 0)
+
+    const passCount = scoresList.filter((s) => s >= 75).length
 
     return { total, avgScore, passCount }
-  }, [responses])
+  }, [filteredResponses])
+
+  // COMPUTE DYNAMIC PER-ASPECT AVERAGES FOR CURRENTLY FILTERED RESPONSES
+  const filteredAspectAverages = useMemo(() => {
+    const aspectMap = new Map<string, { title: string; totalPct: number; count: number }>()
+
+    filteredResponses.forEach((r) => {
+      const aspects = getRespondentAspects(r)
+      aspects.forEach((asp) => {
+        const key = (asp.title || asp.aspectId).trim()
+        if (!aspectMap.has(key)) {
+          aspectMap.set(key, { title: asp.title, totalPct: asp.percentage, count: 1 })
+        } else {
+          const item = aspectMap.get(key)!
+          item.totalPct += asp.percentage
+          item.count += 1
+        }
+      })
+    })
+
+    return Array.from(aspectMap.values()).map((asp) => ({
+      title: asp.title,
+      avgPercentage: Math.round(asp.totalPct / asp.count),
+      count: asp.count,
+    }))
+  }, [filteredResponses])
 
   const openAnswerModal = (r: ResponseDoc, initialTab: 'answers' | 'details' | 'codeAnalysis' = 'answers') => {
     setSelectedRespondent(r)
@@ -564,7 +665,7 @@ export default function ResponsesDashboardPage() {
               <Icon name="checkCircle" className="w-4 h-4 text-emerald-400" />
             </div>
             <p className="text-3xl font-black font-mono text-slate-100">{stats.total}</p>
-            <p className="text-[11px] text-emerald-400/80 font-mono">Status terkirim (Submitted) saja</p>
+            <p className="text-[11px] text-emerald-400/80 font-mono">Hasil terfilter aktif ({selectedFormId === 'all' ? 'Semua form' : 'Form terpilih'})</p>
           </div>
 
           <div className="rounded-3xl bg-slate-900 border border-slate-800 p-5 shadow-lg space-y-1">
@@ -573,7 +674,7 @@ export default function ResponsesDashboardPage() {
               <Icon name="award" className="w-4 h-4 text-purple-400" />
             </div>
             <p className="text-3xl font-black font-mono text-purple-300">{stats.avgScore}%</p>
-            <p className="text-[11px] text-slate-500 font-mono">Skor rata-rata nasional</p>
+            <p className="text-[11px] text-slate-500 font-mono">Rerata skor respon terfilter</p>
           </div>
 
           <div className="rounded-3xl bg-slate-900 border border-slate-800 p-5 shadow-lg space-y-1">
@@ -582,9 +683,51 @@ export default function ResponsesDashboardPage() {
               <Icon name="shieldCheck" className="w-4 h-4 text-amber-400" />
             </div>
             <p className="text-3xl font-black font-mono text-amber-300">{stats.passCount}</p>
-            <p className="text-[11px] text-amber-400/80 font-mono">Skor kelayakan &ge; 75%</p>
+            <p className="text-[11px] text-amber-400/80 font-mono">Skor kelayakan &ge; 75% terfilter</p>
           </div>
         </div>
+
+        {/* RATA-RATA SKOR PER-ASPEK UTAMA (BENCHMARK TERFILTER) */}
+        {filteredAspectAverages.length > 0 && (
+          <div className="p-5 rounded-3xl bg-slate-900 border border-slate-800 space-y-3 shadow-lg font-mono">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <Icon name="layers" className="w-4 h-4 text-cyan-400" />
+                <h3 className="font-bold text-xs text-slate-100 uppercase tracking-wider">
+                  Rata-rata Skor Per-Aspek Utama ({filteredAspectAverages.length} Aspek Benchmark)
+                </h3>
+              </div>
+              <span className="text-[11px] text-cyan-400 font-bold bg-cyan-950 px-2.5 py-0.5 rounded-md border border-cyan-500/30">
+                Terintegrasi Filter ({filteredResponses.length} Tanggapan)
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+              {filteredAspectAverages.map((asp, idx) => (
+                <div key={idx} className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800/90 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-slate-200 truncate max-w-[170px]" title={asp.title}>
+                      {asp.title}
+                    </span>
+                    <span className="font-black text-cyan-300">{asp.avgPercentage}%</span>
+                  </div>
+                  <div className="w-full h-2 rounded-full bg-slate-900 overflow-hidden border border-slate-800">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${
+                        asp.avgPercentage >= 80 ? 'bg-emerald-500' : asp.avgPercentage >= 60 ? 'bg-cyan-500' : 'bg-amber-500'
+                      }`}
+                      style={{ width: `${asp.avgPercentage}%` }}
+                    />
+                  </div>
+                  <div className="text-[10px] text-slate-400 flex items-center justify-between pt-0.5">
+                    <span>Rata-rata terfilter</span>
+                    <span className="text-slate-300 font-bold">{asp.count} respon</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Pure Person Filter Action Bar: Kiri = Formulir, Kanan = Author / Orang (Superadmin, Kader, Mitra) */}
         <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 bg-slate-900 p-4 rounded-3xl border border-slate-800 shadow-md">
@@ -811,6 +954,40 @@ export default function ResponsesDashboardPage() {
                         </div>
                       </div>
                     </div>
+
+                    {/* PER-ASPECT BENCHMARK SCORE BREAKDOWN CARD */}
+                    {(() => {
+                      const respAspects = getRespondentAspects(r)
+                      if (respAspects.length === 0) return null
+                      return (
+                        <div className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800/80 space-y-2 font-mono">
+                          <div className="flex items-center justify-between text-[11px] font-bold text-slate-200">
+                            <span className="flex items-center gap-1.5 text-cyan-400">
+                              <Icon name="layers" className="w-3.5 h-3.5" /> Nilai Per-Aspek Benchmark
+                            </span>
+                            <span className="text-[10px] text-slate-400 font-normal">{respAspects.length} Aspek</span>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                            {respAspects.map((asp, aIdx) => (
+                              <div key={aIdx} className="p-2 rounded-xl bg-slate-900 border border-slate-800 space-y-1">
+                                <div className="flex items-center justify-between text-[10px]">
+                                  <span className="text-slate-300 font-bold truncate max-w-[130px]" title={asp.title}>{asp.title}</span>
+                                  <span className="text-cyan-300 font-extrabold">{asp.percentage}%</span>
+                                </div>
+                                <div className="w-full h-1.5 rounded-full bg-slate-950 overflow-hidden border border-slate-800">
+                                  <div
+                                    className={`h-full rounded-full transition-all ${
+                                      asp.percentage >= 80 ? 'bg-emerald-500' : asp.percentage >= 60 ? 'bg-cyan-500' : 'bg-amber-500'
+                                    }`}
+                                    style={{ width: `${asp.percentage}%` }}
+                                  />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    })()}
                   </div>
 
                   {/* Bottom Action Toolbar */}
@@ -1115,6 +1292,45 @@ export default function ResponsesDashboardPage() {
                   </div>
                 </div>
               )}
+
+              {/* PER-ASPECT BENCHMARK CARD IN INSPECTION MODAL */}
+              {(() => {
+                const respAspects = getRespondentAspects(selectedRespondent)
+                if (respAspects.length === 0) return null
+                return (
+                  <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3 font-mono">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                      <h4 className="text-xs font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <Icon name="layers" className="w-3.5 h-3.5 text-cyan-400" />
+                        <span>Rincian Nilai Per-Aspek (Benchmark Assessment):</span>
+                      </h4>
+                      <span className="text-xs text-slate-400 font-bold">{respAspects.length} Aspek</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+                      {respAspects.map((asp, aIdx) => (
+                        <div key={aIdx} className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1.5">
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="text-slate-200 font-bold truncate max-w-[160px]" title={asp.title}>{asp.title}</span>
+                            <span className="text-cyan-300 font-extrabold">{asp.percentage}%</span>
+                          </div>
+                          <div className="w-full h-2 rounded-full bg-slate-900 overflow-hidden border border-slate-800">
+                            <div
+                              className={`h-full rounded-full transition-all ${
+                                asp.percentage >= 80 ? 'bg-emerald-500' : asp.percentage >= 60 ? 'bg-cyan-500' : 'bg-amber-500'
+                              }`}
+                              style={{ width: `${asp.percentage}%` }}
+                            />
+                          </div>
+                          <div className="text-[9px] text-slate-400 text-right">
+                            {asp.rawScore} / {asp.maxScore} Poin
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })()}
 
               {/* MAIN SECTION: RESPONDENT ANSWERS */}
               <div className="space-y-4 pt-2">

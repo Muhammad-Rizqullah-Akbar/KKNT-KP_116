@@ -44,6 +44,9 @@ export function Sidebar({ userRole }: SidebarProps) {
     setIsCollapsed((prev) => {
       const next = !prev
       localStorage.setItem('sidebar_collapsed', String(next))
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('sidebar_toggle'))
+      }
       return next
     })
   }
@@ -143,7 +146,7 @@ export function Sidebar({ userRole }: SidebarProps) {
     },
   ]
 
-  const menuSections: MenuSection[] = isPartnership
+  const menuSections = isPartnership
     ? partnershipMenus
     : isCadre
     ? cadreMenus
@@ -159,15 +162,14 @@ export function Sidebar({ userRole }: SidebarProps) {
         />
       )}
 
-      {/* Sidebar Container */}
+      {/* Sidebar Container - FIXED POSITIONED TO VIEWPORT */}
       <aside
         className={clsx(
-          'fixed lg:sticky top-0 self-start shrink-0 z-50 lg:z-30',
+          'fixed inset-y-0 left-0 z-40 lg:z-30',
           'flex flex-col bg-[#080812] border-r border-white/[0.06]',
-          'h-screen transition-all duration-300 ease-in-out',
-          'lg:translate-x-0',
-          isCollapsed ? 'lg:w-20' : 'w-64 md:w-72',
-          isMobileOpen ? 'translate-x-0 w-64' : '-translate-x-full lg:translate-x-0'
+          'h-screen h-[100dvh] transition-all duration-300 ease-in-out',
+          isCollapsed ? 'w-20' : 'w-64 md:w-72',
+          isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         )}
       >
         {/* ============ LOGO UTAMA SIDEBAR ============ */}

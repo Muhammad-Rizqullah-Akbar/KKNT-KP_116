@@ -3,6 +3,7 @@
 import { useState, useEffect, useLayoutEffect, useRef, use, useCallback } from 'react'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { Icon } from '@/components/ui/Icons'
 
 // Import Repositori Firestore & Firebase Auth
@@ -360,8 +361,15 @@ export default function ArticleDetailPage({ params }: { params: Promise<{ slug: 
       <nav className="sticky top-0 z-50 w-full px-4 sm:px-6 lg:px-8 py-4 bg-[#06060E]/80 backdrop-blur-xl border-b border-white/[0.04]">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <Link href="/" className="flex items-center gap-3 group">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-500 to-violet-500 flex items-center justify-center shadow-lg shadow-cyan-500/20">
-              <Icon name="hexagon" className="w-5 h-5 text-white" />
+            <div className="relative w-9 h-9 rounded-xl overflow-hidden flex items-center justify-center flex-shrink-0 bg-white/[0.04] border border-white/10 p-1 shadow-lg shadow-cyan-500/20">
+              <Image
+                src="/logo.png"
+                alt="Logo KKNT-KP UH"
+                width={32}
+                height={32}
+                className="w-full h-full object-contain"
+                priority
+              />
             </div>
             <span className="font-display font-bold text-lg tracking-tight text-white">
               KKNT-KP<span className="text-cyan-400"> UH</span>

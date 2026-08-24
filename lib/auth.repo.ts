@@ -117,22 +117,17 @@ export const getUserData = async (uid: string): Promise<UserData | null> => {
     console.error('Error getting user data:', error)
   }
 
+  // Safe fallback for authenticated currentUser if Firestore document read fails or is pending
   if (auth.currentUser && auth.currentUser.uid === uid) {
-    const email = auth.currentUser.email || ''
-    if (email.startsWith('admin@') || email.includes('admin')) {
+    const email = (auth.currentUser.email || '').toLowerCase().trim()
+    
+    // Strict exact email checks for pre-provisioned system accounts
+    if (email === '[REDACTED_ADMIN_EMAIL]' || email === '[REDACTED_ADMIN_EMAIL]') {
       return {
         uid,
         email,
-        displayName: auth.currentUser.displayName || 'KKPD ADMIN',
+        displayName: auth.currentUser.displayName || 'Administrator System',
         role: 'admin',
-      }
-    }
-    if (email.includes('cadre') || email.includes('kader')) {
-      return {
-        uid,
-        email,
-        displayName: auth.currentUser.displayName || 'Kader Lapangan',
-        role: 'cadre',
       }
     }
   }

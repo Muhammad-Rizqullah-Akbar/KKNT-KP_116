@@ -329,7 +329,7 @@ export function QuestionEditor({ question, aspects = [], onUpdate }: QuestionEdi
                               mediaUrl: data.url,
                               presentation: {
                                 ...question.presentation,
-                                media: { ...question.presentation.media, type: 'image', url: data.url },
+                                media: { ...question.presentation?.media, type: 'image', url: data.url },
                               },
                             })
                           } else {
@@ -342,7 +342,7 @@ export function QuestionEditor({ question, aspects = [], onUpdate }: QuestionEdi
                                   mediaUrl: base64,
                                   presentation: {
                                     ...question.presentation,
-                                    media: { ...question.presentation.media, type: 'image', url: base64 },
+                                    media: { ...question.presentation?.media, type: 'image', url: base64 },
                                   },
                                 })
                               }
@@ -359,7 +359,7 @@ export function QuestionEditor({ question, aspects = [], onUpdate }: QuestionEdi
                                 mediaUrl: base64,
                                 presentation: {
                                   ...question.presentation,
-                                  media: { ...question.presentation.media, type: 'image', url: base64 },
+                                  media: { ...question.presentation?.media, type: 'image', url: base64 },
                                 },
                               })
                             }

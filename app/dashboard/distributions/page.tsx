@@ -9,6 +9,7 @@ import type { DistributionDoc } from '@/lib/forms/v1_5/distributionTypes'
 import type { FormAggregateDoc } from '@/lib/firebase/repositories/v1_5/v1_5Forms.repo'
 import { useAuth } from '@/context/AuthContext'
 import { safeFetchJson } from '@/lib/shared/safeFetch'
+import { SkeletonTable } from '@/components/ui/Skeleton'
 
 export default function DistributionsDashboardPage() {
   const router = useRouter()
@@ -595,10 +596,7 @@ export default function DistributionsDashboardPage() {
           )}
 
           {isLoading ? (
-            <div className="flex items-center justify-center py-16 text-slate-400 text-xs gap-3">
-              <Icon name="loader" className="w-5 h-5 text-cyan-400 animate-spin" />
-              <span>Memuat daftar kode distribusi...</span>
-            </div>
+            <SkeletonTable rows={6} cols={6} />
           ) : error ? (
             <div className="p-8 text-center text-xs text-rose-300 space-y-2">
               <p className="font-semibold">{error}</p>
@@ -1405,8 +1403,8 @@ export default function DistributionsDashboardPage() {
                             </span>
 
                             {isActive && (
-                              <span className="text-[10px] font-bold text-emerald-400 flex items-center gap-1">
-                                🟢 DIDISTRIBUSIKAN SAAT INI
+                              <span className="text-[10px] font-bold text-emerald-400 flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                                DIDISTRIBUSIKAN SAAT INI
                               </span>
                             )}
                           </div>
