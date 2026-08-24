@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getAuthorizationContext, requireRole } from '@/lib/auth/server'
 import { getFormAggregateFromDb } from '@/lib/firebase/repositories/v1_5/v1_5Forms.repo'
 import { saveDraftWorkflow, updateFormMetadataWorkflow } from '@/lib/forms/v1_5/formManagement.service'
+import { deleteForm } from '@/lib/firebase/repositories/forms.repo'
 
 /**
  * PATCH /api/v1_5/forms/[formId]
@@ -105,6 +106,27 @@ export async function PUT(request: Request, { params }: RouteParams) {
     return NextResponse.json(
       { success: false, message: error.message || 'Gagal menyimpan draft formulir.' },
       { status }
+    )
+  }
+}
+
+/**
+ * DELETE /api/v1_5/forms/[formId]
+ * Delete a form permanently from Firestore.
+ */
+export async function DELETE(_request: Request, { params }: RouteParams) {
+  try {
+    const { formId } = await params
+    await deleteForm(formId)
+
+    return NextResponse.json({
+      success: true,
+      message: `Formulir "${formId}" berhasil dihapus secara permanen.`,
+    })
+  } catch (error: any) {
+    return NextResponse.json(
+      { success: false, message: error.message || 'Gagal menghapus formulir.' },
+      { status: 500 }
     )
   }
 }

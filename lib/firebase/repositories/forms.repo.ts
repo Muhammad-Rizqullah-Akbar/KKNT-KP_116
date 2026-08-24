@@ -491,6 +491,10 @@ export const deleteForm = async (formId: string): Promise<void> => {
   try {
     const docRef = doc(firestore, 'forms', formId)
     await deleteDoc(docRef)
+    try {
+      const v15Ref = doc(firestore, 'v1_5_forms', formId)
+      await deleteDoc(v15Ref)
+    } catch (_) {}
   } catch (error) {
     console.error('Error deleting form:', error)
     throw error
