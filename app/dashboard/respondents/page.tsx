@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { Topbar } from '@/features/dashboard/components/layout/Topbar'
-import { Icon } from '@/components/ui/Icons'
+import { Icon, type IconName } from '@/components/ui/Icons'
 import { SkeletonTable } from '@/components/ui/Skeleton'
 import {
   getAllResponses,
@@ -22,6 +22,7 @@ import { isBiodataAspect } from '@/lib/domain/scoring/scoring-engine'
 import { extractRespondentName, extractRespondentEmail } from '@/lib/domain/responses/respondent-utils'
 import * as XLSX from 'xlsx'
 import { queryKeys } from '@/lib/query-keys'
+import { useToast } from '@/lib/hooks'
 
 // ---------- TYPES ----------
 type Respondent = {
@@ -95,13 +96,8 @@ export default function RespondentsPage() {
   const [previewTab, setPreviewTab] = useState<'answers' | 'details'>('answers')
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [respondentToDelete, setRespondentToDelete] = useState<string | null>(null)
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
+  const toast = useToast()
   const itemsPerPage = 10
-
-  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
-    setToast({ message, type })
-    setTimeout(() => setToast(null), 3000)
-  }
 
   const queryClient = useQueryClient()
 
@@ -192,7 +188,7 @@ export default function RespondentsPage() {
       const transformedRespondents: Respondent[] = await Promise.all(
         responsesData.map(async (response: FormResponse) => {
           const form = findMatchingForm(response, formsData)
-          const group = form?.groupId ? groupsData.find(g => g.id === form.groupId) : null
+          const group = form?.groupId ? groupsData.find(groupItem => groupItem.id === form.groupId) : null
 
           // 🔥 MAPPING JAWABAN KHUSUS UNTUK SCORING ENGINE (Flatten object & IDs)
           const mappedAnswers = mapAnswersToQuestionIds(response.answers || {}, form || null)
@@ -230,7 +226,7 @@ export default function RespondentsPage() {
             id: response.id || Math.random().toString(36).substring(2, 9),
             name: respondentName,
             formId: response.formId,
-            formCode: response.formCode || (form as any)?.code || response.distributionCode,
+            formCode: response.formCode || form?.code || response.distributionCode || '',
             formTitle: resolvedFormTitle,
             groupId: form?.groupId || null,
             groupName: group?.title || null,
@@ -383,11 +379,11 @@ export default function RespondentsPage() {
             })
 
             if (aspectGroups.size > 0) {
-              stages = Array.from(aspectGroups.values()).map(g => ({
-                id: g.id,
-                name: g.name,
+              stages = Array.from(aspectGroups.values()).map(group => ({
+                id: group.id,
+                name: group.name,
                 order: 0,
-                questionIds: g.questionIds,
+                questionIds: group.questionIds,
                 includeInScoring: true,
               }))
             }
@@ -489,8 +485,8 @@ export default function RespondentsPage() {
     const form = findMatchingForm(r, forms)
     if (form) {
       if ((form as any).aspects && Array.isArray((form as any).aspects) && (form as any).aspects.length > 0) {
-        const validAspects = (form as any).aspects.filter((a: any) => {
-          const t = (a.title || a.name || '').trim()
+        const validAspects = (form as any).aspects.filter((aspect: any) => {
+          const t = (aspect.title || aspect.name || '').trim()
           return t && t !== 'Semua Pertanyaan' && t !== 'default'
         })
         if (validAspects.length > 0) {
@@ -505,8 +501,8 @@ export default function RespondentsPage() {
       }
 
       if (form.stages && Array.isArray(form.stages) && form.stages.length > 0) {
-        const validStages = form.stages.filter((s: any) => {
-          const t = (s.name || s.title || '').trim()
+        const validStages = form.stages.filter((stage: any) => {
+          const t = (stage.name || stage.title || '').trim()
           return t && t !== 'Semua Pertanyaan' && t !== 'default'
         })
         if (validStages.length > 0) {
@@ -533,7 +529,7 @@ export default function RespondentsPage() {
               aspectTitle = matchBracket[1].trim()
             } else if (prompt.includes(':')) {
               const prefix = prompt.split(':')[0].trim()
-              if (prefix.length <= 30 && ['sikap', 'perilaku', 'pengetahuan', 'higiene', 'sanitasi', 'aspek'].some(k => prefix.toLowerCase().includes(k))) {
+              if (prefix.length <= 30 && ['sikap', 'perilaku', 'pengetahuan', 'higiene', 'sanitasi', 'aspek'].some(keyword => prefix.toLowerCase().includes(keyword))) {
                 aspectTitle = prefix
               }
             }
@@ -549,9 +545,9 @@ export default function RespondentsPage() {
         })
 
         if (aspectGroups.size > 0) {
-          return Array.from(aspectGroups.values()).map(g => ({
-            aspectId: g.title,
-            title: g.title,
+          return Array.from(aspectGroups.values()).map(group => ({
+            aspectId: group.title,
+            title: group.title,
             percentage: Math.round(r.score || 0),
             rawScore: 0,
             maxScore: 100,
@@ -628,12 +624,12 @@ export default function RespondentsPage() {
   // ============ HANDLERS ============
   const handleGroupToggle = (group: string) => {
     if (group === 'Semua Group') { setSelectedGroups([]); return }
-    setSelectedGroups(prev => prev.includes(group) ? prev.filter(g => g !== group) : [...prev, group])
+    setSelectedGroups(prev => prev.includes(group) ? prev.filter(grp => grp !== group) : [...prev, group])
   }
 
   const handleFormToggle = (form: string) => {
     if (form === 'Semua Formulir') { setSelectedForms([]); return }
-    setSelectedForms(prev => prev.includes(form) ? prev.filter(f => f !== form) : [...prev, form])
+    setSelectedForms(prev => prev.includes(form) ? prev.filter(frm => frm !== form) : [...prev, form])
   }
 
   const handlePreview = (respondent: Respondent) => {
@@ -655,10 +651,10 @@ export default function RespondentsPage() {
           if (!old) return old
           return { ...old, respondents: old.respondents.filter((r: Respondent) => r.id !== respondentToDelete) }
         })
-        showToast('Data responden berhasil dihapus', 'success')
+        toast.show('Data responden berhasil dihapus')
       } catch (error) {
         console.error('Error deleting response:', error)
-        showToast('Gagal menghapus data', 'error')
+        toast.show('Gagal menghapus data')
       }
     }
     setIsDeleteModalOpen(false)
@@ -667,7 +663,7 @@ export default function RespondentsPage() {
 
   const handlePrint = () => {
     if (filteredData.length === 0) {
-      showToast('Tidak ada data untuk dicetak', 'error')
+      toast.show('Tidak ada data untuk dicetak')
       return
     }
     window.print()
@@ -677,7 +673,7 @@ export default function RespondentsPage() {
   const exportToExcel = () => {
     const dataToExport = filteredData
     if (dataToExport.length === 0) {
-      showToast('Tidak ada data untuk diexport', 'error')
+      toast.show('Tidak ada data untuk diexport')
       return
     }
 
@@ -746,13 +742,13 @@ export default function RespondentsPage() {
     XLSX.utils.book_append_sheet(wb, ws1, 'Summary')
 
     // Sheet 2: Responden (Includes Per-Aspect Score Columns)
-    const aspectTitles = Array.from(aspectMap.values()).map(a => a.title)
+    const aspectTitles = Array.from(aspectMap.values()).map(aspect => aspect.title)
 
     const respData = dataToExport.map((r, i) => {
       const respAspects = getRespondentAspects(r)
       const aspScoreObj: Record<string, string> = {}
       aspectTitles.forEach(t => {
-        const found = respAspects.find(a => a.title === t)
+        const found = respAspects.find(aspect => aspect.title === t)
         aspScoreObj[`[Aspek] ${t} (%)`] = found ? `${found.percentage}%` : '-'
       })
 
@@ -760,7 +756,7 @@ export default function RespondentsPage() {
         'No': i + 1,
         'Nama Responden': r.respondentName || r.name,
         'Email': r.respondentEmail || '-',
-        'Instansi / Sekolah': (r as any).institution || (r as any).answers?.institution || (r as any).answers?.instansi || '-',
+        'Instansi / Sekolah': (r as any).institution || r.answers?.institution || r.answers?.instansi || '-',
         'Formulir': r.formTitle,
         'Group / Kode': r.groupName || '-',
         'Tanggal': r.date,
@@ -791,7 +787,7 @@ export default function RespondentsPage() {
             'No Responden': i + 1,
             'Nama Responden': r.respondentName || r.name,
             'Email': r.respondentEmail || '-',
-            'Instansi / Sekolah': (r as any).institution || (r as any).answers?.institution || (r as any).answers?.instansi || '-',
+            'Instansi / Sekolah': (r as any).institution || r.answers?.institution || r.answers?.instansi || '-',
             'Formulir': r.formTitle,
             'Skor Overall (%)': `${r.score}%`,
             'Nama Aspek Penilaian': asp.title,
@@ -840,7 +836,7 @@ export default function RespondentsPage() {
 
     const fileName = `Data_Responden_Penilaian_${formTitle.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`
     XLSX.writeFile(wb, fileName)
-    showToast(`${dataToExport.length} data berhasil diexport ke Excel!`, 'success')
+    toast.show(`${dataToExport.length} data berhasil diexport ke Excel!`)
   }
 
   // ============ COLORS ============
@@ -1140,15 +1136,15 @@ export default function RespondentsPage() {
                 >
                   Semua
                 </button>
-                {groupOptions.map(g => (
-                  <button key={g} onClick={() => handleGroupToggle(g)}
+                {groupOptions.map(groupOption => (
+                  <button key={groupOption} onClick={() => handleGroupToggle(groupOption)}
                     className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all ${
-                      selectedGroups.includes(g)
+                      selectedGroups.includes(groupOption)
                         ? 'bg-violet-500/20 text-violet-400 border border-violet-500/20'
                         : 'bg-white/3 text-white/50 hover:text-white/80 border border-white/5'
                     }`}
                   >
-                    {g}
+                    {groupOption}
                   </button>
                 ))}
               </div>
@@ -1166,15 +1162,15 @@ export default function RespondentsPage() {
                 >
                   Semua
                 </button>
-                {formOptions.map(f => (
-                  <button key={f} onClick={() => handleFormToggle(f)}
+                {formOptions.map(formOption => (
+                  <button key={formOption} onClick={() => handleFormToggle(formOption)}
                     className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all ${
-                      selectedForms.includes(f)
+                      selectedForms.includes(formOption)
                         ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/20'
                         : 'bg-white/3 text-white/50 hover:text-white/80 border border-white/5'
                     }`}
                   >
-                    {f}
+                    {formOption}
                   </button>
                 ))}
               </div>
@@ -1207,14 +1203,14 @@ export default function RespondentsPage() {
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           {[
             { label: 'Total Responden', value: filteredData.length, icon: 'users', color: 'text-cyan-400', bg: 'border-cyan-500/20 bg-cyan-500/5' },
-            { label: 'Rata-Rata Overall', value: `${filteredData.length > 0 ? Math.round(filteredData.reduce((s, r) => s + r.score, 0) / filteredData.length) : 0}%`, icon: 'award', color: 'text-purple-400', bg: 'border-purple-500/20 bg-purple-500/5' },
+            { label: 'Rata-Rata Overall', value: `${filteredData.length > 0 ? Math.round(filteredData.reduce((sum, resp) => sum + resp.score, 0) / filteredData.length) : 0}%`, icon: 'award', color: 'text-purple-400', bg: 'border-purple-500/20 bg-purple-500/5' },
             { label: 'Terverifikasi', value: filteredData.filter(r => r.status === 'Terverifikasi').length, icon: 'checkCircle', color: 'text-emerald-400', bg: 'border-emerald-500/20 bg-emerald-500/5' },
             { label: 'Perlu Review', value: filteredData.filter(r => r.status === 'Perlu Review').length, icon: 'alertCircle', color: 'text-amber-400', bg: 'border-amber-500/20 bg-amber-500/5' },
             { label: 'Tindak Lanjut', value: filteredData.filter(r => r.status === 'Perlu Tindak Lanjut').length, icon: 'info', color: 'text-rose-400', bg: 'border-rose-500/20 bg-rose-500/5' },
           ].map(stat => (
             <div key={stat.label} className={`rounded-2xl border p-3.5 space-y-1 ${stat.bg}`}>
               <div className="flex items-center gap-2">
-                <Icon name={stat.icon as any} className={`w-4 h-4 ${stat.color}`} />
+                <Icon name={stat.icon as IconName} className={`w-4 h-4 ${stat.color}`} />
                 <span className="text-[10px] font-mono text-white/60 uppercase font-bold">{stat.label}</span>
               </div>
               <p className={`text-2xl font-black font-mono tracking-tight ${stat.color}`}>{stat.value}</p>
@@ -1454,14 +1450,14 @@ export default function RespondentsPage() {
               ].map(tab => (
                 <button
                   key={tab.id}
-                  onClick={() => setPreviewTab(tab.id as any)}
+                  onClick={() => setPreviewTab(tab.id as 'answers' | 'details')}
                   className={`px-4 py-2 text-xs font-medium transition-all border-b-2 ${
                     previewTab === tab.id
                       ? 'text-cyan-400 border-cyan-400'
                       : 'text-white/40 border-transparent hover:text-white/70'
                   }`}
                 >
-                  <Icon name={tab.icon as any} className="w-3.5 h-3.5 inline mr-1.5" />
+                  <Icon name={tab.icon as IconName} className="w-3.5 h-3.5 inline mr-1.5" />
                   {tab.label}
                 </button>
               ))}
@@ -1632,13 +1628,9 @@ export default function RespondentsPage() {
       )}
 
       {/* ========== TOAST ========== */}
-      {toast && (
+      {toast.visible && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
-          <div
-            className={`px-4 py-2.5 rounded-xl text-sm font-medium shadow-2xl ${
-              toast.type === 'success' ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'
-            }`}
-          >
+          <div className="px-4 py-2.5 rounded-xl text-sm font-medium shadow-2xl bg-slate-900 border border-slate-700 text-slate-100">
             {toast.message}
           </div>
         </div>
