@@ -1,6 +1,7 @@
 'use client'
 
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
 import { useAuth } from '@/context/AuthContext'
 import { safeFetchJson } from '@/lib/infra/safe-fetch'
@@ -12,12 +13,6 @@ import type { DistributionDoc } from '@/lib/domain/distributions/distribution-ty
 export default function UserProfileProgressPage() {
   const { user, userData, refreshUserData } = useAuth()
 
-  const [articles, setArticles] = useState<ArticleData[]>([])
-  const [distributions, setDistributions] = useState<DistributionDoc[]>([])
-  const [responsesCount, setResponsesCount] = useState<number>(0)
-  const [isLoading, setIsLoading] = useState(true)
-  const [toastMessage, setToastMessage] = useState<string | null>(null)
-
   // Active Tab: 'articles' | 'distributions' | 'settings'
   const [activeTab, setActiveTab] = useState<'articles' | 'distributions' | 'settings'>('articles')
 
@@ -27,25 +22,53 @@ export default function UserProfileProgressPage() {
   const [editPartnershipType, setEditPartnershipType] = useState(userData?.partnershipType || 'Sekolah')
   const [editPhone, setEditPhone] = useState(userData?.phone || '')
   const [isSaving, setIsSaving] = useState(false)
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
 
   const showToast = (msg: string) => {
     setToastMessage(msg)
     setTimeout(() => setToastMessage(null), 3500)
   }
 
-  const [cadresCount, setCadresCount] = useState<number>(0)
-  const [teamResponsesCount, setTeamResponsesCount] = useState<number>(0)
+  // Keep latest user/userData available to the queryFn without re-running on every render
+  const userRef = useRef(user)
+  const userDataRef = useRef(userData)
+  userRef.current = user
+  userDataRef.current = userData
 
   // Load User Data & Activity Progress
-  const loadUserProgress = async () => {
-    setIsLoading(true)
-    try {
+  const {
+    data: {
+      articles = [],
+      distributions = [],
+      responsesCount = 0,
+      cadresCount = 0,
+      teamResponsesCount = 0,
+    } = {},
+  } = useQuery<{
+    articles: ArticleData[]
+    distributions: DistributionDoc[]
+    responsesCount: number
+    cadresCount: number
+    teamResponsesCount: number
+  }>({
+    queryKey: ['user-progress', user?.uid],
+    queryFn: async () => {
+      const currentUser = userRef.current
+      const currentUserData = userDataRef.current
+      const result = {
+        articles: [] as ArticleData[],
+        distributions: [] as DistributionDoc[],
+        responsesCount: 0,
+        cadresCount: 0,
+        teamResponsesCount: 0,
+      }
+
       // 1. Fetch CMS Articles (strictly personal)
       try {
         const allArticles = await getArticles()
-        const userUid = user?.uid
-        const userEmail = (user?.email || '').toLowerCase().trim()
-        const userDisplayName = (userData?.displayName || user?.displayName || '').toLowerCase().trim()
+        const userUid = currentUser?.uid
+        const userEmail = (currentUser?.email || '').toLowerCase().trim()
+        const userDisplayName = (currentUserData?.displayName || currentUser?.displayName || '').toLowerCase().trim()
 
         const myArticles = allArticles.filter((a) => {
           if ((a as any).authorId && userUid && (a as any).authorId === userUid) return true
@@ -57,7 +80,7 @@ export default function UserProfileProgressPage() {
 
           return false
         })
-        setArticles(myArticles)
+        result.articles = myArticles
       } catch (artErr) {
         console.warn('Could not fetch articles:', artErr)
       }
@@ -68,11 +91,11 @@ export default function UserProfileProgressPage() {
       if (distRes.ok && distRes.data && Array.isArray(distRes.data.distributions)) {
         const myDists = distRes.data.distributions.filter(
           (d: DistributionDoc) =>
-            d.createdBy === user?.uid ||
-            d.ownerId === user?.uid ||
-            (userData?.displayName && d.ownerName?.toLowerCase() === userData.displayName.toLowerCase())
+            d.createdBy === currentUser?.uid ||
+            d.ownerId === currentUser?.uid ||
+            (currentUserData?.displayName && d.ownerName?.toLowerCase() === currentUserData.displayName.toLowerCase())
         )
-        setDistributions(myDists)
+        result.distributions = myDists
         myDistCodes = myDists.map((d: DistributionDoc) => d.code).filter(Boolean)
       }
 
@@ -85,14 +108,14 @@ export default function UserProfileProgressPage() {
 
         // Personal responses count
         const personalResponses = allResponses.filter((r: any) =>
-          r.createdBy === user?.uid ||
+          r.createdBy === currentUser?.uid ||
           (r.distributionCode && myDistCodes.includes(r.distributionCode)) ||
-          (userData?.displayName && r.ownerName?.toLowerCase() === userData.displayName.toLowerCase())
+          (currentUserData?.displayName && r.ownerName?.toLowerCase() === currentUserData.displayName.toLowerCase())
         )
-        setResponsesCount(personalResponses.length)
+        result.responsesCount = personalResponses.length
 
         // If user is Mitra / Partner: Calculate Team Cadre Statistics strictly for linked cadres
-        if (['mitra', 'partner', 'partnership', 'organization'].includes(userData?.role || '')) {
+        if (['mitra', 'partner', 'partnership', 'organization'].includes(currentUserData?.role || '')) {
           let cadreUids: string[] = []
           let cadreNames: string[] = []
 
@@ -100,12 +123,12 @@ export default function UserProfileProgressPage() {
             const myCadres = usersRes.data.users.filter((u: any) =>
               u.role === 'cadre' &&
               (
-                u.mitraId === user?.uid ||
-                (userData?.organization && u.organization?.toLowerCase() === userData.organization.toLowerCase()) ||
-                (userData?.organization && u.partnershipName?.toLowerCase() === userData.organization.toLowerCase())
+                u.mitraId === currentUser?.uid ||
+                (currentUserData?.organization && u.organization?.toLowerCase() === currentUserData.organization.toLowerCase()) ||
+                (currentUserData?.organization && u.partnershipName?.toLowerCase() === currentUserData.organization.toLowerCase())
               )
             )
-            setCadresCount(myCadres.length)
+            result.cadresCount = myCadres.length
             cadreUids = myCadres.map((u: any) => u.uid || u.id)
             cadreNames = myCadres.map((u: any) => (u.displayName || u.name || '').toLowerCase()).filter(Boolean)
           }
@@ -115,19 +138,13 @@ export default function UserProfileProgressPage() {
             cadreUids.includes(r.createdBy) ||
             (r.ownerName && cadreNames.includes(r.ownerName.toLowerCase()))
           )
-          setTeamResponsesCount(teamResponses.length)
+          result.teamResponsesCount = teamResponses.length
         }
       }
-    } catch (err: any) {
-      console.error('Error loading profile progress:', err)
-    } finally {
-      setIsLoading(false)
-    }
-  }
 
-  useEffect(() => {
-    loadUserProgress()
-  }, [user, userData])
+      return result
+    },
+  })
 
   useEffect(() => {
     if (userData) {
