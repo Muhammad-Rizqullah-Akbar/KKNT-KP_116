@@ -2,6 +2,128 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // Helper: resolve role dari user profile (dibaca saat request).
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isSuperAdmin() {
+      return isSignedIn() && getUserRole() == 'super_admin';
+    }
+
+    function isPartnership() {
+      return isSignedIn() && getUserRole() == 'partnership';
+    }
+
+    function isCadre() {
+      return isSignedIn() && getUserRole() == 'cadre';
+    }
+
+    function isStaff() {
+      return isSuperAdmin() || isPartnership() || isCadre();
+    }
+
+    // ============================================================
+    // 1. users
+    // ============================================================
+    match /users/{uid} {
+      allow read: if isSignedIn() && (request.auth.uid == uid || isStaff());
+      allow create: if isSuperAdmin();
+      allow update: if isSignedIn() && (request.auth.uid == uid || isSuperAdmin());
+      allow delete: if isSuperAdmin();
+    }
+
+    // ============================================================
+    // 2. partnerships (first-class)
+    // ============================================================
+    match /partnerships/{partnershipId} {
+      allow read: if isStaff();
+      allow write: if isSuperAdmin();
+    }
+
+    // ============================================================
+    // 3. forms (metadata) + 4. versions (subcollection, answer keys)
+    // ============================================================
+    match /forms/{formId} {
+      allow read: if isStaff() || resource.data.status == 'published';
+      allow create: if isStaff();
+      allow update: if isStaff();
+      allow delete: if isSuperAdmin();
+
+      // versions hold answer keys -> staff-only read
+      match /versions/{versionId} {
+        allow read: if isStaff();
+        allow write: if isStaff();
+      }
+    }
+
+    // ============================================================
+    // 5. distributions
+    // ============================================================
+    match /distributions/{distributionId} {
+      allow read: if isStaff() || resource.data.status == 'active';
+      allow create: if isStaff();
+      allow update: if isStaff() && (resource.data.ownerId == request.auth.uid || isSuperAdmin());
+      allow delete: if isSuperAdmin();
+    }
+
+    // ============================================================
+    // 6. responses (kritis: anti-spam + anti-tamper)
+    // ============================================================
+    match /responses/{responseId} {
+      // Publik boleh submit via distribution code, tapi tidak boleh mengubah setelah submitted.
+      allow read: if isStaff() || resource.data.ownerId == request.auth.uid;
+      allow create: if isSignedIn();
+      allow update: if resource.data.status == 'in_progress' && (
+        resource.data.ownerId == request.auth.uid || isStaff()
+      );
+      allow delete: if isSuperAdmin();
+    }
+
+    // ============================================================
+    // 7. articles + 8. article_categories
+    // ============================================================
+    match /articles/{articleId} {
+      allow read: if resource.data.status == 'published' || isStaff();
+      allow create: if isStaff();
+      allow update: if isStaff();
+      allow delete: if isSuperAdmin();
+    }
+
+    match /article_categories/{categoryId} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
+    // ============================================================
+    // 9. form_access (junction RBAC)
+    // ============================================================
+    match /form_access/{accessId} {
+      allow read: if isStaff();
+      allow write: if isSuperAdmin() || isPartnership();
+    }
+
+    // ============================================================
+    // 10. form_registry + settings (singleton config)
+    // ============================================================
+    match /form_registry/{docId} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
+    match /settings/{docId} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
+    // ============================================================
+    // DENY-BY-DEFAULT (fallback — semua yang tak ter-match ditolak)
+    // ============================================================
     match /{document=**} {
       allow read, write: if false;
     }
