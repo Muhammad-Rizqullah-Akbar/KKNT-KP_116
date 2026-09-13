@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { Topbar } from '@/features/dashboard/components/layout/Topbar'
@@ -90,7 +91,6 @@ export default function SettingsPage() {
 
   // ============ STATE UTAMA ============
   const [activeTab, setActiveTab] = useState<'hero' | 'partnership' | 'gallery'>('hero')
-  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
   const [successMessage, setSuccessMessage] = useState('')
@@ -114,33 +114,27 @@ export default function SettingsPage() {
   const [galleryToDelete, setGalleryToDelete] = useState<number | null>(null)
 
   // ============ FETCH DATA DARI FIRESTORE ============
-  useEffect(() => {
-    const fetchSettings = async () => {
-      setLoading(true)
-      try {
-        const settings = await getLandingPageSettings()
-        if (settings) {
-          if (settings.hero) {
-            setHeroForm({ ...defaultHeroData, ...settings.hero })
-          }
-          if (settings.partnership) {
-            setPartnershipForm({
-              kkn: { ...defaultPartnershipData.kkn, ...settings.partnership.kkn },
-              bpom: { ...defaultPartnershipData.bpom, ...settings.partnership.bpom },
-            })
-          }
-          if (settings.gallery && settings.gallery.length > 0) {
-            setGallery(settings.gallery as GalleryItem[])
-          }
+  const { isLoading: loading } = useQuery({
+    queryKey: ['landing-page-settings'],
+    queryFn: async () => {
+      const settings = await getLandingPageSettings()
+      if (settings) {
+        if (settings.hero) {
+          setHeroForm({ ...defaultHeroData, ...settings.hero })
         }
-      } catch (error) {
-        console.error('Gagal memuat pengaturan dari Firestore:', error)
-      } finally {
-        setLoading(false)
+        if (settings.partnership) {
+          setPartnershipForm({
+            kkn: { ...defaultPartnershipData.kkn, ...settings.partnership.kkn },
+            bpom: { ...defaultPartnershipData.bpom, ...settings.partnership.bpom },
+          })
+        }
+        if (settings.gallery && settings.gallery.length > 0) {
+          setGallery(settings.gallery as GalleryItem[])
+        }
       }
-    }
-    fetchSettings()
-  }, [])
+      return settings
+    },
+  })
 
   // ============ HANDLER HERO SECTION ============
   const handleHeroSave = async () => {
