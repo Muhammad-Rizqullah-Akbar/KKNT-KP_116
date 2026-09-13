@@ -2,8 +2,8 @@ name: E2E (Playwright)
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
+  # E2E hanya manual trigger untuk sekarang (butuh webServer config + emulator)
+  # Aktifkan push main setelah playwright.config.ts dilengkapi webServer
 
 jobs:
   e2e:
