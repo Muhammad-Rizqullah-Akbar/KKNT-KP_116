@@ -40,14 +40,14 @@ export default function ArticlesPage() {
     const fetchPublishedArticles = async () => {
       setLoading(true)
       try {
-        const [rawArticles, catData] = await Promise.all([
+        const [rawArticles, categoryData] = await Promise.all([
           getArticles(),
           getArticleCategories().catch(() => []),
         ])
         // Filter hanya artikel berstatus Published
-        const published = rawArticles.filter(a => a.status === 'Published')
+        const published = rawArticles.filter((article) => article.status === 'Published')
         setArticles(published)
-        setDbCategories(catData.map(c => c.name).filter(Boolean))
+        setDbCategories(categoryData.map((category) => category.name).filter(Boolean))
       } catch (error) {
         console.error('Gagal mengambil daftar artikel dari Firestore:', error)
       } finally {
@@ -65,32 +65,32 @@ export default function ArticlesPage() {
     // Search filter
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase()
-      result = result.filter(a => 
-        a.title.toLowerCase().includes(term) ||
-        a.excerpt.toLowerCase().includes(term) ||
-        a.author.toLowerCase().includes(term) ||
-        (a.tags && a.tags.some(t => t.toLowerCase().includes(term)))
+      result = result.filter(article =>
+        article.title.toLowerCase().includes(term) ||
+        article.excerpt.toLowerCase().includes(term) ||
+        article.author.toLowerCase().includes(term) ||
+        (article.tags && article.tags.some(tag => tag.toLowerCase().includes(term)))
       )
     }
 
     // Category filter
     if (selectedCategory !== 'Semua') {
-      result = result.filter(a => a.category === selectedCategory)
+      result = result.filter(article => article.category === selectedCategory)
     }
 
     // Sort algorithm
-    result.sort((a, b) => {
+    result.sort((articleA, articleB) => {
       if (sortBy === 'terbaru') {
-        const dateA = new Date(a.date || a.createdAt || 0).getTime()
-        const dateB = new Date(b.date || b.createdAt || 0).getTime()
+        const dateA = new Date(articleA.date || articleA.createdAt || 0).getTime()
+        const dateB = new Date(articleB.date || articleB.createdAt || 0).getTime()
         return dateB - dateA
       }
       if (sortBy === 'terpopuler') {
-        return (b.views || 0) - (a.views || 0)
+        return (articleB.views || 0) - (articleA.views || 0)
       }
       if (sortBy === 'terlama') {
-        const dateA = new Date(a.date || a.createdAt || 0).getTime()
-        const dateB = new Date(b.date || b.createdAt || 0).getTime()
+        const dateA = new Date(articleA.date || articleA.createdAt || 0).getTime()
+        const dateB = new Date(articleB.date || articleB.createdAt || 0).getTime()
         return dateA - dateB
       }
       return 0
