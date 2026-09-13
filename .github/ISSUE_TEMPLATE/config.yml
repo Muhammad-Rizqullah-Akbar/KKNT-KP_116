@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Diskusi / Tanya Jawab
+    url: https://github.com/Muhammad-Rizqullah-Akbar/KKNT-KP_116/discussions
+    about: Untuk pertanyaan umum, gunakan Discussions, bukan Issues.
+  - name: 📖 Dokumentasi Proyek
+    url: https://github.com/Muhammad-Rizqullah-Akbar/KKNT-KP_116#readme
+    about: Baca README sebelum membuat issue.
