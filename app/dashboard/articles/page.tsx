@@ -5,13 +5,12 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Topbar } from '@/features/dashboard/components/layout/Topbar'
 import { Icon } from '@/components/ui/Icons'
 import { useAuth } from '@/context/AuthContext'
-import { SkeletonTable } from '@/components/ui/Skeleton'
-import { 
-  getArticles, 
-  createArticle, 
-  updateArticle, 
-  deleteArticle, 
-  type ArticleData 
+import {
+  getArticles,
+  createArticle,
+  updateArticle,
+  deleteArticle,
+  type ArticleData
 } from '@/lib/repositories/articles.repo'
 import { getArticleCategories, createArticleCategory } from '@/lib/repositories/article-categories.repo'
 import { getForms } from '@/lib/repositories/forms.repo'
@@ -23,69 +22,23 @@ import { exportArticleToJson } from '@/lib/domain/articles/smart-article-parser'
 import { queryKeys } from '@/lib/query-keys'
 import { TOAST_DURATION_LONG_MS } from '@/lib/constants'
 import { useToast } from '@/lib/hooks/use-toast'
-
-// ============ TIPE DATA & KONSTANTA ============
-type GalleryImage = { id: string; url?: string; caption: string; gradient: string }
-type ContentBlock = { 
-  id: string; 
-  type: 'p' | 'h2' | 'quote' | 'list' | 'image'; 
-  value: string; 
-  quoteAuthor?: string; 
-  imageUrl?: string; 
-  imageCaption?: string 
-}
-
-type Article = {
-  id?: string
-  title: string
-  slug: string
-  author: string
-  authorBio: string
-  category: string
-  status: 'Draft' | 'Published'
-  views: number
-  date: string
-  readTime: number
-  excerpt: string
-  content: string 
-  featuredImage: string
-  tags: string[]
-  gallery: GalleryImage[]
-  embeddedDistributionCode?: string
-  pretestCode?: string
-  posttestCode?: string
-}
-
-type MediaItem = { name: string; url: string }
-
-const categoryColors: Record<string, string> = {
-  Teknologi: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
-  Bisnis: 'text-rose-400 bg-rose-500/10 border-rose-500/20',
-  Karir: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
-  Data: 'text-sky-400 bg-sky-500/10 border-sky-500/20',
-}
-
-const categoryGradients: Record<string, string> = {
-  Teknologi: 'from-emerald-700/40 to-cyan-800/40',
-  Bisnis: 'from-rose-700/40 to-pink-800/40',
-  Karir: 'from-amber-700/40 to-orange-800/40',
-  Data: 'from-sky-700/40 to-blue-800/40',
-}
-
-const statusColors: Record<string, string> = {
-  Published: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
-  Draft: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
-}
-
-const categoryOptions = ['Semua Kategori', 'Teknologi', 'Bisnis', 'Karir', 'Data']
-const statusOptions = ['Semua Status', 'Published', 'Draft']
-
-const galleryGradients = [
-  'from-cyan-700/50 to-emerald-800/50',
-  'from-violet-700/50 to-purple-800/50',
-  'from-amber-700/50 to-orange-800/50',
-  'from-rose-700/50 to-pink-800/50',
-]
+import { useArticleDraft } from './use-article-draft'
+import ArticlesFormModal from './articles-form-modal'
+import ArticlesImageMatcher from './articles-image-matcher'
+import ArticlesTable from './articles-table'
+import {
+  categoryGradients,
+  galleryGradients,
+  statusOptions,
+  formatViews,
+  type GalleryImage,
+  type ContentBlock,
+  type Article,
+  type MediaItem,
+  type DetectedMarker,
+  type ArticleFormData,
+  type AvailableForm,
+} from './articles-types'
 
 // ============ KOMPONEN UTAMA ============
 export default function ArticlesAdminPage() {
@@ -131,17 +84,6 @@ export default function ArticlesAdminPage() {
   const [loadingMedia, setLoadingMedia] = useState(false)
   const [onSelectMediaCallback, setOnSelectMediaCallback] = useState<((url: string) => void) | null>(null)
 
-  // Smart Image Marker Picker State
-  interface DetectedMarker {
-    key: string
-    label: string
-    targetType: 'featured' | 'block' | 'gallery'
-    blockId?: string
-    galleryId?: string
-    file?: File | null
-    uploadedUrl?: string
-  }
-
   // Smart Upload & Text Parser Modal State
   const [isSmartUploadOpen, setIsSmartUploadOpen] = useState(false)
   const [isJsonImportOpen, setIsJsonImportOpen] = useState(false)
@@ -159,12 +101,12 @@ export default function ArticlesAdminPage() {
   const itemsPerPage = 10
 
   // Form State
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<ArticleFormData>({
     title: '',
     category: 'Teknologi',
     author: '',
     authorBio: '',
-    status: 'Draft' as 'Draft' | 'Published',
+    status: 'Draft',
     readTime: 5,
     featuredImage: '',
     excerpt: '',
@@ -172,62 +114,27 @@ export default function ArticlesAdminPage() {
     embeddedDistributionCode: '',
     pretestCode: '',
     posttestCode: '',
-    gallery: [] as GalleryImage[],
-    blocks: [] as ContentBlock[],
+    gallery: [],
+    blocks: [],
   })
 
   // Auto-Save Draft & Accidental Close Guard State
-  const DRAFT_STORAGE_KEY = 'cms_article_temp_draft'
-  const [isConfirmCloseOpen, setIsConfirmCloseOpen] = useState(false)
-
-  // Real-time Auto-Save Draft Persistence to localStorage
-  useEffect(() => {
-    if (isModalOpen && (formData.title || formData.excerpt || formData.blocks.length > 0)) {
-      try {
-        localStorage.setItem(
-          DRAFT_STORAGE_KEY,
-          JSON.stringify({
-            formData,
-            isEditing,
-            selectedArticleId: selectedArticle?.id || null,
-            savedAt: new Date().toISOString(),
-          })
-        )
-      } catch (err) {
-        console.warn('[CMS Draft] Failed to auto-save draft:', err)
-      }
-    }
-  }, [formData, isModalOpen, isEditing, selectedArticle])
-
-  const handleAttemptCloseModal = () => {
-    const hasUnsavedContent = Boolean(
-      formData.title.trim() !== '' ||
-      formData.excerpt.trim() !== '' ||
-      formData.blocks.length > 0 ||
-      formData.featuredImage !== ''
-    )
-
-    if (hasUnsavedContent) {
-      setIsConfirmCloseOpen(true)
-    } else {
-      setIsModalOpen(false)
-      setIsConfirmCloseOpen(false)
-    }
-  }
-
-  const handleConfirmCloseSaveDraft = () => {
-    setIsConfirmCloseOpen(false)
-    setIsModalOpen(false)
-    showToast('Draft artikel sementara Anda aman tersimpan di browser!')
-  }
-
-  const handleConfirmCloseDiscardDraft = () => {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem(DRAFT_STORAGE_KEY)
-    }
-    setIsConfirmCloseOpen(false)
-    setIsModalOpen(false)
-  }
+  const {
+    isConfirmCloseOpen,
+    setIsConfirmCloseOpen,
+    handleAttemptCloseModal,
+    handleConfirmCloseSaveDraft,
+    handleConfirmCloseDiscardDraft,
+    clearDraft,
+    restoreDraft,
+  } = useArticleDraft({
+    formData,
+    isModalOpen,
+    setIsModalOpen,
+    isEditing,
+    selectedArticle,
+    showToast,
+  })
 
   // Debounce & Request Submission Guards
   const [isSavingArticle, setIsSavingArticle] = useState(false)
@@ -341,7 +248,7 @@ export default function ArticlesAdminPage() {
       })
     }
 
-    return { articles: formattedData as Article[], availableForms: fetchedForms, dbCategories: mergedCategories }
+    return { articles: formattedData as Article[], availableForms: fetchedForms as AvailableForm[], dbCategories: mergedCategories }
   }, [articlesQuery.data, userData, user, extraCategories])
 
   const articles = articlesData?.articles ?? []
@@ -402,7 +309,7 @@ export default function ArticlesAdminPage() {
       if (child.tagName === 'H2') {
         blocks.push({ id: `b-${index}`, type: 'h2', value: child.textContent || '' })
       } else if (child.tagName === 'BLOCKQUOTE') {
-        const text = child.firstChild?.textContent?.replace(/^["']|["']$/g, '') || ''
+        const text = child.firstChild?.textContent?.replace(/^[\"']|[\"']$/g, '') || ''
         const cite = child.querySelector('cite')?.textContent?.replace('— ', '') || ''
         blocks.push({ id: `b-${index}`, type: 'quote', value: text, quoteAuthor: cite })
       } else if (child.tagName === 'UL') {
@@ -424,9 +331,9 @@ export default function ArticlesAdminPage() {
   const compileBlocksToHtml = (blocks: ContentBlock[]): string => {
     return blocks.map(block => {
       if (block.type === 'h2') return `<h2>${block.value}</h2>`
-      if (block.type === 'quote') return `<blockquote>"${block.value}"<cite class="block text-xs text-white/40 mt-2 not-italic">— ${block.quoteAuthor || 'Anonim'}</cite></blockquote>`
+      if (block.type === 'quote') return `<blockquote>\"${block.value}\"<cite class=\"block text-xs text-white/40 mt-2 not-italic\">— ${block.quoteAuthor || 'Anonim'}</cite></blockquote>`
       if (block.type === 'list') return `<ul><li>${block.value}</li></ul>`
-      if (block.type === 'image') return `<figure class="my-6"><img src="${block.imageUrl}" alt="${block.imageCaption || 'Media'}" class="w-full rounded-2xl border border-white/[0.08]" />${block.imageCaption ? `<figcaption class="text-center text-xs text-white/40 mt-2 italic">${block.imageCaption}</figcaption>` : ''}</figure>`
+      if (block.type === 'image') return `<figure class=\"my-6\"><img src=\"${block.imageUrl}\" alt=\"${block.imageCaption || 'Media'}\" class=\"w-full rounded-2xl border border-white/[0.08]\" />${block.imageCaption ? `<figcaption class=\"text-center text-xs text-white/40 mt-2 italic\">${block.imageCaption}</figcaption>` : ''}</figure>`
       return `<p>${block.value}</p>`
     }).join('\n')
   }
@@ -524,7 +431,7 @@ export default function ArticlesAdminPage() {
     try {
       const parsed = JSON.parse(jsonString)
       if (!parsed.title || typeof parsed.title !== 'string') {
-        throw new Error('Properti "title" wajib ada dan berupa string.')
+        throw new Error('Properti \"title\" wajib ada dan berupa string.')
       }
 
       // Process batch local image files if uploaded alongside JSON
@@ -782,21 +689,12 @@ export default function ArticlesAdminPage() {
     setIsEditing(false)
     setSelectedArticle(null)
 
-    if (typeof window !== 'undefined') {
-      const savedRaw = localStorage.getItem(DRAFT_STORAGE_KEY)
-      if (savedRaw) {
-        try {
-          const parsed = JSON.parse(savedRaw)
-          if (parsed && parsed.formData && !parsed.isEditing) {
-            setFormData(parsed.formData)
-            setIsModalOpen(true)
-            showToast('Draft artikel sementara sebelumnya berhasil dipulihkan!')
-            return
-          }
-        } catch (e) {
-          console.warn('[CMS Draft] Error parsing draft:', e)
-        }
-      }
+    const restored = restoreDraft(false)
+    if (restored) {
+      setFormData(restored)
+      setIsModalOpen(true)
+      showToast('Draft artikel sementara sebelumnya berhasil dipulihkan!')
+      return
     }
 
     setFormData({
@@ -814,21 +712,12 @@ export default function ArticlesAdminPage() {
     setIsEditing(true)
     setSelectedArticle(article)
 
-    if (typeof window !== 'undefined') {
-      const savedRaw = localStorage.getItem(DRAFT_STORAGE_KEY)
-      if (savedRaw) {
-        try {
-          const parsed = JSON.parse(savedRaw)
-          if (parsed && parsed.formData && parsed.isEditing && parsed.selectedArticleId === article.id) {
-            setFormData(parsed.formData)
-            setIsModalOpen(true)
-            showToast('Draft editan artikel sementara berhasil dipulihkan!')
-            return
-          }
-        } catch (e) {
-          console.warn('[CMS Draft] Error parsing draft:', e)
-        }
-      }
+    const restored = restoreDraft(true, article.id)
+    if (restored) {
+      setFormData(restored)
+      setIsModalOpen(true)
+      showToast('Draft editan artikel sementara berhasil dipulihkan!')
+      return
     }
 
     setFormData({
@@ -892,9 +781,7 @@ export default function ArticlesAdminPage() {
         showToast('Artikel baru berhasil dibuat!')
       }
 
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem(DRAFT_STORAGE_KEY)
-      }
+      clearDraft()
       setIsModalOpen(false)
       setIsPreviewOpen(false)
       queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.articles(user?.uid, userData?.role) })
@@ -963,7 +850,6 @@ export default function ArticlesAdminPage() {
     setFormData(prev => ({ ...prev, blocks: newBlocks }))
   }
 
-  // 🔥 DEKLARASI FUNGSI KUNCI YANG SEBELUMNYA MISSING
   const updateGalleryUrl = (id: string, url: string) => {
     setFormData(prev => ({
       ...prev,
@@ -993,9 +879,6 @@ export default function ArticlesAdminPage() {
     }))
   }
 
-  const formatViews = (views: number) => views >= 1000 ? `${(views / 1000).toFixed(1)}K` : views.toString()
-  const formatDate = (dateStr: string) => dateStr ? new Date(dateStr).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) : ''
-
   const previewHeadings = useMemo(() => {
     return formData.blocks.filter(block => block.type === 'h2' && block.value.trim() !== '').map((block, i) => ({
       blockId: block.id,
@@ -1010,6 +893,29 @@ export default function ArticlesAdminPage() {
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' })
     }
+  }
+
+  // Preview opened directly from the table action button
+  const openPreviewFromTable = (article: Article) => {
+    setSelectedArticle(article)
+    setFormData({
+      title: article.title,
+      category: article.category,
+      author: article.author,
+      authorBio: article.authorBio,
+      status: article.status,
+      readTime: article.readTime,
+      featuredImage: article.featuredImage,
+      excerpt: article.excerpt,
+      tags: article.tags ? article.tags.join(', ') : '',
+      embeddedDistributionCode: article.embeddedDistributionCode || '',
+      pretestCode: article.pretestCode || '',
+      posttestCode: article.posttestCode || article.embeddedDistributionCode || '',
+      gallery: article.gallery || [],
+      blocks: htmlToBlocks(article.content),
+    })
+    setIsPreviewOpen(true)
+    document.body.style.overflow = 'hidden'
   }
 
   return (
@@ -1137,82 +1043,17 @@ export default function ArticlesAdminPage() {
         )}
 
         {/* TABEL DATA */}
-        <div className="rounded-2xl bg-[#080812] border border-white/[0.05] overflow-hidden">
-          {loading ? (
-            <div className="p-4">
-              <SkeletonTable rows={6} cols={6} />
-            </div>
-          ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-white/[0.05] bg-white/[0.01]">
-                  <th className="px-4 py-4 w-10 text-center">
-                    <input
-                      type="checkbox"
-                      checked={
-                        paginatedArticles.length > 0 &&
-                        paginatedArticles.every((article) => article.id && selectedArticleIds.includes(article.id))
-                      }
-                      onChange={() => toggleSelectAllCurrentPage(paginatedArticles)}
-                      className="rounded border-slate-700 bg-slate-900 text-cyan-500 focus:ring-cyan-400 w-4 h-4 cursor-pointer"
-                    />
-                  </th>
-                  <th className="text-left px-6 py-4 text-xs text-white/35 uppercase tracking-wider font-medium">Judul Artikel</th>
-                  <th className="text-left px-6 py-4 text-xs text-white/35 uppercase tracking-wider font-medium">Kategori</th>
-                  <th className="text-left px-6 py-4 text-xs text-white/35 uppercase tracking-wider font-medium">Status</th>
-                  <th className="text-left px-6 py-4 text-xs text-white/35 uppercase tracking-wider font-medium">Views</th>
-                  <th className="text-left px-6 py-4 text-xs text-white/35 uppercase tracking-wider font-medium">Tanggal</th>
-                  <th className="text-left px-6 py-4 text-xs text-white/35 uppercase tracking-wider font-medium">Aksi</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/[0.03]">
-                {paginatedArticles.map((article) => (
-                  <tr key={article.id} className="hover:bg-white/[0.02] transition-colors">
-                    <td className="px-4 py-4 text-center">
-                      {article.id && (
-                        <input
-                          type="checkbox"
-                          checked={selectedArticleIds.includes(article.id)}
-                          onChange={() => toggleSelectArticle(article.id!)}
-                          className="rounded border-slate-700 bg-slate-900 text-cyan-500 focus:ring-cyan-400 w-4 h-4 cursor-pointer"
-                        />
-                      )}
-                    </td>
-                    <td className="px-6 py-4 font-medium text-white max-w-xs truncate">{article.title}</td>
-                    <td className="px-6 py-4">
-                      <span className="px-2.5 py-1 rounded-full bg-white/[0.03] border border-white/[0.06] text-xs text-cyan-400">
-                        {article.category}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2.5 py-1 rounded-full border text-xs ${statusColors[article.status]}`}>
-                        {article.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-white/60">{formatViews(article.views)}</td>
-                    <td className="px-6 py-4 text-white/40 text-xs">{formatDate(article.date)}</td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-1.5">
-                        <button onClick={() => handleEdit(article)} className="p-2 rounded-lg hover:bg-white/[0.05]" title="Edit Form">
-                          <Icon name="pencil" className="w-4 h-4 text-white/50 hover:text-cyan-400" />
-                        </button>
-                        <button onClick={() => { setSelectedArticle(article); setFormData({ title: article.title, category: article.category, author: article.author, authorBio: article.authorBio, status: article.status, readTime: article.readTime, featuredImage: article.featuredImage, excerpt: article.excerpt, tags: article.tags ? article.tags.join(', ') : '', embeddedDistributionCode: article.embeddedDistributionCode || '', pretestCode: article.pretestCode || '', posttestCode: article.posttestCode || article.embeddedDistributionCode || '', gallery: article.gallery || [], blocks: htmlToBlocks(article.content) }); setIsPreviewOpen(true); document.body.style.overflow = 'hidden'; }} className="p-2 rounded-lg hover:bg-white/[0.05]" title="Live Editor Preview">
-                          <Icon name="eye" className="w-4 h-4 text-white/50 hover:text-sky-400" />
-                        </button>
-                        <button onClick={() => handleExportArticleJson(article)} className="p-2 rounded-lg hover:bg-white/[0.05]" title="Unduh File Draf (.json)">
-                          <Icon name="download" className="w-4 h-4 text-white/50 hover:text-emerald-400" />
-                        </button>
-                        <button onClick={() => handleDelete(article.id!)} className="p-2 rounded-lg hover:bg-red-500/10" title="Hapus">
-                          <Icon name="trash" className="w-4 h-4 text-white/50 hover:text-red-400" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
+        <ArticlesTable
+          loading={loading}
+          paginatedArticles={paginatedArticles}
+          selectedArticleIds={selectedArticleIds}
+          toggleSelectArticle={toggleSelectArticle}
+          toggleSelectAllCurrentPage={toggleSelectAllCurrentPage}
+          handleEdit={handleEdit}
+          handleExportArticleJson={handleExportArticleJson}
+          handleDelete={handleDelete}
+          openPreviewFromTable={openPreviewFromTable}
+        />
       </div>
 
       {/* ============ MODAL BULK DELETE CONFIRMATION ============ */}
@@ -1257,655 +1098,44 @@ export default function ArticlesAdminPage() {
       )}
 
       {/* ============ MODAL FORM EDIT (RICH 3-TAB BUILDER) ============ */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center pt-8 pb-8 px-4 overflow-y-auto" style={{ backgroundColor: 'rgba(0, 0, 0, 0.85)' }} onClick={handleAttemptCloseModal}>
-          <div className="relative w-full max-w-4xl bg-[#0e0e1a] border border-white/[0.1] rounded-3xl shadow-2xl animate-slideUp my-auto overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
-            
-            {/* Modal Header & Title */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.08] bg-slate-950/60">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
-                  <Icon name="pencil" className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="font-display text-base font-bold text-white">
-                    {isEditing ? `Edit: ${formData.title || 'Artikel'}` : 'Buat Artikel Edukasi Baru'}
-                  </h3>
-                  <p className="text-xs text-white/40">Sistem manajemen konten terintegrasi dengan Auto-Save Draft & Live Preview</p>
-                </div>
-              </div>
-
-              <button onClick={handleAttemptCloseModal} className="w-8 h-8 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] flex items-center justify-center transition-colors">
-                <Icon name="x" className="w-4 h-4 text-white/60" />
-              </button>
-            </div>
-
-            {/* Tab Navigation */}
-            <div className="flex items-center gap-2 px-6 pt-3 bg-slate-950/40 border-b border-white/[0.06]">
-              <button
-                type="button"
-                onClick={() => setModalTab('info')}
-                className={`px-4 py-2.5 rounded-t-xl text-xs font-bold transition-all flex items-center gap-2 border-b-2 ${
-                  modalTab === 'info'
-                    ? 'border-cyan-400 bg-cyan-500/10 text-cyan-300'
-                    : 'border-transparent text-white/50 hover:text-white hover:bg-white/[0.03]'
-                }`}
-              >
-                <Icon name="fileText" className="w-4 h-4" />
-                <span>1. Info Utama & Banner</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setModalTab('blocks')}
-                className={`px-4 py-2.5 rounded-t-xl text-xs font-bold transition-all flex items-center gap-2 border-b-2 ${
-                  modalTab === 'blocks'
-                    ? 'border-cyan-400 bg-cyan-500/10 text-cyan-300'
-                    : 'border-transparent text-white/50 hover:text-white hover:bg-white/[0.03]'
-                }`}
-              >
-                <Icon name="layout" className="w-4 h-4" />
-                <span>2. Blok Konten ({formData.blocks.length})</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setModalTab('gallery')}
-                className={`px-4 py-2.5 rounded-t-xl text-xs font-bold transition-all flex items-center gap-2 border-b-2 ${
-                  modalTab === 'gallery'
-                    ? 'border-cyan-400 bg-cyan-500/10 text-cyan-300'
-                    : 'border-transparent text-white/50 hover:text-white hover:bg-white/[0.03]'
-                }`}
-              >
-                <Icon name="image" className="w-4 h-4" />
-                <span>3. Galeri Dokumentasi ({formData.gallery.length})</span>
-              </button>
-            </div>
-
-            {/* Modal Body Container */}
-            <div className="p-6 space-y-6 max-h-[65vh] overflow-y-auto custom-scrollbar">
-
-              {/* TAB 1: INFO UTAMA & BANNER */}
-              {modalTab === 'info' && (
-                <div className="space-y-5 animate-in fade-in duration-200">
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-white/70 uppercase tracking-wider">Judul Artikel <span className="text-rose-400">*</span></label>
-                    <input
-                      type="text"
-                      value={formData.title}
-                      onChange={e => setFormData({...formData, title: e.target.value})}
-                      className="w-full px-4 py-3 rounded-xl bg-white/[0.03] border border-white/[0.08] text-white focus:outline-none focus:border-cyan-400 text-sm font-semibold"
-                      placeholder="Masukkan judul artikel edukasi..."
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-white/70 uppercase tracking-wider">Subtitle / Ringkasan Excerpt</label>
-                    <textarea
-                      value={formData.excerpt}
-                      onChange={e => setFormData({...formData, excerpt: e.target.value})}
-                      rows={2}
-                      placeholder="Tulis ringkasan singkat artikel yang akan tampil pada kartu publik..."
-                      className="w-full px-4 py-3 rounded-xl bg-white/[0.03] border border-white/[0.08] text-white focus:outline-none focus:border-cyan-400 text-xs leading-relaxed resize-none"
-                    />
-                  </div>
-
-                  {/* FEATURED IMAGE UPLOADER */}
-                  <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/[0.06] space-y-3">
-                    <label className="text-xs font-bold text-cyan-300 uppercase tracking-wider flex items-center justify-between">
-                      <span>Foto Utama / Banner Artikel</span>
-                      <span className="text-[10px] text-white/40 font-normal">Resolusi tinggi terkompresi otomatis</span>
-                    </label>
-
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                      <input 
-                        type="text" 
-                        value={formData.featuredImage} 
-                        onChange={e => setFormData({...formData, featuredImage: e.target.value})} 
-                        placeholder="URL foto / klik tombol upload di kanan..." 
-                        className="flex-1 px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.08] text-white text-xs focus:outline-none focus:border-cyan-400" 
-                      />
-
-                      <div className="flex items-center gap-2 shrink-0">
-                        {/* Direct Upload Button */}
-                        <label className="px-3.5 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold cursor-pointer transition-all flex items-center gap-1.5 shadow-md">
-                          <Icon name="uploadCloud" className="w-4 h-4" />
-                          <span>{uploadingImage ? 'Mengunggah...' : 'Upload Baru'}</span>
-                          <input 
-                            type="file" 
-                            accept="image/*" 
-                            className="hidden" 
-                            disabled={uploadingImage}
-                            onChange={async (e) => {
-                              const file = e.target.files?.[0]
-                              if (file) {
-                                const url = await handleFileUpload(file)
-                                if (url) setFormData(prev => ({ ...prev, featuredImage: url }))
-                              }
-                            }} 
-                          />
-                        </label>
-
-                        {/* Select from Storage */}
-                        <button
-                          type="button"
-                          onClick={() => openMediaLibrary((url) => setFormData(prev => ({ ...prev, featuredImage: url })))}
-                          className="px-3.5 py-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.1] text-xs font-semibold text-white/80 transition-all flex items-center gap-1.5"
-                        >
-                          <Icon name="image" className="w-4 h-4 text-cyan-400" />
-                          <span>Pilih dari Storage</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Banner Preview */}
-                    {formData.featuredImage && (
-                      <div className="relative h-40 w-full rounded-xl overflow-hidden border border-white/10 bg-slate-950 mt-2">
-                        <img src={formData.featuredImage} alt="Banner Preview" className="w-full h-full object-cover" />
-                        <span className="absolute bottom-2 left-2 text-[10px] bg-black/60 px-2 py-0.5 rounded text-cyan-300 font-mono">Preview Banner Utama</span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <label className="text-xs font-bold text-white/70 uppercase tracking-wider block">Kategori</label>
-                        <button
-                          type="button"
-                          onClick={() => setIsAddCategoryOpen(!isAddCategoryOpen)}
-                          className="text-[10px] text-cyan-400 hover:text-cyan-300 font-bold font-mono flex items-center gap-1"
-                        >
-                          <Icon name="plus" className="w-3 h-3" />
-                          <span>+ Kategori Baru</span>
-                        </button>
-                      </div>
-
-                      {isAddCategoryOpen && (
-                        <div className="flex items-center gap-1.5 mb-2 animate-fadeIn">
-                          <input
-                            type="text"
-                            value={newCatName}
-                            onChange={(e) => setNewCatName(e.target.value)}
-                            placeholder="Nama Kategori Baru..."
-                            className="flex-1 px-3 py-1.5 rounded-xl bg-slate-950 border border-cyan-500/40 text-cyan-200 text-xs focus:outline-none font-mono"
-                          />
-                          <button
-                            type="button"
-                            onClick={handleCreateNewCategory}
-                            className="px-3 py-1.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs font-mono"
-                          >
-                            Simpan
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setIsAddCategoryOpen(false)}
-                            className="p-1.5 text-slate-400 hover:text-white"
-                          >
-                            <Icon name="x" className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      )}
-
-                      <select
-                        value={formData.category}
-                        onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.08] text-xs text-white/80 focus:outline-none focus:border-cyan-400 cursor-pointer"
-                      >
-                        {dbCategories.map((catName) => (
-                          <option key={catName} value={catName} className="bg-[#0e0e1a]">
-                            {catName}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-bold text-white/70 uppercase tracking-wider block mb-1.5">Status Publikasi</label>
-                      <select
-                        value={formData.status}
-                        onChange={e => setFormData({...formData, status: e.target.value as 'Draft'|'Published'})}
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.08] text-xs text-white/80 focus:outline-none focus:border-cyan-400"
-                      >
-                        <option value="Draft" className="bg-[#0e0e1a]">Draft (Belum Publik)</option>
-                        <option value="Published" className="bg-[#0e0e1a]">Published (Tampil Publik)</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-bold text-white/70 uppercase tracking-wider block mb-1.5">Waktu Baca (Menit)</label>
-                      <input
-                        type="number"
-                        value={formData.readTime}
-                        onChange={e => setFormData({...formData, readTime: parseInt(e.target.value) || 1})}
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.08] text-xs text-white focus:outline-none"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-xs font-bold text-white/70 uppercase tracking-wider block mb-1.5">Nama Penulis</label>
-                      <input
-                        type="text"
-                        value={formData.author}
-                        onChange={e => setFormData({...formData, author: e.target.value})}
-                        placeholder="Contoh: Dr. Ir. Ahmad Sudirman..."
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.08] text-xs text-white focus:outline-none"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-bold text-white/70 uppercase tracking-wider block mb-1.5">Tags (Pisahkan Koma)</label>
-                      <input
-                        type="text"
-                        value={formData.tags}
-                        onChange={e => setFormData({...formData, tags: e.target.value})}
-                        placeholder="Contoh: #FoodSafety, #BPOM, #KKN"
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.08] text-xs text-white focus:outline-none"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* TAB 2: EDITOR BLOK KONTEN */}
-              {modalTab === 'blocks' && (
-                <div className="space-y-4 animate-in fade-in duration-200">
-                  {/* Quick Add Block Toolbar */}
-                  <div className="p-3 rounded-2xl bg-slate-950 border border-white/[0.08] flex items-center gap-2 flex-wrap justify-between">
-                    <span className="text-xs font-bold text-cyan-300">Tambah Elemen Konten:</span>
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <button type="button" onClick={() => addBlock('p')} className="px-3 py-1.5 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] text-xs text-white font-medium flex items-center gap-1">
-                        + Paragraf
-                      </button>
-                      <button type="button" onClick={() => addBlock('h2')} className="px-3 py-1.5 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 text-xs text-cyan-300 font-bold flex items-center gap-1">
-                        + Sub-Judul H2
-                      </button>
-                      <button type="button" onClick={() => addBlock('quote')} className="px-3 py-1.5 rounded-lg bg-violet-500/10 hover:bg-violet-500/20 text-xs text-violet-300 font-medium flex items-center gap-1">
-                        + Kutipan Quote
-                      </button>
-                      <button type="button" onClick={() => addBlock('image')} className="px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-xs text-amber-300 font-bold flex items-center gap-1">
-                        + Gambar Infografis
-                      </button>
-                      <button type="button" onClick={() => addBlock('list')} className="px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-xs text-emerald-300 font-medium flex items-center gap-1">
-                        + List Poin
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* List of Blocks */}
-                  <div className="space-y-3">
-                    {formData.blocks.map((block, idx) => (
-                      <div key={block.id} className="p-4 rounded-2xl bg-white/[0.02] border border-white/[0.06] space-y-3 relative group">
-                        <div className="flex items-center justify-between border-b border-white/[0.04] pb-2">
-                          <span className="text-xs font-bold font-mono text-cyan-400 uppercase">
-                            #{idx + 1} Blok: {block.type.toUpperCase()}
-                          </span>
-
-                          <div className="flex items-center gap-1">
-                            <button type="button" onClick={() => moveBlock(block.id, 'up')} disabled={idx === 0} className="p-1 text-white/40 hover:text-white disabled:opacity-20">
-                              <Icon name="chevronUp" className="w-4 h-4" />
-                            </button>
-                            <button type="button" onClick={() => moveBlock(block.id, 'down')} disabled={idx === formData.blocks.length - 1} className="p-1 text-white/40 hover:text-white disabled:opacity-20">
-                              <Icon name="chevronDown" className="w-4 h-4" />
-                            </button>
-                            <button type="button" onClick={() => removeBlock(block.id)} className="p-1 text-rose-400/60 hover:text-rose-400">
-                              <Icon name="trash" className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Render Block Type Edit Input */}
-                        {block.type === 'h2' ? (
-                          <input
-                            type="text"
-                            value={block.value}
-                            onChange={e => updateBlockValue(block.id, e.target.value)}
-                            placeholder="Judul bagian (H2)..."
-                            className="w-full px-3.5 py-2 rounded-xl bg-cyan-950/40 border border-cyan-500/30 text-cyan-200 font-bold text-sm focus:outline-none"
-                          />
-                        ) : block.type === 'quote' ? (
-                          <div className="space-y-2">
-                            <textarea
-                              value={block.value}
-                              onChange={e => updateBlockValue(block.id, e.target.value)}
-                              placeholder="Kutipan/quote penting..."
-                              rows={2}
-                              className="w-full px-3.5 py-2 rounded-xl bg-violet-950/30 border border-violet-500/30 text-violet-200 text-xs italic focus:outline-none"
-                            />
-                            <input
-                              type="text"
-                              value={block.quoteAuthor || ''}
-                              onChange={e => updateBlockAuthor(block.id, e.target.value)}
-                              placeholder="Nama sumber quote..."
-                              className="w-full px-3.5 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.06] text-xs text-white/70"
-                            />
-                          </div>
-                        ) : block.type === 'image' ? (
-                          <div className="space-y-3">
-                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                              <input
-                                type="text"
-                                value={block.imageUrl || ''}
-                                onChange={e => {
-                                  const val = e.target.value
-                                  setFormData(prev => ({
-                                    ...prev,
-                                    blocks: prev.blocks.map(item => item.id === block.id ? { ...item, imageUrl: val } : item)
-                                  }))
-                                }}
-                                placeholder="URL gambar..."
-                                className="flex-1 px-3.5 py-2 rounded-xl bg-white/[0.03] border border-white/[0.08] text-xs text-white"
-                              />
-
-                              <div className="flex items-center gap-2">
-                                <label className="px-3 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-xs font-bold text-white cursor-pointer flex items-center gap-1">
-                                  <Icon name="uploadCloud" className="w-3.5 h-3.5" />
-                                  <span>Upload</span>
-                                  <input
-                                    type="file"
-                                    accept="image/*"
-                                    className="hidden"
-                                    onChange={async (e) => {
-                                      const file = e.target.files?.[0]
-                                      if (file) {
-                                        const url = await handleFileUpload(file)
-                                        if (url) {
-                                          setFormData(prev => ({
-                                            ...prev,
-                                            blocks: prev.blocks.map(item => item.id === block.id ? { ...item, imageUrl: url } : item)
-                                          }))
-                                        }
-                                      }
-                                    }}
-                                  />
-                                </label>
-
-                                <button
-                                  type="button"
-                                  onClick={() => openMediaLibrary((url) => {
-                                    setFormData(prev => ({
-                                      ...prev,
-                                      blocks: prev.blocks.map(item => item.id === block.id ? { ...item, imageUrl: url } : item)
-                                    }))
-                                  })}
-                                  className="px-3 py-1.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] text-xs font-semibold text-white/80"
-                                >
-                                  Pilih Storage
-                                </button>
-                              </div>
-                            </div>
-
-                            <input
-                              type="text"
-                              value={block.imageCaption || ''}
-                              onChange={e => updateBlockImageCaption(block.id, e.target.value)}
-                              placeholder="Keterangan gambar/figcaption..."
-                              className="w-full px-3.5 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.06] text-xs text-white/70 italic"
-                            />
-
-                            {block.imageUrl && (
-                              <img src={block.imageUrl} alt="Block Image Preview" className="h-32 rounded-xl object-cover border border-white/10" />
-                            )}
-                          </div>
-                        ) : (
-                          <textarea
-                            value={block.value}
-                            onChange={e => updateBlockValue(block.id, e.target.value)}
-                            placeholder="Isi paragraf..."
-                            rows={3}
-                            className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-xs text-white/90 leading-relaxed focus:outline-none"
-                          />
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* TAB 3: GALERI DOKUMENTASI */}
-              {modalTab === 'gallery' && (
-                <div className="space-y-4 animate-in fade-in duration-200">
-                  <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
-                    <div>
-                      <h4 className="text-sm font-bold text-white">Galeri Foto Dokumentasi</h4>
-                      <p className="text-xs text-white/40">Kumpulan foto pendukung kegiatan atau survei lapangan</p>
-                    </div>
-                    <button type="button" onClick={addGallerySlot} className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-xs font-bold text-white flex items-center gap-1.5 shadow-md">
-                      <Icon name="plus" className="w-4 h-4" />
-                      <span>Tambah Foto Galeri</span>
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {formData.gallery.map(img => (
-                      <div key={img.id} className="p-3 rounded-2xl bg-white/[0.02] border border-white/[0.06] space-y-3 relative group">
-                        <button 
-                          type="button"
-                          onClick={() => removeGalleryImage(img.id)}
-                          className="absolute top-3 right-3 z-10 p-1.5 bg-rose-600 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          <Icon name="trash" className="w-3.5 h-3.5" />
-                        </button>
-
-                        <div className="relative aspect-video w-full rounded-xl overflow-hidden bg-slate-950 border border-white/10 flex items-center justify-center">
-                          {img.url ? (
-                            <img src={img.url} alt={img.caption} className="w-full h-full object-cover" />
-                          ) : (
-                            <div className="text-center text-xs text-white/40">Belum Ada Foto</div>
-                          )}
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="text"
-                            value={img.url || ''}
-                            onChange={e => updateGalleryUrl(img.id, e.target.value)}
-                            placeholder="URL foto..."
-                            className="flex-1 px-3 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.06] text-xs text-white"
-                          />
-
-                          <label className="px-2.5 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-[11px] font-bold text-white cursor-pointer shrink-0">
-                            Upload
-                            <input
-                              type="file"
-                              accept="image/*"
-                              className="hidden"
-                              onChange={async (e) => {
-                                const file = e.target.files?.[0]
-                                if (file) {
-                                  const url = await handleFileUpload(file)
-                                  if (url) updateGalleryUrl(img.id, url)
-                                }
-                              }}
-                            />
-                          </label>
-
-                          <button
-                            type="button"
-                            onClick={() => openMediaLibrary((url) => updateGalleryUrl(img.id, url))}
-                            className="px-2.5 py-1.5 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] text-[11px] font-semibold text-white/80 shrink-0"
-                          >
-                            Storage
-                          </button>
-                        </div>
-
-                        <input
-                          type="text"
-                          value={img.caption}
-                          onChange={e => updateGalleryCaption(img.id, e.target.value)}
-                          placeholder="Keterangan foto..."
-                          className="w-full bg-white/[0.03] border border-white/[0.06] px-3 py-1.5 rounded-lg text-xs text-white"
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Modal Footer Controls */}
-            <div className="flex items-center justify-between px-6 py-4 border-t border-white/[0.08] bg-slate-950/80">
-              <button onClick={handleAttemptCloseModal} className="px-5 py-2.5 rounded-xl text-xs font-semibold text-white/50 hover:bg-white/[0.05] transition-colors">
-                Batal
-              </button>
-
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedArticle(selectedArticle)
-                    setIsPreviewOpen(true)
-                  }}
-                  className="px-4 py-2.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.1] text-xs font-bold text-cyan-300 flex items-center gap-1.5"
-                >
-                  <Icon name="eye" className="w-4 h-4" /> Live Editor Preview
-                </button>
-                <button
-                  type="button"
-                  disabled={isSavingArticle}
-                  onClick={() => handleSave('Draft')}
-                  className="px-4 py-2.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] text-xs font-bold text-white/80 flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
-                >
-                  {isSavingArticle ? <Icon name="spinner" className="w-4 h-4 animate-spin text-cyan-400" /> : <Icon name="save" className="w-4 h-4" />}
-                  <span>{isSavingArticle ? 'Menyimpan...' : 'Simpan Draft'}</span>
-                </button>
-
-                <button
-                  type="button"
-                  disabled={isSavingArticle}
-                  onClick={() => handleSave('Published')}
-                  className="px-5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-xs font-bold text-white shadow-lg shadow-cyan-600/30 flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
-                >
-                  {isSavingArticle ? <Icon name="spinner" className="w-4 h-4 animate-spin text-white" /> : <Icon name="send" className="w-4 h-4" />}
-                  <span>{isSavingArticle ? 'Mempublikasikan...' : 'Publish Sekarang'}</span>
-                </button>
-              </div>
-
-              {/* ============ CONFIRMATION MODAL BEFORE CLOSING EDIT CARD ============ */}
-              {isConfirmCloseOpen && (
-                <div
-                  className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <div className="w-full max-w-md bg-[#0e0e1a] border border-amber-500/30 rounded-3xl p-6 space-y-5 shadow-2xl">
-                    <div className="flex items-center gap-3 border-b border-white/[0.08] pb-3">
-                      <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
-                        <Icon name="bookOpen" className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-sm text-white">Draft Artikel Tersimpan Otomatis</h4>
-                        <p className="text-xs text-white/40 mt-0.5">Perubahan Anda aman dan tidak akan hilang.</p>
-                      </div>
-                    </div>
-
-                    <p className="text-xs text-white/70 leading-relaxed bg-white/[0.03] p-3.5 rounded-2xl border border-white/[0.06]">
-                      Seluruh ketikan & perubahan artikel telah tersimpan secara otomatis di memori browser (draft sementara). Pilih opsi di bawah:
-                    </p>
-
-                    <div className="flex flex-col gap-2.5">
-                      <button
-                        type="button"
-                        onClick={handleConfirmCloseSaveDraft}
-                        className="w-full py-2.5 px-4 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs shadow-lg transition-all cursor-pointer"
-                      >
-                        Simpan Draft & Tutup Editor
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setIsConfirmCloseOpen(false)}
-                        className="w-full py-2.5 px-4 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] text-white/80 font-semibold text-xs border border-white/[0.08] transition-all cursor-pointer"
-                      >
-                        Batal (Tetap Lanjutkan Mengedit)
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={handleConfirmCloseDiscardDraft}
-                        className="w-full py-2.5 px-4 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 font-semibold text-xs border border-rose-500/30 transition-all text-center cursor-pointer"
-                      >
-                        Hapus Draft & Keluar
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div className="space-y-3 p-4 rounded-2xl bg-cyan-950/20 border border-cyan-500/30 font-mono text-xs">
-                <label className="text-xs text-cyan-400 font-bold uppercase tracking-wider flex items-center gap-1.5 font-mono">
-                  <Icon name="key" className="w-3.5 h-3.5 text-cyan-400" />
-                  Sematkan Kuesioner Evaluasi (Pretest & Posttest)
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* PRETEST SELECTOR & INPUT */}
-                  <div className="space-y-1.5">
-                    <span className="text-[10px] font-bold text-cyan-300 block">Form Kuesioner Pretest (Atas Artikel):</span>
-                    {availableForms.length > 0 && (
-                      <select
-                        value={availableForms.find((form) => form.code === formData.pretestCode || form.id === formData.pretestCode)?.code || ''}
-                        onChange={(e) => {
-                          if (e.target.value) setFormData({ ...formData, pretestCode: e.target.value.toUpperCase() })
-                        }}
-                        className="w-full px-3 py-1.5 rounded-xl bg-slate-950 border border-cyan-500/30 text-cyan-300 text-xs focus:outline-none mb-1 cursor-pointer font-sans"
-                      >
-                        <option value="">-- Pilih Form Kuesioner Database --</option>
-                        {availableForms.map((form) => (
-                          <option key={`pre_${form.id}`} value={form.code} className="bg-[#0e0e1a]">
-                            {form.title} ({form.code})
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                    <input
-                      type="text"
-                      value={formData.pretestCode}
-                      onChange={(e) => setFormData({ ...formData, pretestCode: e.target.value.toUpperCase() })}
-                      placeholder="Kode / ID Form Pretest (mis: KKPD7X9 atau PRE-01)"
-                      className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-cyan-500/30 text-cyan-300 font-mono focus:outline-none focus:border-cyan-400 text-xs"
-                    />
-                  </div>
-
-                  {/* POSTTEST SELECTOR & INPUT */}
-                  <div className="space-y-1.5">
-                    <span className="text-[10px] font-bold text-purple-300 block">Form Kuesioner Posttest (Bawah Artikel):</span>
-                    {availableForms.length > 0 && (
-                      <select
-                        value={availableForms.find((form) => form.code === formData.posttestCode || form.id === formData.posttestCode)?.code || ''}
-                        onChange={(e) => {
-                          if (e.target.value) {
-                            const val = e.target.value.toUpperCase()
-                            setFormData({ ...formData, posttestCode: val, embeddedDistributionCode: val })
-                          }
-                        }}
-                        className="w-full px-3 py-1.5 rounded-xl bg-slate-950 border border-purple-500/30 text-purple-300 text-xs focus:outline-none mb-1 cursor-pointer font-sans"
-                      >
-                        <option value="">-- Pilih Form Kuesioner Database --</option>
-                        {availableForms.map((form) => (
-                          <option key={`post_${form.id}`} value={form.code} className="bg-[#0e0e1a]">
-                            {form.title} ({form.code})
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                    <input
-                      type="text"
-                      value={formData.posttestCode}
-                      onChange={(e) => setFormData({ ...formData, posttestCode: e.target.value.toUpperCase(), embeddedDistributionCode: e.target.value.toUpperCase() })}
-                      placeholder="Kode / ID Form Posttest (mis: KKPD8Y2 atau POST-01)"
-                      className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-purple-500/30 text-purple-300 font-mono focus:outline-none focus:border-purple-400 text-xs"
-                    />
-                  </div>
-                </div>
-                <p className="text-[10px] text-white/40 font-sans">
-                  Pilih formulir kuesioner resmi dari database Firestore atau ketik kode kuesioner secara manual.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <ArticlesFormModal
+        isOpen={isModalOpen}
+        isEditing={isEditing}
+        formData={formData}
+        setFormData={setFormData}
+        selectedArticle={selectedArticle}
+        setSelectedArticle={setSelectedArticle}
+        modalTab={modalTab}
+        setModalTab={setModalTab}
+        isSavingArticle={isSavingArticle}
+        handleSave={handleSave}
+        handleAttemptCloseModal={handleAttemptCloseModal}
+        isConfirmCloseOpen={isConfirmCloseOpen}
+        setIsConfirmCloseOpen={setIsConfirmCloseOpen}
+        handleConfirmCloseSaveDraft={handleConfirmCloseSaveDraft}
+        handleConfirmCloseDiscardDraft={handleConfirmCloseDiscardDraft}
+        uploadingImage={uploadingImage}
+        handleFileUpload={handleFileUpload}
+        openMediaLibrary={openMediaLibrary}
+        dbCategories={dbCategories}
+        availableForms={availableForms}
+        isAddCategoryOpen={isAddCategoryOpen}
+        setIsAddCategoryOpen={setIsAddCategoryOpen}
+        newCatName={newCatName}
+        setNewCatName={setNewCatName}
+        handleCreateNewCategory={handleCreateNewCategory}
+        addBlock={addBlock}
+        updateBlockValue={updateBlockValue}
+        updateBlockAuthor={updateBlockAuthor}
+        updateBlockImageCaption={updateBlockImageCaption}
+        removeBlock={removeBlock}
+        moveBlock={moveBlock}
+        updateGalleryUrl={updateGalleryUrl}
+        updateGalleryCaption={updateGalleryCaption}
+        removeGalleryImage={removeGalleryImage}
+        addGallerySlot={addGallerySlot}
+        setIsPreviewOpen={setIsPreviewOpen}
+      />
 
       {/* ============ 🔥 LIVE EDITOR PREVIEW MODAL DENGAN HAMBURGER POPOVER TOC ============ */}
       {isPreviewOpen && (
@@ -2302,76 +1532,14 @@ export default function ArticlesAdminPage() {
       )}
 
       {/* ============ 🖼️ SMART IMAGE MARKER MATCHER STEP MODAL ============ */}
-      {isImageMatcherOpen && (
-        <div className="fixed inset-0 z-[140] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md" onClick={() => setIsImageMatcherOpen(false)}>
-          <div className="relative w-full max-w-2xl bg-slate-950 border border-slate-800 rounded-3xl shadow-2xl p-6 space-y-5 max-h-[85vh] overflow-y-auto custom-scrollbar" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-2xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400">
-                  <Icon name="image" className="w-5 h-5 text-amber-400" />
-                </div>
-                <div>
-                  <h3 className="text-base font-extrabold text-white">Ditemukan Tag Gambar pada File JSON</h3>
-                  <p className="text-xs text-slate-400">Silakan unggah foto untuk setiap penanda (Mark) yang terdeteksi</p>
-                </div>
-              </div>
-              <button onClick={() => setIsImageMatcherOpen(false)} className="p-2 rounded-xl bg-slate-900 text-slate-400 hover:text-white">
-                <Icon name="x" className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <p className="text-xs text-slate-300 leading-relaxed">
-                Sistem mengidentifikasi <strong>{detectedMarkers.length} tag/penanda gambar</strong> pada file JSON artikel. Unggah file gambar lokal untuk tiap tag berikut:
-              </p>
-
-              <div className="space-y-3">
-                {detectedMarkers.map((marker, idx) => (
-                  <div key={marker.key || idx} className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-mono font-bold text-amber-400">
-                        Tag #{idx + 1}: {marker.label}
-                      </span>
-                      <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-amber-500/10 text-amber-300 border border-amber-500/30 font-bold uppercase">
-                        {marker.targetType}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0]
-                          if (file) {
-                            setDetectedMarkers((prev) =>
-                              prev.map((m, i) => (i === idx ? { ...m, file } : m))
-                            )
-                          }
-                        }}
-                        className="w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-amber-950 file:text-amber-300 hover:file:bg-amber-900 border border-slate-800 rounded-xl p-1 bg-slate-950"
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between border-t border-slate-800 pt-4">
-              <button onClick={() => { setIsImageMatcherOpen(false); setIsPreviewOpen(true); }} className="px-4 py-2 text-xs text-slate-400 hover:text-white">
-                Lewati (Gunakan Fallback)
-              </button>
-
-              <button
-                onClick={handleApplyMatchedImages}
-                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-emerald-500 hover:from-amber-400 hover:to-emerald-400 text-slate-950 text-xs font-black uppercase tracking-wider shadow-lg shadow-amber-500/20"
-              >
-                Terapkan Foto & Lanjut ke Preview →
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ArticlesImageMatcher
+        isOpen={isImageMatcherOpen}
+        detectedMarkers={detectedMarkers}
+        setDetectedMarkers={setDetectedMarkers}
+        handleApplyMatchedImages={handleApplyMatchedImages}
+        setIsImageMatcherOpen={setIsImageMatcherOpen}
+        setIsPreviewOpen={setIsPreviewOpen}
+      />
 
       {/* ============ 📥 SMART UPLOAD & PARSER MODAL ============ */}
       <SmartUploadArticleModal
