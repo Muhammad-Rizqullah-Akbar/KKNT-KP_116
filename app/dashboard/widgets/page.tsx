@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useMemo, useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { Topbar } from '@/features/dashboard/components/layout/Topbar'
 import { Icon, type IconName } from '@/components/ui/Icons'
@@ -60,6 +61,314 @@ export interface StackedAccountingItem {
   enabled: boolean
 }
 
+type WidgetCmsData = {
+  responses: FormResponse[]
+  forms: LegacyFormData[]
+  groups: FormGroup[]
+  v15Forms: any[]
+  users: any[]
+  dynamicWidgets: WidgetItem[]
+}
+
+// Fetch & transform all widget CMS data from database (was previously inline loadWidgetData)
+async function fetchWidgetData(): Promise<WidgetCmsData> {
+  const [resData, v10Data, groupsData, v15Res, usersRes, v15RespRes] = await Promise.all([
+    getAllResponses().catch(() => []),
+    getForms().catch(() => []),
+    getFormGroups().catch(() => []),
+    safeFetchJson('/api/forms'),
+    safeFetchJson('/api/auth/users'),
+    safeFetchJson('/api/responses'),
+  ])
+
+  const cleanString = (str: string) => str.toLowerCase().replace(/[^a-z0-9]/g, '').trim()
+
+  const mapAnswersToQuestionIds = (rawAnswers: Record<string, any>, form: any): Record<string, any> => {
+    if (!form || !form.questions) return rawAnswers
+    const mapped: Record<string, any> = {}
+    const questionById: Record<string, any> = {}
+    const questionByLabel: Record<string, any> = {}
+    const questionByCleanLabel: Record<string, any> = {}
+
+    form.questions.forEach((q: any) => {
+      if (q.id) questionById[q.id] = q
+      if (q.questionId) questionById[q.questionId] = q
+      const label = (q.question || q.prompt || q.title || q.label || '').trim()
+      if (label) {
+        questionByLabel[label] = q
+        questionByCleanLabel[cleanString(label)] = q
+      }
+    })
+
+    for (const [key, value] of Object.entries(rawAnswers)) {
+      let q = questionByLabel[key] || questionByCleanLabel[cleanString(key)] || questionById[key]
+      if (!q) {
+        for (const [lbl, ques] of Object.entries(questionByLabel)) {
+          if (key.includes(lbl) || cleanString(key).includes(cleanString(lbl))) {
+            q = ques
+            break
+          }
+        }
+      }
+      if (q) {
+        const type = q.answerType || q.type || 'short-text'
+        if ((type === 'indicator-table' || type === 'likert') && typeof value === 'object' && value !== null && !Array.isArray(value)) {
+          const indicators = q.config?.indicators || q.presentation?.indicators || q.indicators || []
+          const statements = q.config?.statements || q.options || []
+          const rows = indicators.length > 0 ? indicators.map((ind: any) => ind.label || ind) : statements
+          for (const [rowLabel, rowVal] of Object.entries(value)) {
+            const rowIndex = rows.findIndex((rStr: string) => rStr === rowLabel || cleanString(rStr) === cleanString(rowLabel))
+            if (rowIndex !== -1) {
+              mapped[`${q.id || q.questionId}-${rowIndex}`] = rowVal
+            }
+          }
+        } else {
+          mapped[q.id || q.questionId] = value
+        }
+      } else {
+        mapped[key] = value
+      }
+    }
+    return mapped
+  }
+
+  // Helper: 4-Tier Deterministic Form Matcher (Plek Ketiplek Data Responden Engine)
+  const findMatchingForm = (response: any, formsList: any[]): any | null => {
+    if (!formsList || formsList.length === 0 || !response) return null
+
+    // Tier 1: Direct ID Match (formId / id / docId)
+    if (response.formId) {
+      const match = formsList.find(
+        (f) => f.id === response.formId || f.formId === response.formId || f.docId === response.formId
+      )
+      if (match) return match
+    }
+
+    // Tier 2: Code & Distribution Match (code, distributionCode, formCode, pretestCode, posttestCode)
+    const codeToMatch = (response.distributionCode || response.formCode || response.code || '').trim().toUpperCase()
+    if (codeToMatch) {
+      const match = formsList.find((f) => {
+        const fCode = (f.code || f.formCode || f.normalizedCode || '').trim().toUpperCase()
+        const fPre = (f.pretestCode || '').trim().toUpperCase()
+        const fPost = (f.posttestCode || '').trim().toUpperCase()
+        const fDist = (f.embeddedDistributionCode || '').trim().toUpperCase()
+        return (fCode && fCode === codeToMatch) || (fPre && fPre === codeToMatch) || (fPost && fPost === codeToMatch) || (fDist && fDist === codeToMatch)
+      })
+      if (match) return match
+    }
+
+    // Tier 3: Question Content / Prompt Overlap Matching (100% Deterministic)
+    if (response.answers && typeof response.answers === 'object') {
+      const answerKeys = Object.keys(response.answers)
+      if (answerKeys.length > 0) {
+        let bestMatch: any = null
+        let maxOverlap = 0
+
+        formsList.forEach((f) => {
+          if (!f.questions || !Array.isArray(f.questions)) return
+          let overlapCount = 0
+
+          f.questions.forEach((q: any) => {
+            const qId = q.id || q.questionId
+            const qPrompt = (q.question || q.prompt || q.title || q.label || '').trim().toLowerCase()
+
+            answerKeys.forEach((ansKey) => {
+              const cleanAnsKey = ansKey.trim().toLowerCase()
+              if (
+                (qId && (ansKey === qId || cleanAnsKey === qId.toLowerCase())) ||
+                (qPrompt && cleanAnsKey.length > 3 && (cleanAnsKey.includes(qPrompt) || qPrompt.includes(cleanAnsKey)))
+              ) {
+                overlapCount++
+              }
+            })
+          })
+
+          if (overlapCount > maxOverlap) {
+            maxOverlap = overlapCount
+            bestMatch = f
+          }
+        })
+
+        if (bestMatch && maxOverlap > 0) return bestMatch
+      }
+    }
+
+    // Tier 4: Exact Title Match
+    if (response.formTitle) {
+      const cleanRespTitle = response.formTitle.trim().toLowerCase()
+      const match = formsList.find((f) => {
+        const fTitle = (f.title || f.metadata?.title || '').trim().toLowerCase()
+        return fTitle && (fTitle === cleanRespTitle || fTitle.includes(cleanRespTitle) || cleanRespTitle.includes(fTitle))
+      })
+      if (match) return match
+    }
+
+    return null
+  }
+
+  const { ScoringEngine } = await import('@/lib/domain/scoring/preview-engine')
+
+  let rawCombined: any[] = Array.isArray(resData) ? [...resData] : []
+  if (v15RespRes.ok && v15RespRes.data && Array.isArray(v15RespRes.data.responses)) {
+    rawCombined = [...rawCombined, ...v15RespRes.data.responses]
+  }
+
+  // DEDUPLICATE BY UNIQUE RESPONSE ID TO PREVENT 2X OVERCOUNTING
+  const responseMap = new Map<string, any>()
+  rawCombined.forEach((r) => {
+    const id = r.responseId || r.id || (r as any).docId
+    if (id && !responseMap.has(id)) {
+      responseMap.set(id, r)
+    } else if (!id) {
+      responseMap.set(JSON.stringify(r.answers || {}) + (r.submittedAt || ''), r)
+    }
+  })
+  const uniqueResponses = Array.from(responseMap.values())
+
+  // Transform responses with exact Data Responden score calculation engine
+  const transformedResponses = uniqueResponses.map((r: any) => {
+    const form = findMatchingForm(r, v10Data)
+    const mappedAnswers = mapAnswersToQuestionIds(r.answers || {}, form || null)
+
+    let calculatedScore = 0
+    if (form && form.questions && form.questions.length > 0) {
+      try {
+        const questionsWithScoring = form.questions.map((q: any) => {
+          const type = q.answerType || q.type || 'short-text'
+          let scheme: 'none' | 'binary' | 'likert' | 'rating' | 'indicator' = 'none'
+          if (type === 'single-choice' || type === 'dropdown' || type === 'binary' || type === 'multiple-choice') scheme = 'binary'
+          else if (type === 'indicator-table' || type === 'likert') scheme = 'indicator'
+          else if (type === 'rating') scheme = 'rating'
+          return { ...q, scoring: q.scoring || { scheme, weight: 1 } }
+        })
+
+        const scoring = form.scoring || { totalPoints: 100, mode: 'auto', distribution: {}, overrides: {}, allowOverride: true, autoBalance: true }
+        const validation = form.validation || { mode: 'all_required', exceptions: [], allowOverride: true }
+        const stages = form.stages && form.stages.length > 0 ? form.stages : [{ id: 'default', name: 'Semua Pertanyaan', order: 0, questionIds: form.questions.map((q: any) => q.id), includeInScoring: true }]
+
+        const engine = new ScoringEngine(questionsWithScoring, scoring as any, validation as any, stages as any)
+        const result = engine.calculateScore(mappedAnswers)
+        if (result && typeof result.percentage === 'number' && !isNaN(result.percentage)) {
+          calculatedScore = Math.round(result.percentage)
+        }
+      } catch {}
+    }
+
+    const storedScore =
+      typeof r.score === 'number' && r.score > 0
+        ? r.score
+        : typeof r.result?.percentage === 'number' && r.result.percentage > 0
+        ? r.result.percentage
+        : typeof r.totalScore === 'number' && r.totalScore > 0
+        ? r.totalScore
+        : null
+
+    const finalScore = storedScore !== null ? storedScore : calculatedScore
+
+    const respondentName = extractRespondentName(r, form)
+    const respondentEmail = extractRespondentEmail(r, form)
+    const resolvedFormTitle = form?.title || (form as any)?.metadata?.title || r.formTitle || 'Formulir Tanpa Judul'
+    const formCode = r.formCode || (form as any)?.code || r.distributionCode || ''
+
+    return {
+      ...r,
+      score: finalScore,
+      matchedForm: form,
+      respondentName,
+      respondentEmail,
+      formTitle: resolvedFormTitle,
+      formCode,
+    }
+  })
+
+  const v15Forms: any[] = []
+  if (v15Res.ok && v15Res.data && Array.isArray(v15Res.data.forms)) {
+    v15Forms.push(...v15Res.data.forms)
+  }
+
+  const users: any[] = []
+  if (usersRes.ok && usersRes.data && Array.isArray(usersRes.data.users)) {
+    users.push(...usersRes.data.users)
+  }
+
+  // Generate Dynamic Widgets from REAL questions in database
+  const dynamicWidgets: WidgetItem[] = []
+  let positionCounter = 0
+
+  // Process V1.0 Questions from Database
+  v10Data.forEach((form) => {
+    form.questions?.forEach((q: any, qIdx: number) => {
+      const type = q.answerType || q.type || 'short-text'
+      if (['single-choice', 'multiple-choice', 'dropdown', 'indicator-table', 'likert', 'rating', 'binary'].includes(type)) {
+        const qTitle = q.question || q.label || 'Pertanyaan Evaluasi'
+
+        const assignedType: 'bar' | 'pie' | 'line' | 'number' | 'matrix' =
+          type === 'indicator-table' || type === 'likert'
+            ? 'matrix'
+            : type === 'rating'
+            ? 'number'
+            : qIdx % 3 === 0
+            ? 'bar'
+            : qIdx % 3 === 1
+            ? 'pie'
+            : 'line'
+
+        dynamicWidgets.push({
+          id: `widget-v10-${q.id}`,
+          name: `${form.title}: ${qTitle}`,
+          formId: form.id || 'v10-form',
+          formTitle: form.title || 'Formulir V1.0',
+          questionId: q.id,
+          questionText: qTitle,
+          chartType: assignedType,
+          enabled: positionCounter < 6,
+          position: positionCounter++,
+          config: {
+            title: qTitle,
+            colorScheme: COLOR_SCHEMES[positionCounter % COLOR_SCHEMES.length].id,
+            showLegend: true,
+          },
+        })
+      }
+    })
+  })
+
+  // Process V1.5 Questions from Database
+  v15Forms.forEach((f15: any) => {
+    f15.questions?.forEach((q: any, qIdx: number) => {
+      const qTitle = q.title || q.question || 'Pertanyaan V1.5'
+      const assignedType: 'bar' | 'pie' | 'line' | 'number' | 'matrix' =
+        qIdx % 4 === 0 ? 'bar' : qIdx % 4 === 1 ? 'pie' : qIdx % 4 === 2 ? 'line' : 'matrix'
+
+      dynamicWidgets.push({
+        id: `widget-v15-${q.id || crypto.randomUUID()}`,
+        name: `[V1.5] ${f15.metadata?.title || 'Form V1.5'}: ${qTitle}`,
+        formId: f15.formId,
+        formTitle: f15.metadata?.title || 'Form V1.5',
+        questionId: q.id || q.questionId,
+        questionText: qTitle,
+        chartType: assignedType,
+        enabled: positionCounter < 8,
+        position: positionCounter++,
+        config: {
+          title: qTitle,
+          colorScheme: COLOR_SCHEMES[positionCounter % COLOR_SCHEMES.length].id,
+          showLegend: true,
+        },
+      })
+    })
+  })
+
+  return {
+    responses: transformedResponses,
+    forms: v10Data,
+    groups: groupsData,
+    v15Forms,
+    users,
+    dynamicWidgets,
+  }
+}
+
 export default function WidgetsPage() {
   const { user, userData, userRole, loading: authLoading } = useAuth()
   const router = useRouter()
@@ -94,14 +403,8 @@ export default function WidgetsPage() {
   // Active Selected Stack Index for Detailed Viewing
   const [activeStackId, setActiveStackId] = useState<string>('stack-1')
 
-  // Data States Fetched Dynamically From Database
+  // Data States Fetched Dynamically From Database (via useQuery below)
   const [widgets, setWidgets] = useState<WidgetItem[]>([])
-  const [responses, setResponses] = useState<FormResponse[]>([])
-  const [forms, setForms] = useState<LegacyFormData[]>([])
-  const [groups, setGroups] = useState<FormGroup[]>([])
-  const [v15Forms, setV15Forms] = useState<any[]>([])
-  const [users, setUsers] = useState<any[]>([])
-  const [isLoading, setIsLoading] = useState(true)
 
   // Search & Chart Filters
   const [searchTerm, setSearchTerm] = useState('')
@@ -134,337 +437,50 @@ export default function WidgetsPage() {
     setTimeout(() => setToastMessage(null), 3500)
   }
 
-  // Load All Forms, Responses, & Users Dynamically From Database
-  const loadWidgetData = async () => {
-    setIsLoading(true)
-    try {
-      const [resData, v10Data, groupsData, v15Res, usersRes, v15RespRes] = await Promise.all([
-        getAllResponses().catch(() => []),
-        getForms().catch(() => []),
-        getFormGroups().catch(() => []),
-        safeFetchJson('/api/forms'),
-        safeFetchJson('/api/auth/users'),
-        safeFetchJson('/api/responses'),
-      ])
+  // Load All Forms, Responses, & Users Dynamically From Database via useQuery
+  const {
+    data: {
+      responses = [],
+      forms = [],
+      groups = [],
+      v15Forms = [],
+      users = [],
+      dynamicWidgets = [],
+    } = {},
+  } = useQuery<WidgetCmsData>({
+    queryKey: ['widget-cms-data'],
+    queryFn: fetchWidgetData,
+  })
 
-      const cleanString = (str: string) => str.toLowerCase().replace(/[^a-z0-9]/g, '').trim()
+  // Hydrate widget/stacks from localStorage (or fall back to dynamically-generated widgets)
+  useEffect(() => {
+    if (dynamicWidgets.length === 0) return
 
-      const mapAnswersToQuestionIds = (rawAnswers: Record<string, any>, form: any): Record<string, any> => {
-        if (!form || !form.questions) return rawAnswers
-        const mapped: Record<string, any> = {}
-        const questionById: Record<string, any> = {}
-        const questionByLabel: Record<string, any> = {}
-        const questionByCleanLabel: Record<string, any> = {}
-
-        form.questions.forEach((q: any) => {
-          if (q.id) questionById[q.id] = q
-          if (q.questionId) questionById[q.questionId] = q
-          const label = (q.question || q.prompt || q.title || q.label || '').trim()
-          if (label) {
-            questionByLabel[label] = q
-            questionByCleanLabel[cleanString(label)] = q
-          }
-        })
-
-        for (const [key, value] of Object.entries(rawAnswers)) {
-          let q = questionByLabel[key] || questionByCleanLabel[cleanString(key)] || questionById[key]
-          if (!q) {
-            for (const [lbl, ques] of Object.entries(questionByLabel)) {
-              if (key.includes(lbl) || cleanString(key).includes(cleanString(lbl))) {
-                q = ques
-                break
-              }
-            }
-          }
-          if (q) {
-            const type = q.answerType || q.type || 'short-text'
-            if ((type === 'indicator-table' || type === 'likert') && typeof value === 'object' && value !== null && !Array.isArray(value)) {
-              const indicators = q.config?.indicators || q.presentation?.indicators || q.indicators || []
-              const statements = q.config?.statements || q.options || []
-              const rows = indicators.length > 0 ? indicators.map((ind: any) => ind.label || ind) : statements
-              for (const [rowLabel, rowVal] of Object.entries(value)) {
-                const rowIndex = rows.findIndex((rStr: string) => rStr === rowLabel || cleanString(rStr) === cleanString(rowLabel))
-                if (rowIndex !== -1) {
-                  mapped[`${q.id || q.questionId}-${rowIndex}`] = rowVal
-                }
-              }
-            } else {
-              mapped[q.id || q.questionId] = value
-            }
-          } else {
-            mapped[key] = value
-          }
-        }
-        return mapped
-      }
-
-      // Helper: 4-Tier Deterministic Form Matcher (Plek Ketiplek Data Responden Engine)
-      const findMatchingForm = (response: any, formsList: any[]): any | null => {
-        if (!formsList || formsList.length === 0 || !response) return null
-
-        // Tier 1: Direct ID Match (formId / id / docId)
-        if (response.formId) {
-          const match = formsList.find(
-            (f) => f.id === response.formId || f.formId === response.formId || f.docId === response.formId
-          )
-          if (match) return match
-        }
-
-        // Tier 2: Code & Distribution Match (code, distributionCode, formCode, pretestCode, posttestCode)
-        const codeToMatch = (response.distributionCode || response.formCode || response.code || '').trim().toUpperCase()
-        if (codeToMatch) {
-          const match = formsList.find((f) => {
-            const fCode = (f.code || f.formCode || f.normalizedCode || '').trim().toUpperCase()
-            const fPre = (f.pretestCode || '').trim().toUpperCase()
-            const fPost = (f.posttestCode || '').trim().toUpperCase()
-            const fDist = (f.embeddedDistributionCode || '').trim().toUpperCase()
-            return (fCode && fCode === codeToMatch) || (fPre && fPre === codeToMatch) || (fPost && fPost === codeToMatch) || (fDist && fDist === codeToMatch)
-          })
-          if (match) return match
-        }
-
-        // Tier 3: Question Content / Prompt Overlap Matching (100% Deterministic)
-        if (response.answers && typeof response.answers === 'object') {
-          const answerKeys = Object.keys(response.answers)
-          if (answerKeys.length > 0) {
-            let bestMatch: any = null
-            let maxOverlap = 0
-
-            formsList.forEach((f) => {
-              if (!f.questions || !Array.isArray(f.questions)) return
-              let overlapCount = 0
-
-              f.questions.forEach((q: any) => {
-                const qId = q.id || q.questionId
-                const qPrompt = (q.question || q.prompt || q.title || q.label || '').trim().toLowerCase()
-
-                answerKeys.forEach((ansKey) => {
-                  const cleanAnsKey = ansKey.trim().toLowerCase()
-                  if (
-                    (qId && (ansKey === qId || cleanAnsKey === qId.toLowerCase())) ||
-                    (qPrompt && cleanAnsKey.length > 3 && (cleanAnsKey.includes(qPrompt) || qPrompt.includes(cleanAnsKey)))
-                  ) {
-                    overlapCount++
-                  }
-                })
-              })
-
-              if (overlapCount > maxOverlap) {
-                maxOverlap = overlapCount
-                bestMatch = f
-              }
-            })
-
-            if (bestMatch && maxOverlap > 0) return bestMatch
-          }
-        }
-
-        // Tier 4: Exact Title Match
-        if (response.formTitle) {
-          const cleanRespTitle = response.formTitle.trim().toLowerCase()
-          const match = formsList.find((f) => {
-            const fTitle = (f.title || f.metadata?.title || '').trim().toLowerCase()
-            return fTitle && (fTitle === cleanRespTitle || fTitle.includes(cleanRespTitle) || cleanRespTitle.includes(fTitle))
-          })
-          if (match) return match
-        }
-
-        return null
-      }
-
-      const { ScoringEngine } = await import('@/lib/domain/scoring/preview-engine')
-
-      let rawCombined: any[] = Array.isArray(resData) ? [...resData] : []
-      if (v15RespRes.ok && v15RespRes.data && Array.isArray(v15RespRes.data.responses)) {
-        rawCombined = [...rawCombined, ...v15RespRes.data.responses]
-      }
-
-      // DEDUPLICATE BY UNIQUE RESPONSE ID TO PREVENT 2X OVERCOUNTING
-      const responseMap = new Map<string, any>()
-      rawCombined.forEach((r) => {
-        const id = r.responseId || r.id || (r as any).docId
-        if (id && !responseMap.has(id)) {
-          responseMap.set(id, r)
-        } else if (!id) {
-          responseMap.set(JSON.stringify(r.answers || {}) + (r.submittedAt || ''), r)
-        }
-      })
-      const uniqueResponses = Array.from(responseMap.values())
-
-      // Transform responses with exact Data Responden score calculation engine
-      const transformedResponses = uniqueResponses.map((r: any) => {
-        const form = findMatchingForm(r, v10Data)
-        const mappedAnswers = mapAnswersToQuestionIds(r.answers || {}, form || null)
-
-        let calculatedScore = 0
-        if (form && form.questions && form.questions.length > 0) {
-          try {
-            const questionsWithScoring = form.questions.map((q: any) => {
-              const type = q.answerType || q.type || 'short-text'
-              let scheme: 'none' | 'binary' | 'likert' | 'rating' | 'indicator' = 'none'
-              if (type === 'single-choice' || type === 'dropdown' || type === 'binary' || type === 'multiple-choice') scheme = 'binary'
-              else if (type === 'indicator-table' || type === 'likert') scheme = 'indicator'
-              else if (type === 'rating') scheme = 'rating'
-              return { ...q, scoring: q.scoring || { scheme, weight: 1 } }
-            })
-
-            const scoring = form.scoring || { totalPoints: 100, mode: 'auto', distribution: {}, overrides: {}, allowOverride: true, autoBalance: true }
-            const validation = form.validation || { mode: 'all_required', exceptions: [], allowOverride: true }
-            const stages = form.stages && form.stages.length > 0 ? form.stages : [{ id: 'default', name: 'Semua Pertanyaan', order: 0, questionIds: form.questions.map((q: any) => q.id), includeInScoring: true }]
-
-            const engine = new ScoringEngine(questionsWithScoring, scoring as any, validation as any, stages as any)
-            const result = engine.calculateScore(mappedAnswers)
-            if (result && typeof result.percentage === 'number' && !isNaN(result.percentage)) {
-              calculatedScore = Math.round(result.percentage)
-            }
-          } catch {}
-        }
-
-        const storedScore =
-          typeof r.score === 'number' && r.score > 0
-            ? r.score
-            : typeof r.result?.percentage === 'number' && r.result.percentage > 0
-            ? r.result.percentage
-            : typeof r.totalScore === 'number' && r.totalScore > 0
-            ? r.totalScore
-            : null
-
-        const finalScore = storedScore !== null ? storedScore : calculatedScore
-
-        const respondentName = extractRespondentName(r, form)
-        const respondentEmail = extractRespondentEmail(r, form)
-        const resolvedFormTitle = form?.title || (form as any)?.metadata?.title || r.formTitle || 'Formulir Tanpa Judul'
-        const formCode = r.formCode || (form as any)?.code || r.distributionCode || ''
-
-        return {
-          ...r,
-          score: finalScore,
-          matchedForm: form,
-          respondentName,
-          respondentEmail,
-          formTitle: resolvedFormTitle,
-          formCode,
-        }
-      })
-
-      setResponses(transformedResponses)
-      setForms(v10Data)
-      setGroups(groupsData)
-
-      if (v15Res.ok && v15Res.data && Array.isArray(v15Res.data.forms)) {
-        setV15Forms(v15Res.data.forms)
-      }
-
-      if (usersRes.ok && usersRes.data && Array.isArray(usersRes.data.users)) {
-        setUsers(usersRes.data.users)
-      }
-
-      // Generate Dynamic Widgets from REAL questions in database
-      const dynamicWidgets: WidgetItem[] = []
-      let positionCounter = 0
-
-      // Process V1.0 Questions from Database
-      v10Data.forEach((form) => {
-        form.questions?.forEach((q: any, qIdx: number) => {
-          const type = q.answerType || q.type || 'short-text'
-          if (['single-choice', 'multiple-choice', 'dropdown', 'indicator-table', 'likert', 'rating', 'binary'].includes(type)) {
-            const qTitle = q.question || q.label || 'Pertanyaan Evaluasi'
-            
-            const assignedType: 'bar' | 'pie' | 'line' | 'number' | 'matrix' =
-              type === 'indicator-table' || type === 'likert'
-                ? 'matrix'
-                : type === 'rating'
-                ? 'number'
-                : qIdx % 3 === 0
-                ? 'bar'
-                : qIdx % 3 === 1
-                ? 'pie'
-                : 'line'
-
-            dynamicWidgets.push({
-              id: `widget-v10-${q.id}`,
-              name: `${form.title}: ${qTitle}`,
-              formId: form.id || 'v10-form',
-              formTitle: form.title || 'Formulir V1.0',
-              questionId: q.id,
-              questionText: qTitle,
-              chartType: assignedType,
-              enabled: positionCounter < 6,
-              position: positionCounter++,
-              config: {
-                title: qTitle,
-                colorScheme: COLOR_SCHEMES[positionCounter % COLOR_SCHEMES.length].id,
-                showLegend: true,
-              },
-            })
-          }
-        })
-      })
-
-      // Process V1.5 Questions from Database
-      if (v15Res.ok && v15Res.data && Array.isArray(v15Res.data.forms)) {
-        v15Res.data.forms.forEach((f15: any) => {
-          f15.questions?.forEach((q: any, qIdx: number) => {
-            const qTitle = q.title || q.question || 'Pertanyaan V1.5'
-            const assignedType: 'bar' | 'pie' | 'line' | 'number' | 'matrix' =
-              qIdx % 4 === 0 ? 'bar' : qIdx % 4 === 1 ? 'pie' : qIdx % 4 === 2 ? 'line' : 'matrix'
-
-            dynamicWidgets.push({
-              id: `widget-v15-${q.id || crypto.randomUUID()}`,
-              name: `[V1.5] ${f15.metadata?.title || 'Form V1.5'}: ${qTitle}`,
-              formId: f15.formId,
-              formTitle: f15.metadata?.title || 'Form V1.5',
-              questionId: q.id || q.questionId,
-              questionText: qTitle,
-              chartType: assignedType,
-              enabled: positionCounter < 8,
-              position: positionCounter++,
-              config: {
-                title: qTitle,
-                colorScheme: COLOR_SCHEMES[positionCounter % COLOR_SCHEMES.length].id,
-                showLegend: true,
-              },
-            })
-          })
-        })
-      }
-
-      // Load Saved Preferences
-      if (typeof window !== 'undefined') {
-        const savedWidgets = localStorage.getItem('dashboard_widgets_cms_config_v5')
-        if (savedWidgets) {
-          try {
-            const parsed = JSON.parse(savedWidgets)
-            if (Array.isArray(parsed) && parsed.length > 0) setWidgets(parsed)
-            else setWidgets(dynamicWidgets)
-          } catch {
-            setWidgets(dynamicWidgets)
-          }
-        } else {
+    if (typeof window !== 'undefined') {
+      const savedWidgets = localStorage.getItem('dashboard_widgets_cms_config_v5')
+      if (savedWidgets) {
+        try {
+          const parsed = JSON.parse(savedWidgets)
+          if (Array.isArray(parsed) && parsed.length > 0) setWidgets(parsed)
+          else setWidgets(dynamicWidgets)
+        } catch {
           setWidgets(dynamicWidgets)
-        }
-
-        const savedStacks = localStorage.getItem('dashboard_accounting_stack_v5')
-        if (savedStacks) {
-          try {
-            const parsed = JSON.parse(savedStacks)
-            if (Array.isArray(parsed) && parsed.length > 0) setAccountingStacks(parsed)
-          } catch {}
         }
       } else {
         setWidgets(dynamicWidgets)
       }
-    } catch (err: any) {
-      console.error('Error loading widget CMS data:', err)
-      showToast('Gagal memuat data grafik dari database.')
-    } finally {
-      setIsLoading(false)
-    }
-  }
 
-  useEffect(() => {
-    loadWidgetData()
-  }, [])
+      const savedStacks = localStorage.getItem('dashboard_accounting_stack_v5')
+      if (savedStacks) {
+        try {
+          const parsed = JSON.parse(savedStacks)
+          if (Array.isArray(parsed) && parsed.length > 0) setAccountingStacks(parsed)
+        } catch {}
+      }
+    } else {
+      setWidgets(dynamicWidgets)
+    }
+  }, [dynamicWidgets])
 
   // Save Settings Local & Sync to Main Dashboard
   const saveWidgetSettings = (updatedList: WidgetItem[], updatedStacks: StackedAccountingItem[] = accountingStacks) => {
