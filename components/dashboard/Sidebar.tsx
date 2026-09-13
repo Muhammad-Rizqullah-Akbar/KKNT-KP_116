@@ -108,7 +108,7 @@ export function Sidebar({ userRole }: SidebarProps) {
     {
       section: 'Assessment / Form',
       items: [
-        { href: '/dashboard/forms/v1-5-builder', icon: 'filePlus', label: 'Form Builder', badge: 'Builder' },
+        { href: '/dashboard/forms/new', icon: 'filePlus', label: 'Form Builder (Baru)', badge: 'Builder' },
         { href: '/dashboard/forms/v1-5-list', icon: 'clipboardList', label: 'Daftar Formulir', badge: 'Form' },
         { href: '/dashboard/distributions', icon: 'send', label: 'Distribusi & Kode', badge: 'Kode' },
         { href: '/dashboard/responses', icon: 'checkCircle', label: 'Hasil Penilaian', badge: 'Hasil' },
