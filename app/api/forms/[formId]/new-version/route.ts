@@ -13,7 +13,7 @@ interface RouteParams {
 export async function POST(_request: Request, { params }: RouteParams) {
   try {
     const { formId } = await params
-    const authContext = await requireRole(['super_admin', 'super_admin'])
+    const authContext = await requireRole(['super_admin'])
 
     const updated = await createNewVersionWorkflow(formId, authContext.uid)
     return NextResponse.json({

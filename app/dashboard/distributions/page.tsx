@@ -15,7 +15,7 @@ import { SkeletonTable } from '@/components/ui/Skeleton'
 export default function DistributionsDashboardPage() {
   const router = useRouter()
   const { user, userData, userRole } = useAuth()
-  const isGlobalRole = ['super_admin', 'super_admin', 'super_admin'].includes(userRole || '')
+  const isGlobalRole = ['super_admin'].includes(userRole || '')
   const isPartnershipRole = userRole === 'partnership'
   const isCadreRole = userRole === 'cadre'
 
@@ -33,7 +33,7 @@ export default function DistributionsDashboardPage() {
       }
 
       let formsList = formRes.ok && formRes.data && Array.isArray(formRes.data.forms) ? formRes.data.forms : []
-      const isGlobal = ['super_admin', 'super_admin', 'super_admin'].includes(userRole || '')
+      const isGlobal = ['super_admin'].includes(userRole || '')
 
       const permittedForms = formsList.filter((f: any) => {
         const isPublished = f.status === 'published' || f.metadata?.status === 'published'

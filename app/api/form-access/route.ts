@@ -12,7 +12,7 @@ import {
  */
 export async function GET(request: Request) {
   try {
-    await requireRole(['super_admin', 'super_admin', 'cadre', 'partnership'])
+    await requireRole(['super_admin', 'cadre', 'partnership'])
     const { searchParams } = new URL(request.url)
     const formId = searchParams.get('formId') || undefined
     const subjectId = searchParams.get('subjectId') || undefined
@@ -34,7 +34,7 @@ export async function GET(request: Request) {
  */
 export async function POST(request: Request) {
   try {
-    const authContext = await requireRole(['super_admin', 'super_admin'])
+    const authContext = await requireRole(['super_admin'])
     const body = await request.json()
 
     if (body.action === 'revoke' && body.accessId) {

@@ -31,7 +31,7 @@ import { randomInt, randomBytes } from 'crypto'
  * Global Role Scope Boundary Check
  */
 function isGlobalRole(role: string): boolean {
-  return role === 'super_admin' || role === 'super_admin' || role === 'super_admin'
+  return role === 'super_admin'
 }
 
 /**

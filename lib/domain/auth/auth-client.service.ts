@@ -222,7 +222,7 @@ export const loginWithEmail = async (
   const role = userData?.role || null
 
   // 5. Verify user has a valid registered role
-  const validRoles = ['super_admin', 'super_admin', 'super_admin', 'partnership', 'cadre']
+  const validRoles = ['super_admin', 'partnership', 'cadre']
   if (!role || !validRoles.includes(role)) {
     await signOut(auth)
     await clearServerSession()
