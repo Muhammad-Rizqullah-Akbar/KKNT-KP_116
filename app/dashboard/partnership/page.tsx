@@ -1,6 +1,7 @@
 'use client'
 
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useMemo } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { safeFetchJson } from '@/lib/infra/safe-fetch'
@@ -45,12 +46,43 @@ export default function PartnershipDomainPage() {
   const isSuperAdminOrAdmin = userData?.role === 'super_admin'
   const isPartnershipRole = userData?.role === 'partnership'
 
-  const [allUsers, setAllUsers] = useState<UserProfile[]>([])
-  const [distributions, setDistributions] = useState<any[]>([])
-  const [responses, setResponses] = useState<any[]>([])
-  const [articles, setArticles] = useState<ArticleData[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const queryClient = useQueryClient()
+
+  const {
+    data: {
+      allUsers = [],
+      distributions = [],
+      responses = [],
+      articles = [],
+    } = {},
+    isLoading,
+  } = useQuery<{
+    allUsers: UserProfile[]
+    distributions: any[]
+    responses: any[]
+    articles: ArticleData[]
+  }>({
+    queryKey: ['partnership-data'],
+    queryFn: async () => {
+      const [usersRes, distRes, respRes, articlesData] = await Promise.all([
+        safeFetchJson('/api/auth/users'),
+        safeFetchJson('/api/distributions'),
+        safeFetchJson('/api/responses'),
+        getArticles().catch(() => []),
+      ])
+
+      return {
+        allUsers: usersRes.ok && usersRes.data && Array.isArray(usersRes.data.users) ? usersRes.data.users : [],
+        distributions: distRes.ok && distRes.data && Array.isArray(distRes.data.distributions) ? distRes.data.distributions : [],
+        responses: respRes.ok && respRes.data && Array.isArray(respRes.data.responses) ? respRes.data.responses : [],
+        articles: Array.isArray(articlesData) ? articlesData : [],
+      }
+    },
+  })
+
+  const invalidatePartnershipData = () =>
+    queryClient.invalidateQueries({ queryKey: ['partnership-data'] })
+
   const [toastMessage, setToastMessage] = useState<string | null>(null)
 
   // Filters & Search
@@ -98,40 +130,7 @@ export default function PartnershipDomainPage() {
     router.replace(`/dashboard/partnership?tab=${tab}`, { scroll: false })
   }
 
-  // Fetch Users, Distributions, Responses, & Articles
-  const fetchUsersData = async () => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      const [usersRes, distRes, respRes, articlesData] = await Promise.all([
-        safeFetchJson('/api/auth/users'),
-        safeFetchJson('/api/distributions'),
-        safeFetchJson('/api/responses'),
-        getArticles().catch(() => []),
-      ])
-
-      if (usersRes.ok && usersRes.data && Array.isArray(usersRes.data.users)) {
-        setAllUsers(usersRes.data.users)
-      }
-      if (distRes.ok && distRes.data && Array.isArray(distRes.data.distributions)) {
-        setDistributions(distRes.data.distributions)
-      }
-      if (respRes.ok && respRes.data && Array.isArray(respRes.data.responses)) {
-        setResponses(respRes.data.responses)
-      }
-      if (Array.isArray(articlesData)) {
-        setArticles(articlesData)
-      }
-    } catch (err: any) {
-      setError(err.message || 'Terjadi kesalahan koneksi server.')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    fetchUsersData()
-  }, [])
+  // (partnership data is loaded via useQuery above)
 
   // Helper: Get Cadre Progress Summary
   const getCadreProgressSummary = (cadreUid: string) => {
@@ -430,7 +429,6 @@ export default function PartnershipDomainPage() {
   const handleCreateMitra = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmittingMitra(true)
-    setError(null)
     try {
       const res = await fetch('/api/auth/register', {
         method: 'POST',
@@ -455,7 +453,7 @@ export default function PartnershipDomainPage() {
       setMitraPassword('')
       setMitraName('')
       setMitraPhone('')
-      fetchUsersData()
+      invalidatePartnershipData()
     } catch (err: any) {
       showToast(`Error: ${err.message}`)
     } finally {
@@ -467,7 +465,6 @@ export default function PartnershipDomainPage() {
   const handleCreateCadre = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmittingCadre(true)
-    setError(null)
     try {
       const targetOrg = cadreContextMitra
         ? cadreContextMitra.organization || cadreContextMitra.displayName
@@ -501,7 +498,7 @@ export default function PartnershipDomainPage() {
       setCadreName('')
       setCadrePhone('')
       setCadreOrganization('')
-      fetchUsersData()
+      invalidatePartnershipData()
     } catch (err: any) {
       showToast(`Error: ${err.message}`)
     } finally {
