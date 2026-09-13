@@ -5,66 +5,16 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { safeFetchJson } from '@/lib/infra/safe-fetch'
-import { Icon, type IconName } from '@/components/ui/Icons'
+import { Icon } from '@/components/ui/Icons'
 import { Topbar } from '@/features/dashboard/components/layout/Topbar'
 import { queryKeys } from '@/lib/query-keys'
 import { useToast } from '@/lib/hooks'
-
-type UserRole = 'super_admin' | 'cadre' | 'partnership' | null
-
-type User = {
-  uid: string
-  email: string
-  displayName: string
-  role: UserRole
-  organization?: string
-  phone?: string
-  partnershipId?: string
-  partnershipName?: string
-  photoURL?: string
-  createdAt?: string
-  updatedAt?: string
-  isChildOfMitra?: boolean
-  parentMitraName?: string
-}
-
-const ROLE_OPTIONS: { id: UserRole; label: string; icon: IconName; colorClass: string; desc: string }[] = [
-  {
-    id: 'super_admin',
-    label: 'Super Admin',
-    icon: 'crown',
-    colorClass: 'text-amber-400 bg-amber-500/10 border-amber-500/30',
-    desc: 'Akses penuh tanpa batas seluruh fitur, manajemen user, dan pengaturan sistem.',
-  },
-  {
-    id: 'super_admin',
-    label: 'Admin Systems',
-    icon: 'shieldCheck',
-    colorClass: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/30',
-    desc: 'Akses membuat kuesioner V1.5, Form Builder, distribusi kode, dan rekap nasional.',
-  },
-  {
-    id: 'super_admin',
-    label: 'Internal BPOM',
-    icon: 'award',
-    colorClass: 'text-blue-400 bg-blue-500/10 border-blue-500/30',
-    desc: 'Evaluator & Pengawas Resmi BPOM untuk verifikasi instrumen & laporan evaluasi.',
-  },
-  {
-    id: 'partnership',
-    label: 'Mitra / Partnership',
-    icon: 'briefcase',
-    colorClass: 'text-purple-400 bg-purple-500/10 border-purple-500/30',
-    desc: 'Akun Organisasi/Instansi Mitra yang dapat mengelola kelompok Kader miliknya sendiri.',
-  },
-  {
-    id: 'cadre',
-    label: 'Kader Lapangan / Komunitas',
-    icon: 'users',
-    colorClass: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30',
-    desc: 'Kader Lapangan (Sekolah, Komunitas, Pasar, atau Desa) untuk eksekusi kuesioner publik.',
-  },
-]
+import { filterAndSortUsers, type User, type UserRole } from './users-utils'
+import RegisterForm from './register-form'
+import UsersTable from './users-table'
+import DeleteUserModal from './delete-user-modal'
+import BulkDeleteModal from './bulk-delete-modal'
+import EditUserModal from './edit-user-modal'
 
 export default function UserManagementPage() {
   const { userRole, user, userData, loading: authLoading } = useAuth()
@@ -137,74 +87,14 @@ export default function UserManagementPage() {
   const [editPhone, setEditPhone] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // Fetch All Users
-  // (users are loaded via useQuery above)
-
   // Filtered Partnership list for Cadre assignment
   const partnershipUsers = useMemo(() => {
     return users.filter((account) => account.role === 'partnership')
   }, [users])
 
-  // Hierarchically Sorted Users List: super_admin -> admin -> internal_bpom -> (partnership -> cadre_mitra) -> independent_cadres
+  // Hierarchically Sorted Users List
   const filteredUsers = useMemo(() => {
-    // 1. Filter by search term & selected role
-    const matched = users.filter((u) => {
-      const term = searchTerm.toLowerCase()
-      const matchSearch =
-        (u.email || '').toLowerCase().includes(term) ||
-        (u.displayName || '').toLowerCase().includes(term) ||
-        (u.organization || '').toLowerCase().includes(term)
-
-      const matchRole = filterRole === 'all' || u.role === filterRole
-      return matchSearch && matchRole
-    })
-
-    // If specific role filter is active (not 'all'), retain simple filter
-    if (filterRole !== 'all') {
-      return matched
-    }
-
-    // 2. Group into buckets
-    const superAdmins = matched.filter((u) => u.role === 'super_admin')
-    const admins = matched.filter((u) => u.role === 'super_admin')
-    const internalBpoms = matched.filter((u) => u.role === 'super_admin')
-    const partnerships = matched.filter((u) => u.role === 'partnership')
-    const cadres = matched.filter((u) => u.role === 'cadre' || !u.role)
-
-    const attachedCadreUids = new Set<string>()
-    const sortedResult: User[] = [
-      ...superAdmins,
-      ...admins,
-      ...internalBpoms,
-    ]
-
-    // 3. Place each Partnership followed immediately by its owned Cadres
-    partnerships.forEach((p) => {
-      sortedResult.push(p)
-      const pOrg = (p.organization || p.partnershipName || p.displayName || '').toLowerCase().trim()
-
-      const ownedCadres = cadres.filter((c) => {
-        if (c.partnershipId === p.uid) return true
-        const cOrg = (c.organization || c.partnershipName || '').toLowerCase().trim()
-        if (pOrg && cOrg && pOrg === cOrg) return true
-        return false
-      })
-
-      ownedCadres.forEach((c) => {
-        attachedCadreUids.add(c.uid)
-        sortedResult.push({
-          ...c,
-          isChildOfMitra: true,
-          parentMitraName: p.displayName || p.organization || 'Mitra Induk',
-        })
-      })
-    })
-
-    // 4. Add unattached independent cadres at the bottom
-    const unattachedCadres = cadres.filter((c) => !attachedCadreUids.has(c.uid))
-    sortedResult.push(...unattachedCadres)
-
-    return sortedResult
+    return filterAndSortUsers(users, searchTerm, filterRole)
   }, [users, searchTerm, filterRole])
 
   const totalPages = Math.ceil(filteredUsers.length / itemsPerPage)
@@ -398,28 +288,6 @@ export default function UserManagementPage() {
     }
   }
 
-  // Helper Badge Render
-  const getRoleBadge = (role: UserRole) => {
-    const found = ROLE_OPTIONS.find((r) => r.id === role)
-    if (found) {
-      return {
-        label: found.label,
-        className: found.colorClass,
-        icon: found.icon,
-      }
-    }
-    return {
-      label: 'Kader Desa',
-      className: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30',
-      icon: 'users' as IconName,
-    }
-  }
-
-  const getInitials = (name?: string, email?: string) => {
-    const text = name || email || 'User'
-    return text.substring(0, 2).toUpperCase()
-  }
-
   return (
     <div className="flex flex-col min-h-screen bg-[#06060E] text-slate-100">
       <Topbar
@@ -464,499 +332,90 @@ export default function UserManagementPage() {
         )}
 
         {/* Registration Form */}
-        <div className="rounded-3xl bg-slate-900/90 border border-slate-800 p-6 space-y-4 shadow-xl">
-          <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
-            <Icon name="userPlus" className="w-5 h-5 text-cyan-400" />
-            <span>Tambah User & Pendaftaran Peran Baru</span>
-          </h3>
+        <RegisterForm
+          registerEmail={registerEmail}
+          registerPassword={registerPassword}
+          registerDisplayName={registerDisplayName}
+          registerRole={registerRole}
+          registerOrganization={registerOrganization}
+          registerPhone={registerPhone}
+          registerPartnershipId={registerPartnershipId}
+          isRegistering={isRegistering}
+          partnershipUsers={partnershipUsers}
+          setRegisterEmail={setRegisterEmail}
+          setRegisterPassword={setRegisterPassword}
+          setRegisterDisplayName={setRegisterDisplayName}
+          setRegisterRole={setRegisterRole}
+          setRegisterOrganization={setRegisterOrganization}
+          setRegisterPhone={setRegisterPhone}
+          setRegisterPartnershipId={setRegisterPartnershipId}
+          onSubmit={handleRegister}
+        />
 
-          <form onSubmit={handleRegister} className="space-y-4 text-xs">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block font-semibold text-slate-300 mb-1.5">
-                  Email Akun <span className="text-rose-400">*</span>
-                </label>
-                <input
-                  type="email"
-                  required
-                  placeholder="pengguna@kkntkp.id"
-                  value={registerEmail}
-                  onChange={(e) => setRegisterEmail(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 text-slate-100 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-cyan-400"
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-300 mb-1.5">
-                  Password Login <span className="text-rose-400">*</span>
-                </label>
-                <input
-                  type="password"
-                  required
-                  minLength={6}
-                  placeholder="Minimal 6 karakter"
-                  value={registerPassword}
-                  onChange={(e) => setRegisterPassword(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 text-slate-100 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-cyan-400"
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-300 mb-1.5">Nama Lengkap</label>
-                <input
-                  type="text"
-                  placeholder="Contoh: Dr. Ir. Ahmad Sudirman..."
-                  value={registerDisplayName}
-                  onChange={(e) => setRegisterDisplayName(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 text-slate-100 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-cyan-400"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block font-semibold text-slate-300 mb-1.5">
-                  Pilih Peran Sistem <span className="text-rose-400">*</span>
-                </label>
-                <select
-                  value={registerRole || 'super_admin'}
-                  onChange={(e) => setRegisterRole(e.target.value as UserRole)}
-                  className="w-full bg-slate-950 border border-slate-700 text-slate-200 rounded-xl px-3 py-2.5"
-                >
-                  {ROLE_OPTIONS.map((r) => (
-                    <option key={r.id} value={r.id || ''}>
-                      {r.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-300 mb-1.5">
-                  Organisasi / Insta / Desa (Opsional)
-                </label>
-                <input
-                  type="text"
-                  placeholder="Contoh: BPOM Sulsel / Desa Sehat Bantaeng..."
-                  value={registerOrganization}
-                  onChange={(e) => setRegisterOrganization(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 text-slate-100 rounded-xl px-3.5 py-2.5"
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-300 mb-1.5">Nomor HP / WhatsApp</label>
-                <input
-                  type="text"
-                  placeholder="08123456789"
-                  value={registerPhone}
-                  onChange={(e) => setRegisterPhone(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 text-slate-100 rounded-xl px-3.5 py-2.5"
-                />
-              </div>
-            </div>
-
-            {registerRole === 'cadre' && (
-              <div>
-                <label className="block font-semibold text-cyan-300 mb-1.5">
-                  Tautkan ke Akun Mitra / Partnership Induk (Opsional)
-                </label>
-                <select
-                  value={registerPartnershipId}
-                  onChange={(e) => setRegisterPartnershipId(e.target.value)}
-                  className="w-full bg-slate-950 border border-cyan-500/40 text-slate-200 rounded-xl px-3 py-2.5"
-                >
-                  <option value="">-- Kader Independen / Tanpa Mitra Induk --</option>
-                  {partnershipUsers.map((partner) => (
-                    <option key={partner.uid} value={partner.uid}>
-                      Mitra: {partner.displayName} ({partner.organization || partner.email})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            <div className="pt-2 flex justify-end">
-              <button
-                type="submit"
-                disabled={isRegistering}
-                className="px-6 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-800 text-white font-bold shadow-lg shadow-cyan-600/25 flex items-center gap-2"
-              >
-                {isRegistering ? <Icon name="loader" className="w-4 h-4 animate-spin" /> : <Icon name="plus" className="w-4 h-4" />}
-                <span>{isRegistering ? 'Memproses Pendaftaran...' : 'Daftarkan Akun User'}</span>
-              </button>
-            </div>
-          </form>
-        </div>
-
-        {/* Filter, Search Bar, & BULK DELETE Action Bar */}
-        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 bg-slate-900/60 p-4 rounded-2xl border border-slate-800">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="relative flex-1 sm:flex-initial">
-              <Icon name="search" className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-              <input
-                type="text"
-                placeholder="Cari email / nama / instansi..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 pr-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500 w-full sm:w-64"
-              />
-            </div>
-
-            <select
-              value={filterRole}
-              onChange={(e) => setFilterRole(e.target.value)}
-              className="px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-300 focus:outline-none focus:border-cyan-500 cursor-pointer"
-            >
-              <option value="all">Semua Peran ({users.length})</option>
-              {ROLE_OPTIONS.map((r) => (
-                <option key={r.id} value={r.id || ''}>
-                  {r.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex items-center gap-3">
-            {/* BULK DELETE BUTTON */}
-            {selectedUids.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setShowBulkDeleteModal(true)}
-                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs shadow-lg shadow-rose-600/30 flex items-center gap-2 transition-all animate-pulse"
-              >
-                <Icon name="trash" className="w-4 h-4 text-white" />
-                <span>Hapus Masal ({selectedUids.length}) Akun Terpilih</span>
-              </button>
-            )}
-
-            <span className="text-xs text-slate-400 font-mono">
-              Total: {filteredUsers.length} akun terdaftar
-            </span>
-          </div>
-        </div>
-
-        {/* Users Table with Hierarchical Grouping */}
-        <div className="rounded-3xl bg-slate-900 border border-slate-800 overflow-hidden shadow-md">
-          {loading ? (
-            <div className="flex items-center justify-center py-20 text-slate-400 text-xs gap-3">
-              <Icon name="loader" className="w-5 h-5 text-cyan-400 animate-spin" />
-              <span>Memuat daftar akun pengguna...</span>
-            </div>
-          ) : filteredUsers.length === 0 ? (
-            <div className="text-center py-20 text-slate-500 space-y-2">
-              <Icon name="users" className="w-12 h-12 mx-auto text-slate-700" />
-              <p className="text-sm font-bold text-slate-300">Tidak Ada Akun Ditemukan</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs text-left">
-                <thead>
-                  <tr className="border-b border-slate-800 bg-slate-950/70 text-slate-400 font-mono uppercase text-[10px]">
-                    <th className="px-4 py-3.5 w-10 text-center">
-                      <input
-                        type="checkbox"
-                        checked={isAllPaginatedSelected}
-                        onChange={toggleSelectAll}
-                        className="rounded border-slate-700 bg-slate-900 text-cyan-500 focus:ring-cyan-400 w-4 h-4 cursor-pointer"
-                        title="Pilih Semua Akun di Halaman Ini"
-                      />
-                    </th>
-                    <th className="px-4 py-3.5">Nama & Profil</th>
-                    <th className="px-4 py-3.5">Email</th>
-                    <th className="px-4 py-3.5">Peran (Role)</th>
-                    <th className="px-4 py-3.5">Instansi / Organisasi</th>
-                    <th className="px-4 py-3.5">HP / WA</th>
-                    <th className="px-4 py-3.5 text-right">Aksi Superadmin</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/80">
-                  {paginatedUsers.map((u) => {
-                    const badge = getRoleBadge(u.role)
-                    const isSelf = u.uid === user?.uid
-                    const isSelected = selectedUids.includes(u.uid)
-
-                    return (
-                      <tr
-                        key={u.uid}
-                        className={`transition-colors ${
-                          u.isChildOfMitra
-                            ? 'bg-purple-950/10 hover:bg-purple-950/20'
-                            : isSelected
-                            ? 'bg-rose-950/20 hover:bg-rose-950/30'
-                            : 'hover:bg-slate-800/40'
-                        }`}
-                      >
-                        <td className="px-4 py-3.5 text-center">
-                          <input
-                            type="checkbox"
-                            disabled={isSelf}
-                            checked={isSelected}
-                            onChange={() => toggleSelectUser(u.uid)}
-                            className="rounded border-slate-700 bg-slate-900 text-cyan-500 focus:ring-cyan-400 w-4 h-4 cursor-pointer disabled:opacity-30"
-                          />
-                        </td>
-
-                        <td className="px-4 py-3.5">
-                          <div className={`flex items-center gap-3 ${u.isChildOfMitra ? 'pl-6' : ''}`}>
-                            {u.isChildOfMitra && (
-                              <Icon name="cornerDownRight" className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-                            )}
-                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-violet-600 flex items-center justify-center text-xs font-extrabold text-white shrink-0">
-                              {getInitials(u.displayName, u.email)}
-                            </div>
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <p className="font-bold text-slate-100 text-sm">
-                                  {u.displayName || 'Tanpa Nama'}
-                                </p>
-                                {isSelf && <span className="text-[10px] text-cyan-400 font-bold">(Akun Anda)</span>}
-                              </div>
-                              {u.isChildOfMitra && (
-                                <p className="text-[10px] font-mono text-purple-300 font-medium">
-                                  Kader milik: <span className="font-bold">{u.parentMitraName}</span>
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        </td>
-
-                        <td className="px-4 py-3.5 font-mono text-slate-300">{u.email}</td>
-
-                        <td className="px-4 py-3.5">
-                          <span className={`px-2.5 py-1 rounded-md text-[11px] font-bold border flex items-center gap-1.5 w-fit ${badge.className}`}>
-                            <Icon name={badge.icon} className="w-3.5 h-3.5" />
-                            <span>{badge.label}</span>
-                          </span>
-                        </td>
-
-                        <td className="px-4 py-3.5 text-slate-300">
-                          {u.organization || '-'}
-                        </td>
-
-                        <td className="px-4 py-3.5 font-mono text-slate-400">
-                          {u.phone || '-'}
-                        </td>
-
-                        <td className="px-4 py-3.5 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <button
-                              type="button"
-                              onClick={() => handleEdit(u)}
-                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
-                              title="Edit Role & Profil"
-                            >
-                              <Icon name="pencil" className="w-4 h-4 text-cyan-400" />
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => handleDelete(u)}
-                              disabled={isSelf}
-                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-300 border border-slate-700 disabled:opacity-30 transition-colors"
-                              title="Hapus Akun User"
-                            >
-                              <Icon name="trash" className="w-4 h-4 text-rose-400" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* Pagination Footer */}
-          {totalPages > 1 && (
-            <div className="p-4 border-t border-slate-800 bg-slate-950/70 flex items-center justify-between text-xs text-slate-400">
-              <span>
-                Halaman {currentPage} dari {totalPages}
-              </span>
-              <div className="flex items-center gap-2">
-                <button
-                  disabled={currentPage === 1}
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  className="px-3 py-1.5 rounded-lg bg-slate-800 disabled:opacity-40 text-slate-200"
-                >
-                  Sebelumnya
-                </button>
-                <button
-                  disabled={currentPage === totalPages}
-                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                  className="px-3 py-1.5 rounded-lg bg-slate-800 disabled:opacity-40 text-slate-200"
-                >
-                  Selanjutnya
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
+        {/* Filter + Table */}
+        <UsersTable
+          users={users}
+          filteredUsers={filteredUsers}
+          paginatedUsers={paginatedUsers}
+          loading={loading}
+          currentUserUid={user?.uid}
+          searchTerm={searchTerm}
+          filterRole={filterRole}
+          selectedUids={selectedUids}
+          isAllPaginatedSelected={isAllPaginatedSelected}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          setSearchTerm={setSearchTerm}
+          setFilterRole={setFilterRole}
+          setShowBulkDeleteModal={setShowBulkDeleteModal}
+          toggleSelectAll={toggleSelectAll}
+          toggleSelectUser={toggleSelectUser}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+          setCurrentPage={setCurrentPage}
+        />
       </div>
 
       {/* SINGLE DELETE CONFIRMATION MODAL */}
       {showDeleteModal && selectedUser && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl animate-fadeIn">
-            <div className="flex items-center gap-3 text-rose-400">
-              <div className="p-3 rounded-2xl bg-rose-500/10 border border-rose-500/20">
-                <Icon name="alertTriangle" className="w-6 h-6" />
-              </div>
-              <div>
-                <h4 className="font-bold text-lg text-slate-100">Konfirmasi Hapus Akun</h4>
-                <p className="text-xs text-slate-400">Tindakan ini tidak dapat dibatalkan</p>
-              </div>
-            </div>
-
-            <p className="text-xs text-slate-300 leading-relaxed">
-              Apakah Anda yakin ingin menghapus akun <span className="font-mono font-bold text-rose-300">{selectedUser.email}</span> ({selectedUser.displayName}) secara permanen dari database sistem KKNT-KP V1.5?
-            </p>
-
-            <div className="flex items-center justify-end gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowDeleteModal(false)
-                  setSelectedUser(null)
-                }}
-                disabled={isSubmitting}
-                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold"
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                onClick={confirmDelete}
-                disabled={isSubmitting}
-                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:bg-slate-800 text-white text-xs font-bold flex items-center gap-2"
-              >
-                {isSubmitting ? <Icon name="loader" className="w-4 h-4 animate-spin" /> : <Icon name="trash" className="w-4 h-4" />}
-                <span>{isSubmitting ? 'Menghapus...' : 'Ya, Hapus Akun'}</span>
-              </button>
-            </div>
-          </div>
-        </div>
+        <DeleteUserModal
+          selectedUser={selectedUser}
+          isSubmitting={isSubmitting}
+          onCancel={() => {
+            setShowDeleteModal(false)
+            setSelectedUser(null)
+          }}
+          onConfirm={confirmDelete}
+        />
       )}
 
       {/* BULK DELETE CONFIRMATION MODAL */}
       {showBulkDeleteModal && selectedUids.length > 0 && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl animate-fadeIn">
-            <div className="flex items-center gap-3 text-rose-400">
-              <div className="p-3 rounded-2xl bg-rose-500/10 border border-rose-500/20">
-                <Icon name="trash" className="w-6 h-6 text-rose-400" />
-              </div>
-              <div>
-                <h4 className="font-bold text-lg text-slate-100">Konfirmasi Hapus Masal (Bulk Delete)</h4>
-                <p className="text-xs text-slate-400">Tindakan ini tidak dapat dibatalkan</p>
-              </div>
-            </div>
-
-            <p className="text-xs text-slate-300 leading-relaxed">
-              Apakah Anda yakin ingin menghapus <span className="font-mono font-bold text-rose-300">{selectedUids.length} akun pengguna</span> yang Anda pilih secara masal dan permanen dari database sistem KKNT-KP V1.5?
-            </p>
-
-            <div className="flex items-center justify-end gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setShowBulkDeleteModal(false)}
-                disabled={isSubmitting}
-                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold"
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                onClick={confirmBulkDelete}
-                disabled={isSubmitting}
-                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:bg-slate-800 text-white text-xs font-bold flex items-center gap-2"
-              >
-                {isSubmitting ? <Icon name="loader" className="w-4 h-4 animate-spin" /> : <Icon name="trash" className="w-4 h-4" />}
-                <span>{isSubmitting ? 'Memproses Hapus Masal...' : `Ya, Hapus (${selectedUids.length}) Akun`}</span>
-              </button>
-            </div>
-          </div>
-        </div>
+        <BulkDeleteModal
+          selectedCount={selectedUids.length}
+          isSubmitting={isSubmitting}
+          onCancel={() => setShowBulkDeleteModal(false)}
+          onConfirm={confirmBulkDelete}
+        />
       )}
 
       {/* EDIT ROLE MODAL */}
       {showEditModal && selectedUser && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl animate-fadeIn text-xs">
-            <h4 className="font-bold text-base text-slate-100">Edit Profil & Peran User</h4>
-
-            <div className="space-y-3">
-              <div>
-                <label className="block text-slate-400 font-medium mb-1">Email</label>
-                <input
-                  type="text"
-                  disabled
-                  value={selectedUser.email}
-                  className="w-full bg-slate-950 border border-slate-800 text-slate-400 rounded-xl px-3 py-2"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">Role / Peran Sistem</label>
-                <select
-                  value={editRole || 'super_admin'}
-                  onChange={(e) => setEditRole(e.target.value as UserRole)}
-                  className="w-full bg-slate-950 border border-slate-700 text-slate-200 rounded-xl px-3 py-2"
-                >
-                  {ROLE_OPTIONS.map((r) => (
-                    <option key={r.id} value={r.id || ''}>
-                      {r.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">Organisasi / Instansi</label>
-                <input
-                  type="text"
-                  value={editOrganization}
-                  onChange={(e) => setEditOrganization(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 text-slate-100 rounded-xl px-3 py-2"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">Nomor HP</label>
-                <input
-                  type="text"
-                  value={editPhone}
-                  onChange={(e) => setEditPhone(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 text-slate-100 rounded-xl px-3 py-2"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-3 pt-3">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowEditModal(false)
-                  setSelectedUser(null)
-                }}
-                disabled={isSubmitting}
-                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold"
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                onClick={confirmEdit}
-                disabled={isSubmitting}
-                className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-800 text-white font-bold flex items-center gap-2"
-              >
-                {isSubmitting ? <Icon name="loader" className="w-4 h-4 animate-spin" /> : <Icon name="check" className="w-4 h-4" />}
-                <span>Simpan Perubahan</span>
-              </button>
-            </div>
-          </div>
-        </div>
+        <EditUserModal
+          selectedUser={selectedUser}
+          editRole={editRole}
+          editOrganization={editOrganization}
+          editPhone={editPhone}
+          isSubmitting={isSubmitting}
+          setEditRole={setEditRole}
+          setEditOrganization={setEditOrganization}
+          setEditPhone={setEditPhone}
+          onCancel={() => {
+            setShowEditModal(false)
+            setSelectedUser(null)
+          }}
+          onConfirm={confirmEdit}
+        />
       )}
     </div>
   )
