@@ -4,13 +4,14 @@ import React, { useState, useEffect, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
 import { useAuth } from '@/context/AuthContext'
-import { safeFetchJson } from '@/lib/infra/safe-fetch'
-import { getArticles, type ArticleData } from '@/lib/repositories/articles.repo'
 import { Topbar } from '@/features/dashboard/components/layout/Topbar'
 import { Icon } from '@/components/ui/Icons'
-import type { DistributionDoc } from '@/lib/domain/distributions/distribution-types'
 import { queryKeys } from '@/lib/query-keys'
 import { useToast } from '@/lib/hooks'
+import { fetchProfileProgress, getRoleLabel, type ProfileProgress } from './profile-utils'
+import ArticlesTab from './articles-tab'
+import DistributionsTab from './distributions-tab'
+import ProfileSettings from './profile-settings'
 
 export default function UserProfileProgressPage() {
   const { user, userData, refreshUserData } = useAuth()
@@ -35,106 +36,9 @@ export default function UserProfileProgressPage() {
       cadresCount = 0,
       teamResponsesCount = 0,
     } = {},
-  } = useQuery<{
-    articles: ArticleData[]
-    distributions: DistributionDoc[]
-    responsesCount: number
-    cadresCount: number
-    teamResponsesCount: number
-  }>({
+  } = useQuery<ProfileProgress>({
     queryKey: queryKeys.profile.progress(user?.uid, userData),
-    queryFn: async () => {
-      const currentUser = user
-      const currentUserData = userData
-      const result = {
-        articles: [] as ArticleData[],
-        distributions: [] as DistributionDoc[],
-        responsesCount: 0,
-        cadresCount: 0,
-        teamResponsesCount: 0,
-      }
-
-      // 1. Fetch CMS Articles (strictly personal)
-      try {
-        const allArticles = await getArticles()
-        const userUid = currentUser?.uid
-        const userEmail = (currentUser?.email || '').toLowerCase().trim()
-        const userDisplayName = (currentUserData?.displayName || currentUser?.displayName || '').toLowerCase().trim()
-
-        const myArticles = allArticles.filter((article) => {
-          if (article.authorId && userUid && article.authorId === userUid) return true
-          if (article.createdBy && userUid && article.createdBy === userUid) return true
-
-          const authorLower = (article.author || '').toLowerCase().trim()
-          if (userEmail && authorLower === userEmail) return true
-          if (userDisplayName && userDisplayName.length > 2 && authorLower === userDisplayName) return true
-
-          return false
-        })
-        result.articles = myArticles
-      } catch (artErr) {
-        console.warn('Could not fetch articles:', artErr)
-      }
-
-      // 2. Fetch Distributions (strictly personal or partner organization)
-      const distRes = await safeFetchJson('/api/distributions')
-      let myDistCodes: string[] = []
-      if (distRes.ok && distRes.data && Array.isArray(distRes.data.distributions)) {
-        const myDists = distRes.data.distributions.filter(
-          (d: DistributionDoc) =>
-            d.createdBy === currentUser?.uid ||
-            d.ownerId === currentUser?.uid ||
-            (currentUserData?.displayName && d.ownerName?.toLowerCase() === currentUserData.displayName.toLowerCase())
-        )
-        result.distributions = myDists
-        myDistCodes = myDists.map((d: DistributionDoc) => d.code).filter(Boolean)
-      }
-
-      // 3. Fetch Responses Count & Mitra Cadre Team Stats
-      const respRes = await safeFetchJson('/api/responses')
-      const usersRes = await safeFetchJson('/api/auth/users')
-
-      if (respRes.ok && respRes.data && Array.isArray(respRes.data.responses)) {
-        const allResponses = respRes.data.responses
-
-        // Personal responses count
-        const personalResponses = allResponses.filter((r: any) =>
-          r.createdBy === currentUser?.uid ||
-          (r.distributionCode && myDistCodes.includes(r.distributionCode)) ||
-          (currentUserData?.displayName && r.ownerName?.toLowerCase() === currentUserData.displayName.toLowerCase())
-        )
-        result.responsesCount = personalResponses.length
-
-        // If user is Mitra / Partner: Calculate Team Cadre Statistics strictly for linked cadres
-        if (['mitra', 'partner', 'partnership', 'organization'].includes(currentUserData?.role || '')) {
-          let cadreUids: string[] = []
-          let cadreNames: string[] = []
-
-          if (usersRes.ok && usersRes.data && Array.isArray(usersRes.data.users)) {
-            const myCadres = usersRes.data.users.filter((u: any) =>
-              u.role === 'cadre' &&
-              (
-                u.mitraId === currentUser?.uid ||
-                (currentUserData?.organization && u.organization?.toLowerCase() === currentUserData.organization.toLowerCase()) ||
-                (currentUserData?.organization && u.partnershipName?.toLowerCase() === currentUserData.organization.toLowerCase())
-              )
-            )
-            result.cadresCount = myCadres.length
-            cadreUids = myCadres.map((u: any) => u.uid || u.id)
-            cadreNames = myCadres.map((u: any) => (u.displayName || u.name || '').toLowerCase()).filter(Boolean)
-          }
-
-          // Accumulate team responses from Cadres under this Mitra
-          const teamResponses = allResponses.filter((r: any) =>
-            cadreUids.includes(r.createdBy) ||
-            (r.ownerName && cadreNames.includes(r.ownerName.toLowerCase()))
-          )
-          result.teamResponsesCount = teamResponses.length
-        }
-      }
-
-      return result
-    },
+    queryFn: async () => fetchProfileProgress(user, userData),
   })
 
   useEffect(() => {
@@ -195,14 +99,7 @@ export default function UserProfileProgressPage() {
     }
   }
 
-  const roleLabel =
-    userData?.role === 'super_admin'
-      ? 'Super Admin BPOM'
-      : userData?.role === 'partnership'
-      ? 'Mitra / Instansi Partnership'
-      : userData?.role === 'cadre'
-      ? 'Kader Lapangan'
-      : 'Pengguna Publik'
+  const roleLabel = getRoleLabel(userData?.role)
 
   return (
     <div className="flex flex-col min-h-screen bg-[#070913] text-slate-100 font-sans">
@@ -360,204 +257,28 @@ export default function UserProfileProgressPage() {
 
         {/* Tab Content 1: Articles Contribution */}
         {activeTab === 'articles' && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-extrabold text-slate-100 flex items-center gap-2">
-                <Icon name="bookOpen" className="w-4 h-4 text-purple-400" />
-                <span>Materi Edukasi Pangan Yang Diterbitkan</span>
-              </h3>
-
-              <Link
-                href="/dashboard/articles"
-                className="px-3 py-1.5 rounded-xl bg-purple-600/20 text-purple-300 border border-purple-500/30 text-xs font-bold hover:bg-purple-600/30 transition-all"
-              >
-                + Tulis Artikel Baru (CMS)
-              </Link>
-            </div>
-
-            <div className="rounded-3xl bg-slate-900 border border-slate-800 overflow-hidden">
-              {articles.length === 0 ? (
-                <div className="p-12 text-center text-slate-500 text-xs space-y-2">
-                  <Icon name="bookOpen" className="w-10 h-10 mx-auto text-slate-700" />
-                  <p className="font-bold text-slate-300">Belum ada artikel edukasi yang dipublish</p>
-                  <p className="max-w-md mx-auto text-slate-500">
-                    Mulai bagikan materi edukasi keamanan pangan untuk sekolah, pasar, dan komunitas Anda melalui CMS.
-                  </p>
-                </div>
-              ) : (
-                <div className="divide-y divide-slate-800/80">
-                  {articles.map((art) => (
-                    <div key={art.id || art.slug} className="p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-slate-800/40 transition-colors">
-                      <div className="space-y-1.5 max-w-xl">
-                        <div className="flex items-center gap-2">
-                          <span className="px-2.5 py-0.5 rounded-md bg-purple-950 text-purple-300 border border-purple-500/30 text-[10px] font-bold">
-                            {art.category || 'Materi Edukasi'}
-                          </span>
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${
-                            art.status === 'Published'
-                              ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
-                              : 'bg-amber-500/10 text-amber-300 border-amber-500/30'
-                          }`}>
-                            {art.status}
-                          </span>
-                        </div>
-
-                        <h4 className="text-sm font-bold text-slate-100">{art.title}</h4>
-                        <p className="text-xs text-slate-400 line-clamp-1">{art.excerpt || 'Penulisan edukasi keamanan pangan BPOM.'}</p>
-
-                        <div className="flex items-center gap-3 text-[11px] text-slate-500 font-mono pt-1">
-                          <span>Penulis: {art.author || userData?.displayName}</span>
-                          <span>•</span>
-                          <span>{art.views || 0} Pembaca</span>
-                          <span>•</span>
-                          <span>{art.date}</span>
-                        </div>
-                      </div>
-
-                      <Link
-                        href="/dashboard/articles"
-                        className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold self-start md:self-center transition-colors"
-                      >
-                        Buka di CMS
-                      </Link>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+          <ArticlesTab articles={articles} displayName={userData?.displayName} />
         )}
 
         {/* Tab Content 2: Distribution Codes Progress */}
         {activeTab === 'distributions' && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-extrabold text-slate-100 flex items-center gap-2">
-                <Icon name="send" className="w-4 h-4 text-cyan-400" />
-                <span>Kode Distribusi Kuesioner V1.5 Milik Anda</span>
-              </h3>
-
-              <Link
-                href="/dashboard/distributions"
-                className="px-3 py-1.5 rounded-xl bg-cyan-600/20 text-cyan-300 border border-cyan-500/30 text-xs font-bold hover:bg-cyan-600/30 transition-all"
-              >
-                + Buat Kode Distribusi
-              </Link>
-            </div>
-
-            <div className="rounded-3xl bg-slate-900 border border-slate-800 overflow-hidden">
-              {distributions.length === 0 ? (
-                <div className="p-12 text-center text-slate-500 text-xs space-y-2">
-                  <Icon name="send" className="w-10 h-10 mx-auto text-slate-700" />
-                  <p className="font-bold text-slate-300">Belum ada kode distribusi instrumen V1.5</p>
-                </div>
-              ) : (
-                <div className="divide-y divide-slate-800/80">
-                  {distributions.map((d) => (
-                    <div key={d.distributionId} className="p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-slate-800/40 transition-colors">
-                      <div className="space-y-1.5 max-w-xl">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-mono text-cyan-400 font-extrabold text-xs px-2.5 py-0.5 rounded-lg bg-cyan-950 border border-cyan-500/30">
-                            {d.code}
-                          </span>
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase border ${
-                            d.status === 'active' ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30' : 'bg-amber-500/10 text-amber-300 border-amber-500/30'
-                          }`}>
-                            {d.status}
-                          </span>
-                        </div>
-
-                        <h4 className="text-sm font-bold text-slate-100">{d.title}</h4>
-                        <p className="text-xs text-slate-400 line-clamp-1">{d.description || 'Distribusi kuesioner V1.5.'}</p>
-                      </div>
-
-                      <a
-                        href={`/form/${d.code}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="px-3 py-1.5 rounded-xl bg-cyan-600/20 text-cyan-200 border border-cyan-500/40 text-xs font-semibold self-start md:self-center transition-colors"
-                      >
-                        Buka Form Publik
-                      </a>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+          <DistributionsTab distributions={distributions} />
         )}
 
         {/* Tab Content 3: Profile & Account Settings */}
         {activeTab === 'settings' && (
-          <div className="rounded-3xl bg-slate-900 border border-slate-800 p-6 space-y-6 max-w-2xl">
-            <h3 className="text-base font-extrabold text-slate-100 flex items-center gap-2 pb-3 border-b border-slate-800">
-              <Icon name="settings" className="w-5 h-5 text-purple-400" />
-              <span>Pengaturan Profil & Instansi</span>
-            </h3>
-
-            <form onSubmit={handleSaveProfile} className="space-y-4 text-xs">
-              <div>
-                <label className="block font-semibold text-slate-300 mb-1.5">Nama Lengkap / Nama Tampilan</label>
-                <input
-                  type="text"
-                  required
-                  value={editDisplayName}
-                  onChange={(e) => setEditDisplayName(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 text-slate-100 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-purple-400"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-300 mb-1.5">Jenis Instansi / Kemitraan</label>
-                  <select
-                    value={editPartnershipType}
-                    onChange={(e) => setEditPartnershipType(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 text-slate-100 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-purple-400 cursor-pointer"
-                  >
-                    <option value="Sekolah">Sekolah / Kampus</option>
-                    <option value="Kelurahan / Desa">Kelurahan / Kantor Desa</option>
-                    <option value="Pasar">Pasar Tradisional / Modern</option>
-                    <option value="Puskesmas / Posyandu">Puskesmas / Posyandu</option>
-                    <option value="Komunitas / Ormas">Komunitas / Ormas / PKK</option>
-                    <option value="Instansi Pemerintah">Instansi Pemerintah / BPOM</option>
-                    <option value="Lainnya">Lainnya</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-300 mb-1.5">Nama Instansi / Lembaga</label>
-                  <input
-                    type="text"
-                    value={editOrganization}
-                    onChange={(e) => setEditOrganization(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 text-slate-100 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-purple-400"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-300 mb-1.5">No. HP / WhatsApp</label>
-                <input
-                  type="text"
-                  value={editPhone}
-                  onChange={(e) => setEditPhone(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 text-slate-100 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-purple-400"
-                />
-              </div>
-
-              <div className="pt-3 border-t border-slate-800 flex justify-end">
-                <button
-                  type="submit"
-                  disabled={isSaving}
-                  className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold shadow-lg shadow-purple-600/20 flex items-center gap-2 transition-all"
-                >
-                  {isSaving ? <Icon name="loader" className="w-4 h-4 animate-spin" /> : <Icon name="check" className="w-4 h-4" />}
-                  <span>Simpan Perubahan Profil</span>
-                </button>
-              </div>
-            </form>
-          </div>
+          <ProfileSettings
+            editDisplayName={editDisplayName}
+            editOrganization={editOrganization}
+            editPartnershipType={editPartnershipType}
+            editPhone={editPhone}
+            isSaving={isSaving}
+            setEditDisplayName={setEditDisplayName}
+            setEditOrganization={setEditOrganization}
+            setEditPartnershipType={setEditPartnershipType}
+            setEditPhone={setEditPhone}
+            onSubmit={handleSaveProfile}
+          />
         )}
       </div>
 
