@@ -14,42 +14,43 @@ import { useAuth } from '@/context/AuthContext'
 import { safeFetchJson } from '@/lib/infra/safe-fetch'
 import { SkeletonCard, SkeletonTable } from '@/components/ui/Skeleton'
 import { queryKeys } from '@/lib/query-keys'
+import { useToast } from '@/lib/hooks/use-toast'
 
 export type DerivedLifecycleStatus = 'draft' | 'ready' | 'published' | 'active' | 'archived'
 
-export function getDerivedLifecycle(f: FormAggregateDoc): {
+export function getDerivedLifecycle(form: FormAggregateDoc): {
   status: DerivedLifecycleStatus
   label: string
   colorClass: string
   isReady: boolean
 } {
-  if (f.status === 'archived') {
+  if (form.status === 'archived') {
     return { status: 'archived', label: 'Arsip', colorClass: 'bg-slate-800 text-slate-400 border-slate-700', isReady: false }
   }
 
-  const aspectCount = f.aspects?.length || 0
-  const questionCount = f.questions?.length || 0
-  const hasZeroQuestionAspect = f.aspects?.some((asp) => {
-    const cnt = f.questions?.filter((q) => (q.aspectId || f.aspects[0]?.aspectId) === asp.aspectId).length || 0
+  const aspectCount = form.aspects?.length || 0
+  const questionCount = form.questions?.length || 0
+  const hasZeroQuestionAspect = form.aspects?.some((asp) => {
+    const cnt = form.questions?.filter((question) => (question.aspectId || form.aspects[0]?.aspectId) === asp.aspectId).length || 0
     return cnt === 0
   })
 
-  const missingKeyQuestions = (f.questions || []).filter((q) => {
-    if (q.type === 'indicator-table' || q.type === 'likert') {
-      const indicators = (q as any).presentation?.indicators || (q as any).config?.indicators || []
+  const missingKeyQuestions = (form.questions || []).filter((question) => {
+    if (question.type === 'indicator-table' || question.type === 'likert') {
+      const indicators = (question as any).presentation?.indicators || (question as any).config?.indicators || []
       return indicators.length === 0
     }
-    const targetAspect = f.aspects?.find((a: any) => a.aspectId === (q.aspectId || f.aspects?.[0]?.aspectId))
-    const isNonScoring = targetAspect?.isScored === false || ['biodata-name', 'biodata-email', 'biodata-phone', 'biodata-address', 'biodata-institution', 'short-text', 'long-text', 'text', 'textarea', 'file-upload', 'image', 'signature', 'date'].includes(q.type)
+    const targetAspect = form.aspects?.find((aspect: any) => aspect.aspectId === (question.aspectId || form.aspects?.[0]?.aspectId))
+    const isNonScoring = targetAspect?.isScored === false || ['biodata-name', 'biodata-email', 'biodata-phone', 'biodata-address', 'biodata-institution', 'short-text', 'long-text', 'text', 'textarea', 'file-upload', 'image', 'signature', 'date'].includes(question.type)
     if (isNonScoring) return false
-    return q.answerKey?.kind === 'none' || !(q.answerKey as any)?.correctOptionIds?.length
+    return question.answerKey?.kind === 'none' || !(question.answerKey as any)?.correctOptionIds?.length
   })
 
-  const hasTitle = Boolean(f.metadata?.title && f.metadata.title.trim().length > 0)
+  const hasTitle = Boolean(form.metadata?.title && form.metadata.title.trim().length > 0)
   const isReady = aspectCount > 0 && questionCount > 0 && !hasZeroQuestionAspect && missingKeyQuestions.length === 0 && hasTitle
 
-  if (f.status === 'published') {
-    const activeDistributionCount = (f as any).activeDistributionCount || 0
+  if (form.status === 'published') {
+    const activeDistributionCount = (form as any).activeDistributionCount || 0
     if (activeDistributionCount > 0) {
       return { status: 'active', label: 'Aktif', colorClass: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-sm shadow-emerald-500/10', isReady: true }
     }
@@ -90,31 +91,31 @@ export default function V15FormsDashboardPage() {
 
       // Lookup map for distribution code / ID -> formId
       const distCodeToFormIdMap = new Map<string, string>()
-      allDists.forEach((d: any) => {
-        const targetFormId = d.formId || d.form?.formId
+      allDists.forEach((distribution: any) => {
+        const targetFormId = distribution.formId || distribution.form?.formId
         if (targetFormId) {
-          if (d.code) distCodeToFormIdMap.set(String(d.code).toLowerCase().trim(), targetFormId)
-          if (d.distributionCode) distCodeToFormIdMap.set(String(d.distributionCode).toLowerCase().trim(), targetFormId)
-          if (d.distributionId) distCodeToFormIdMap.set(String(d.distributionId).toLowerCase().trim(), targetFormId)
+          if (distribution.code) distCodeToFormIdMap.set(String(distribution.code).toLowerCase().trim(), targetFormId)
+          if (distribution.distributionCode) distCodeToFormIdMap.set(String(distribution.distributionCode).toLowerCase().trim(), targetFormId)
+          if (distribution.distributionId) distCodeToFormIdMap.set(String(distribution.distributionId).toLowerCase().trim(), targetFormId)
         }
       })
 
       const enrichedForms = formsRes.data.forms
-        .filter((f: any) => Boolean(f?.formId) && (Boolean(f?.activeVersionId) || Boolean(f?.aspects) || Boolean(f?.metadata)))
-        .map((f: any) => {
-          const formIdStr = String(f.formId || f.id || '').trim()
+        .filter((form: any) => Boolean(form?.formId) && (Boolean(form?.activeVersionId) || Boolean(form?.aspects) || Boolean(form?.metadata)))
+        .map((form: any) => {
+          const formIdStr = String(form.formId || form.id || '').trim()
 
           // Count active distributions for this form
           const activeDistributionCount = allDists.filter(
-            (d: any) => String(d.formId || d.form?.formId || '').trim() === formIdStr
+            (distribution: any) => String(distribution.formId || distribution.form?.formId || '').trim() === formIdStr
           ).length
 
           // Count responses for this form
-          const responseCount = allResps.filter((r: any) => {
-            const rFormId = String(r.formId || r.metadata?.formId || '').trim()
-            if (rFormId && rFormId === formIdStr) return true
+          const responseCount = allResps.filter((response: any) => {
+            const responseFormId = String(response.formId || response.metadata?.formId || '').trim()
+            if (responseFormId && responseFormId === formIdStr) return true
 
-            const code = String(r.distributionCode || r.code || r.metadata?.distributionCode || '').toLowerCase().trim()
+            const code = String(response.distributionCode || response.code || response.metadata?.distributionCode || '').toLowerCase().trim()
             if (code && distCodeToFormIdMap.has(code)) {
               return distCodeToFormIdMap.get(code) === formIdStr
             }
@@ -122,13 +123,13 @@ export default function V15FormsDashboardPage() {
           }).length
 
           return {
-            ...f,
+            ...form,
             activeDistributionCount,
             responseCount,
           }
         })
 
-      return enrichedForms as FormAggregateDoc[]
+      return enrichedForms
     },
   })
 
@@ -233,7 +234,7 @@ export default function V15FormsDashboardPage() {
   }
 
   const handleSelectAllToggle = (availableForms: FormAggregateDoc[]) => {
-    const allIds = availableForms.map((f) => f.formId)
+    const allIds = availableForms.map((form) => form.formId)
     if (selectedFormIds.length === allIds.length && allIds.length > 0) {
       setSelectedFormIds([])
     } else {
@@ -283,11 +284,7 @@ export default function V15FormsDashboardPage() {
   }
 
   // Toast Notification
-  const [toastMessage, setToastMessage] = useState<string | null>(null)
-  const showToast = (msg: string) => {
-    setToastMessage(msg)
-    setTimeout(() => setToastMessage(null), 3500)
-  }
+  const { visible: toastVisible, message: toastMessage, show: showToast } = useToast(3500)
 
   // Debounced Search Effect
   useEffect(() => {
@@ -301,8 +298,8 @@ export default function V15FormsDashboardPage() {
   // Categories list derived from forms
   const categories = useMemo(() => {
     const set = new Set<string>()
-    forms.forEach((f) => {
-      const cat = f.metadata?.category
+    forms.forEach((form) => {
+      const cat = form.metadata?.category
       if (cat) set.add(cat)
     })
     return Array.from(set)
@@ -315,8 +312,8 @@ export default function V15FormsDashboardPage() {
     let active = 0
     let archived = 0
 
-    forms.forEach((f) => {
-      const { status } = getDerivedLifecycle(f)
+    forms.forEach((form) => {
+      const { status } = getDerivedLifecycle(form)
       if (status === 'archived') archived++
       else if (status === 'published' || status === 'active') active++
       else if (status === 'ready') ready++
@@ -328,8 +325,8 @@ export default function V15FormsDashboardPage() {
 
   // Filtered & Sorted Forms List
   const filteredForms = useMemo(() => {
-    let list = forms.filter((f) => {
-      const derived = getDerivedLifecycle(f)
+    let list = forms.filter((form) => {
+      const derived = getDerivedLifecycle(form)
 
       // 1. Tab Filter
       if (lifecycleTab === 'draft' && derived.status !== 'draft') return false
@@ -338,17 +335,17 @@ export default function V15FormsDashboardPage() {
       if (lifecycleTab === 'archived' && derived.status !== 'archived') return false
 
       // 2. Category Filter
-      if (categoryFilter !== 'all' && (f.metadata?.category || '').toLowerCase() !== categoryFilter.toLowerCase()) {
+      if (categoryFilter !== 'all' && (form.metadata?.category || '').toLowerCase() !== categoryFilter.toLowerCase()) {
         return false
       }
 
       // 3. Debounced Search Match
       if (debouncedSearch.trim()) {
         const term = debouncedSearch.toLowerCase().trim()
-        const titleMatch = (f.metadata?.title || '').toLowerCase().includes(term)
-        const codeMatch = (f.formId || '').toLowerCase().includes(term)
-        const catMatch = (f.metadata?.category || '').toLowerCase().includes(term)
-        const descMatch = (f.metadata?.description || '').toLowerCase().includes(term)
+        const titleMatch = (form.metadata?.title || '').toLowerCase().includes(term)
+        const codeMatch = (form.formId || '').toLowerCase().includes(term)
+        const catMatch = (form.metadata?.category || '').toLowerCase().includes(term)
+        const descMatch = (form.metadata?.description || '').toLowerCase().includes(term)
         if (!titleMatch && !codeMatch && !catMatch && !descMatch) return false
       }
 
@@ -651,9 +648,9 @@ export default function V15FormsDashboardPage() {
                   className="px-3 py-2 bg-slate-950/80 border border-slate-800 rounded-xl text-xs text-slate-300 focus:outline-none focus:border-emerald-500/50 cursor-pointer"
                 >
                   <option value="all">Semua Kategori</option>
-                  {categories.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
+                  {categories.map((category) => (
+                    <option key={category} value={category}>
+                      {category}
                     </option>
                   ))}
                 </select>
@@ -661,7 +658,7 @@ export default function V15FormsDashboardPage() {
 
               <select
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as any)}
+                onChange={(e) => setSortBy(e.target.value as 'updated' | 'title' | 'questions')}
                 className="px-3 py-2 bg-slate-950/80 border border-slate-800 rounded-xl text-xs text-slate-300 focus:outline-none focus:border-emerald-500/50 cursor-pointer"
               >
                 <option value="updated">Terbaru Ditambahkan</option>
@@ -789,15 +786,15 @@ export default function V15FormsDashboardPage() {
         ) : (
           /* FORM ITEM CONTAINER: GRID VIEW VS COMPACT LIST VIEW */
           <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4' : 'space-y-3'}>
-            {paginatedForms.map((f) => {
-              const derived = getDerivedLifecycle(f)
-              const aspectCount = f.aspects?.length || 0
-              const questionCount = f.questions?.length || 0
-              const responseCount = (f as any).responseCount || 0
-              const activeDistCount = (f as any).activeDistributionCount || 0
-              const isMenuOpen = activeMenuFormId === f.formId
-              const lastUpdatedDate = f.updatedAt
-                ? new Date(f.updatedAt).toLocaleDateString('id-ID', {
+            {paginatedForms.map((form) => {
+              const derived = getDerivedLifecycle(form)
+              const aspectCount = form.aspects?.length || 0
+              const questionCount = form.questions?.length || 0
+              const responseCount = (form as any).responseCount || 0
+              const activeDistCount = (form as any).activeDistributionCount || 0
+              const isMenuOpen = activeMenuFormId === form.formId
+              const lastUpdatedDate = form.updatedAt
+                ? new Date(form.updatedAt).toLocaleDateString('id-ID', {
                     day: 'numeric',
                     month: 'long',
                     year: 'numeric',
@@ -808,7 +805,7 @@ export default function V15FormsDashboardPage() {
                 /* AESTHETIC GRID CARD VIEW */
                 return (
                   <div
-                    key={f.formId}
+                    key={form.formId}
                     className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800/90 hover:border-slate-700/80 transition-all flex flex-col justify-between space-y-4 shadow-sm group hover:shadow-emerald-500/5 relative"
                   >
                     {/* TOP BADGES & ACTIONS */}
@@ -817,8 +814,8 @@ export default function V15FormsDashboardPage() {
                         <div className="flex items-center gap-2">
                           <input
                             type="checkbox"
-                            checked={selectedFormIds.includes(f.formId)}
-                            onChange={() => handleSelectFormToggle(f.formId)}
+                            checked={selectedFormIds.includes(form.formId)}
+                            onChange={() => handleSelectFormToggle(form.formId)}
                             className="w-4 h-4 rounded border-slate-700 bg-slate-950 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-slate-950 cursor-pointer shrink-0"
                             title="Pilih formulir ini"
                           />
@@ -830,18 +827,18 @@ export default function V15FormsDashboardPage() {
                         </div>
 
                         <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
-                          {f.metadata?.category || 'Umum'}
+                          {form.metadata?.category || 'Umum'}
                         </span>
                       </div>
 
                       {/* TITLE & DESCRIPTION */}
                       <div className="space-y-1">
                         <h3 className="text-sm font-bold text-slate-100 group-hover:text-emerald-300 transition-colors line-clamp-1">
-                          {f.metadata?.title || f.formId}
+                          {form.metadata?.title || form.formId}
                         </h3>
-                        {f.metadata?.description && (
+                        {form.metadata?.description && (
                           <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed">
-                            {f.metadata.description}
+                            {form.metadata.description}
                           </p>
                         )}
                       </div>
@@ -851,7 +848,7 @@ export default function V15FormsDashboardPage() {
                     <div className="space-y-3 pt-2 border-t border-slate-800/60">
                       <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
                         <div className="flex items-center gap-1.5">
-                          <span className="text-slate-300 font-bold">V{f.activeVersionNumber || 1}.0</span>
+                          <span className="text-slate-300 font-bold">V{form.activeVersionNumber || 1}.0</span>
                           <span>·</span>
                           <span>{aspectCount} Aspek</span>
                           <span>·</span>
@@ -871,7 +868,7 @@ export default function V15FormsDashboardPage() {
                         {derived.status === 'draft' && (
                           <button
                             type="button"
-                            onClick={() => router.push(`/dashboard/forms/${f.formId}/builder`)}
+                            onClick={() => router.push(`/dashboard/forms/${form.formId}/builder`)}
                             className="flex-1 py-2 rounded-xl bg-purple-600/90 hover:bg-purple-500 text-white text-xs font-bold shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                           >
                             <Icon name="edit" className="w-3.5 h-3.5" />
@@ -882,7 +879,7 @@ export default function V15FormsDashboardPage() {
                         {derived.status === 'ready' && (
                           <button
                             type="button"
-                            onClick={() => router.push(`/dashboard/forms/${f.formId}/builder?step=4`)}
+                            onClick={() => router.push(`/dashboard/forms/${form.formId}/builder?step=4`)}
                             className="flex-1 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                           >
                             <Icon name="checkCircle" className="w-3.5 h-3.5" />
@@ -896,7 +893,7 @@ export default function V15FormsDashboardPage() {
                               <>
                                 <button
                                   type="button"
-                                  onClick={() => setDistributionModalForm(f)}
+                                  onClick={() => setDistributionModalForm(form)}
                                   className="flex-1 py-2 px-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md transition-all flex items-center justify-center gap-1 cursor-pointer truncate"
                                   title="Atur izin distribusi kader & mitra"
                                 >
@@ -906,7 +903,7 @@ export default function V15FormsDashboardPage() {
 
                                 <button
                                   type="button"
-                                  onClick={() => setEditConfirmForm(f)}
+                                  onClick={() => setEditConfirmForm(form)}
                                   className="py-2 px-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 shadow-md transition-all flex items-center justify-center gap-1 cursor-pointer shrink-0"
                                   title="Pratinjau formulir & konfirmasi pembuatan versi draft baru"
                                 >
@@ -914,10 +911,10 @@ export default function V15FormsDashboardPage() {
                                   <span>Pratinjau & Edit</span>
                                 </button>
                               </>
-                            ) : f.allowCadreDistribution !== false ? (
+                            ) : form.allowCadreDistribution !== false ? (
                               <button
                                 type="button"
-                                onClick={() => router.push(`/dashboard/distributions?formId=${f.formId}`)}
+                                onClick={() => router.push(`/dashboard/distributions?formId=${form.formId}`)}
                                 className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                               >
                                 <Icon name="send" className="w-3.5 h-3.5 shrink-0" />
@@ -930,7 +927,7 @@ export default function V15FormsDashboardPage() {
                                 </span>
                                 <button
                                   type="button"
-                                  onClick={() => setPreviewFormDoc(f)}
+                                  onClick={() => setPreviewFormDoc(form)}
                                   className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700"
                                 >
                                   Pratinjau
@@ -943,7 +940,7 @@ export default function V15FormsDashboardPage() {
                         {derived.status === 'archived' && (
                           <button
                             type="button"
-                            onClick={() => handleRestoreForm(f.formId)}
+                            onClick={() => handleRestoreForm(form.formId)}
                             className="flex-1 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                           >
                             <Icon name="refresh" className="w-3.5 h-3.5" />
@@ -957,7 +954,7 @@ export default function V15FormsDashboardPage() {
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation()
-                              setActiveMenuFormId(isMenuOpen ? null : f.formId)
+                              setActiveMenuFormId(isMenuOpen ? null : form.formId)
                             }}
                             className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-slate-200 border border-slate-700/80 transition-all cursor-pointer"
                           >
@@ -973,7 +970,7 @@ export default function V15FormsDashboardPage() {
                                 type="button"
                                 onClick={() => {
                                   setActiveMenuFormId(null)
-                                  setPreviewFormDoc(f)
+                                  setPreviewFormDoc(form)
                                 }}
                                 className="w-full text-left px-3.5 py-2 hover:bg-slate-800 flex items-center gap-2 transition-colors cursor-pointer"
                               >
@@ -987,7 +984,7 @@ export default function V15FormsDashboardPage() {
                                     type="button"
                                     onClick={() => {
                                       setActiveMenuFormId(null)
-                                      setDistributionModalForm(f)
+                                      setDistributionModalForm(form)
                                     }}
                                     className="w-full text-left px-3.5 py-2 hover:bg-slate-800 flex items-center gap-2 transition-colors cursor-pointer text-emerald-300"
                                   >
@@ -999,7 +996,7 @@ export default function V15FormsDashboardPage() {
                                     type="button"
                                     onClick={() => {
                                       setActiveMenuFormId(null)
-                                      setEditConfirmForm(f)
+                                      setEditConfirmForm(form)
                                     }}
                                     className="w-full text-left px-3.5 py-2 hover:bg-slate-800 flex items-center gap-2 transition-colors cursor-pointer text-purple-300"
                                   >
@@ -1011,7 +1008,7 @@ export default function V15FormsDashboardPage() {
 
                               <button
                                 type="button"
-                                onClick={() => handleOpenEditTitleModal(f)}
+                                onClick={() => handleOpenEditTitleModal(form)}
                                 className="w-full text-left px-3.5 py-2 hover:bg-slate-800 flex items-center gap-2 transition-colors cursor-pointer text-amber-300 font-semibold"
                               >
                                 <Icon name="edit" className="w-3.5 h-3.5 text-amber-400" />
@@ -1022,7 +1019,7 @@ export default function V15FormsDashboardPage() {
                                 type="button"
                                 onClick={() => {
                                   setActiveMenuFormId(null)
-                                  setSelectedHistoryFormId(f.formId)
+                                  setSelectedHistoryFormId(form.formId)
                                 }}
                                 className="w-full text-left px-3.5 py-2 hover:bg-slate-800 flex items-center gap-2 transition-colors cursor-pointer"
                               >
@@ -1034,7 +1031,7 @@ export default function V15FormsDashboardPage() {
                                 type="button"
                                 onClick={() => {
                                   setActiveMenuFormId(null)
-                                  router.push(`/dashboard/responses?formId=${f.formId}`)
+                                  router.push(`/dashboard/responses?formId=${form.formId}`)
                                 }}
                                 className="w-full text-left px-3.5 py-2 hover:bg-slate-800 flex items-center gap-2 transition-colors cursor-pointer"
                               >
@@ -1044,18 +1041,18 @@ export default function V15FormsDashboardPage() {
 
                               <button
                                 type="button"
-                                onClick={() => handleDuplicateForm(f.formId)}
-                                disabled={duplicatingFormId === f.formId}
+                                onClick={() => handleDuplicateForm(form.formId)}
+                                disabled={duplicatingFormId === form.formId}
                                 className="w-full text-left px-3.5 py-2 hover:bg-slate-800 flex items-center gap-2 transition-colors cursor-pointer text-cyan-300"
                               >
                                 <Icon name="copy" className="w-3.5 h-3.5 text-cyan-400" />
-                                <span>{duplicatingFormId === f.formId ? 'Menduplikat...' : 'Duplikat Formulir'}</span>
+                                <span>{duplicatingFormId === form.formId ? 'Menduplikat...' : 'Duplikat Formulir'}</span>
                               </button>
 
                               {derived.status !== 'archived' && (
                                 <button
                                   type="button"
-                                  onClick={() => handleArchiveForm(f.formId)}
+                                  onClick={() => handleArchiveForm(form.formId)}
                                   className="w-full text-left px-3.5 py-2 hover:bg-rose-500/10 hover:text-rose-300 flex items-center gap-2 transition-colors cursor-pointer text-rose-400 border-t border-slate-800"
                                 >
                                   <Icon name="archive" className="w-3.5 h-3.5" />
@@ -1067,7 +1064,7 @@ export default function V15FormsDashboardPage() {
                                 type="button"
                                 onClick={() => {
                                   setActiveMenuFormId(null)
-                                  setFormToDelete(f)
+                                  setFormToDelete(form)
                                 }}
                                 className="w-full text-left px-3.5 py-2 hover:bg-rose-500/20 flex items-center gap-2 transition-colors cursor-pointer text-rose-400 font-bold border-t border-slate-800/80"
                               >
@@ -1086,7 +1083,7 @@ export default function V15FormsDashboardPage() {
               /* COMPACT ROW LIST VIEW */
               return (
                 <div
-                  key={f.formId}
+                  key={form.formId}
                   className="p-4 sm:p-5 rounded-2xl bg-slate-900/80 border border-slate-800/90 hover:border-slate-700/80 transition-all space-y-3 shadow-sm group"
                 >
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -1094,7 +1091,7 @@ export default function V15FormsDashboardPage() {
                     <div className="space-y-1 min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="text-sm font-bold text-slate-100 group-hover:text-emerald-300 transition-colors truncate">
-                          {f.metadata?.title || f.formId}
+                          {form.metadata?.title || form.formId}
                         </h3>
 
                         <span
@@ -1104,12 +1101,12 @@ export default function V15FormsDashboardPage() {
                         </span>
 
                         <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
-                          {f.metadata?.category || 'Umum'}
+                          {form.metadata?.category || 'Umum'}
                         </span>
                       </div>
 
                       <div className="text-[11px] text-slate-400 font-mono flex items-center gap-2 flex-wrap">
-                        <span className="text-slate-300 font-bold">V{f.activeVersionNumber || 1}.0</span>
+                        <span className="text-slate-300 font-bold">V{form.activeVersionNumber || 1}.0</span>
                         <span>·</span>
                         <span>{aspectCount} Aspek</span>
                         <span>·</span>
@@ -1123,7 +1120,7 @@ export default function V15FormsDashboardPage() {
                       {derived.status === 'draft' && (
                         <button
                           type="button"
-                          onClick={() => router.push(`/dashboard/forms/${f.formId}/builder`)}
+                          onClick={() => router.push(`/dashboard/forms/${form.formId}/builder`)}
                           className="px-4 py-2 rounded-xl bg-purple-600/90 hover:bg-purple-500 text-white text-xs font-bold shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
                         >
                           <Icon name="edit" className="w-3.5 h-3.5" />
@@ -1134,7 +1131,7 @@ export default function V15FormsDashboardPage() {
                       {derived.status === 'ready' && (
                         <button
                           type="button"
-                          onClick={() => router.push(`/dashboard/forms/${f.formId}/builder?step=4`)}
+                          onClick={() => router.push(`/dashboard/forms/${form.formId}/builder?step=4`)}
                           className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
                         >
                           <Icon name="checkCircle" className="w-3.5 h-3.5" />
@@ -1146,7 +1143,7 @@ export default function V15FormsDashboardPage() {
                         <div className="flex items-center gap-1.5">
                           <button
                             type="button"
-                            onClick={() => setDistributionModalForm(f)}
+                            onClick={() => setDistributionModalForm(form)}
                             className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
                             title="Atur izin distribusi kader & mitra"
                           >
@@ -1156,7 +1153,7 @@ export default function V15FormsDashboardPage() {
 
                           <button
                             type="button"
-                            onClick={() => setEditConfirmForm(f)}
+                            onClick={() => setEditConfirmForm(form)}
                             className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
                             title="Pratinjau formulir & konfirmasi pembuatan versi draft baru"
                           >
@@ -1169,7 +1166,7 @@ export default function V15FormsDashboardPage() {
                       {derived.status === 'archived' && (
                         <button
                           type="button"
-                          onClick={() => handleRestoreForm(f.formId)}
+                          onClick={() => handleRestoreForm(form.formId)}
                           className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
                         >
                           <Icon name="refresh" className="w-3.5 h-3.5" />
@@ -1183,7 +1180,7 @@ export default function V15FormsDashboardPage() {
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation()
-                            setActiveMenuFormId(isMenuOpen ? null : f.formId)
+                            setActiveMenuFormId(isMenuOpen ? null : form.formId)
                           }}
                           className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-slate-200 border border-slate-700/80 transition-all cursor-pointer"
                         >
@@ -1200,7 +1197,7 @@ export default function V15FormsDashboardPage() {
                               type="button"
                               onClick={() => {
                                 setActiveMenuFormId(null)
-                                setPreviewFormDoc(f)
+                                setPreviewFormDoc(form)
                               }}
                               className="w-full text-left px-3.5 py-2 hover:bg-slate-800 flex items-center gap-2 transition-colors cursor-pointer"
                             >
@@ -1214,7 +1211,7 @@ export default function V15FormsDashboardPage() {
                                   type="button"
                                   onClick={() => {
                                     setActiveMenuFormId(null)
-                                    setDistributionModalForm(f)
+                                    setDistributionModalForm(form)
                                   }}
                                   className="w-full text-left px-3.5 py-2 hover:bg-slate-800 flex items-center gap-2 transition-colors cursor-pointer text-emerald-300"
                                 >
@@ -1226,7 +1223,7 @@ export default function V15FormsDashboardPage() {
                                   type="button"
                                   onClick={() => {
                                     setActiveMenuFormId(null)
-                                    setEditConfirmForm(f)
+                                    setEditConfirmForm(form)
                                   }}
                                   className="w-full text-left px-3.5 py-2 hover:bg-slate-800 flex items-center gap-2 transition-colors cursor-pointer text-purple-300"
                                 >
@@ -1238,7 +1235,7 @@ export default function V15FormsDashboardPage() {
 
                             <button
                               type="button"
-                              onClick={() => handleOpenEditTitleModal(f)}
+                              onClick={() => handleOpenEditTitleModal(form)}
                               className="w-full text-left px-3.5 py-2 hover:bg-slate-800 flex items-center gap-2 transition-colors cursor-pointer text-amber-300 font-semibold"
                             >
                               <Icon name="edit" className="w-3.5 h-3.5 text-amber-400" />
@@ -1249,7 +1246,7 @@ export default function V15FormsDashboardPage() {
                               type="button"
                               onClick={() => {
                                 setActiveMenuFormId(null)
-                                setSelectedHistoryFormId(f.formId)
+                                setSelectedHistoryFormId(form.formId)
                               }}
                               className="w-full text-left px-3.5 py-2 hover:bg-slate-800 flex items-center gap-2 transition-colors cursor-pointer"
                             >
@@ -1261,7 +1258,7 @@ export default function V15FormsDashboardPage() {
                               type="button"
                               onClick={() => {
                                 setActiveMenuFormId(null)
-                                router.push(`/dashboard/responses?formId=${f.formId}`)
+                                router.push(`/dashboard/responses?formId=${form.formId}`)
                               }}
                               className="w-full text-left px-3.5 py-2 hover:bg-slate-800 flex items-center gap-2 transition-colors cursor-pointer"
                             >
@@ -1271,18 +1268,18 @@ export default function V15FormsDashboardPage() {
 
                             <button
                               type="button"
-                              onClick={() => handleDuplicateForm(f.formId)}
-                              disabled={duplicatingFormId === f.formId}
+                              onClick={() => handleDuplicateForm(form.formId)}
+                              disabled={duplicatingFormId === form.formId}
                               className="w-full text-left px-3.5 py-2 hover:bg-slate-800 flex items-center gap-2 transition-colors cursor-pointer text-cyan-300"
                             >
                               <Icon name="copy" className="w-3.5 h-3.5 text-cyan-400" />
-                              <span>{duplicatingFormId === f.formId ? 'Menduplikat...' : 'Duplikat Formulir'}</span>
+                              <span>{duplicatingFormId === form.formId ? 'Menduplikat...' : 'Duplikat Formulir'}</span>
                             </button>
 
                             {derived.status !== 'archived' && (
                               <button
                                 type="button"
-                                onClick={() => handleArchiveForm(f.formId)}
+                                onClick={() => handleArchiveForm(form.formId)}
                                 className="w-full text-left px-3.5 py-2 hover:bg-rose-500/10 hover:text-rose-300 flex items-center gap-2 transition-colors cursor-pointer text-rose-400 border-t border-slate-800"
                               >
                                 <Icon name="archive" className="w-3.5 h-3.5" />
@@ -1294,7 +1291,7 @@ export default function V15FormsDashboardPage() {
                               type="button"
                               onClick={() => {
                                 setActiveMenuFormId(null)
-                                setFormToDelete(f)
+                                setFormToDelete(form)
                               }}
                               className="w-full text-left px-3.5 py-2 hover:bg-rose-500/20 flex items-center gap-2 transition-colors cursor-pointer text-rose-400 font-bold border-t border-slate-800/80"
                             >
@@ -1818,7 +1815,7 @@ export default function V15FormsDashboardPage() {
       )}
 
       {/* TOAST NOTIFICATION */}
-      {toastMessage && (
+      {toastVisible && (
         <div className="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl bg-slate-900 border border-emerald-500/40 text-emerald-300 text-xs font-semibold shadow-2xl flex items-center gap-2">
           <Icon name="checkCircle" className="w-4 h-4 text-emerald-400" />
           <span>{toastMessage}</span>
