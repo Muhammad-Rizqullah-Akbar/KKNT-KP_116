@@ -195,6 +195,17 @@ export const scoringCache = new AdvancedCache<any>(5000, 30 * 60 * 1000) // 30 m
  */
 export const articleCache = new AdvancedCache<any>(1000, 15 * 60 * 1000) // 15 minutes TTL
 
+/**
+ * Cache for form_registry singleton config (categories/targets) — baca 1× + cache.
+ * Target struktur: singleton config jarang berubah.
+ */
+export const registryCache = new AdvancedCache<any>(2, 60 * 60 * 1000) // 1 hour TTL
+
+/**
+ * Cache for settings singleton (landing_page) — CMS, jarang berubah.
+ */
+export const settingsCache = new AdvancedCache<any>(2, 60 * 60 * 1000) // 1 hour TTL
+
 // ============ CACHE HELPER FUNCTIONS ============
 
 /**

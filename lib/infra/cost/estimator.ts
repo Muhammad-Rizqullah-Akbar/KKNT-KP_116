@@ -46,18 +46,12 @@ const ENDPOINT_OPERATIONS: Record<string, Array<{ kind: 'full_scan' | 'reads' | 
   'responses.list': [
     { kind: 'full_scan', collection: 'responses' },
     { kind: 'full_scan', collection: 'forms' },
-    { kind: 'full_scan', collection: 'v1_5_forms' },
-    { kind: 'full_scan', collection: 'formGroups' },
-    { kind: 'full_scan', collection: 'v1_5_distributions' },
     { kind: 'full_scan', collection: 'distributions' },
     { kind: 'full_scan', collection: 'users' },
   ],
   'responses.detail': [
     { kind: 'full_scan', collection: 'responses' },
     { kind: 'full_scan', collection: 'forms' },
-    { kind: 'full_scan', collection: 'v1_5_forms' },
-    { kind: 'full_scan', collection: 'formGroups' },
-    { kind: 'full_scan', collection: 'v1_5_distributions' },
     { kind: 'full_scan', collection: 'distributions' },
     { kind: 'full_scan', collection: 'users' },
   ],
@@ -67,7 +61,7 @@ const ENDPOINT_OPERATIONS: Record<string, Array<{ kind: 'full_scan' | 'reads' | 
   'auth.login': [{ kind: 'full_scan', collection: 'users' }],
   'auth.users': [{ kind: 'full_scan', collection: 'users' }],
   'v1_5.users': [{ kind: 'full_scan', collection: 'users' }],
-  'forms.list': [{ kind: 'full_scan', collection: 'v1_5_forms' }],
+  'forms.list': [{ kind: 'full_scan', collection: 'forms' }],
 }
 
 function collectionSize(name: string): number {

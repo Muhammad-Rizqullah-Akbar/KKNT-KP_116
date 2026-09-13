@@ -64,15 +64,14 @@ export const FIRESTORE_FREE_TIER_DAILY: FirestorePricing = {
 export const ESTIMATED_COLLECTION_SIZES: Record<string, number> = {
   responses: 10_000,
   forms: 500,
-  v1_5_forms: 500,
-  formGroups: 50,
   distributions: 200,
-  v1_5_distributions: 200,
   users: 300,
   articles: 200,
-  formAccess: 100,
+  form_access: 100,
+  partnerships: 200,
+  form_registry: 2,
   settings: 10,
-  registry: 2,
+  article_categories: 20,
 }
 
 export const DEFAULT_COLLECTION_SIZE = 100
