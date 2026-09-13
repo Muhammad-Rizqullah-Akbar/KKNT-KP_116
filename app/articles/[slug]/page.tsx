@@ -4,7 +4,7 @@ import { useState, useEffect, useLayoutEffect, useRef, use, useCallback } from '
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Icon } from '@/components/ui/Icons'
+import { Icon, type IconName } from '@/components/ui/Icons'
 import { sanitizeHtml } from '@/lib/infra/sanitize-html'
 
 // Import Repositori Firestore & Firebase Auth
@@ -404,18 +404,18 @@ export default function ArticleDetailPage({ params }: { params: Promise<{ slug: 
                     </p>
                   ) : (
                     <div className="max-h-60 overflow-y-auto custom-scrollbar space-y-1">
-                      {parsedHeadings.map((h, i) => (
+                      {parsedHeadings.map((heading, index) => (
                         <button
                           type="button"
-                          key={`${h.id}-${i}`}
-                          onClick={() => handleScrollToHeading(h.id)}
+                          key={`${heading.id}-${index}`}
+                          onClick={() => handleScrollToHeading(heading.id)}
                           className={`w-full text-left text-xs p-2 rounded-lg transition-all truncate ${
-                            activeHeading === h.id ? 'bg-cyan-500/20 text-cyan-400 font-medium' : 'text-white/70 hover:bg-white/5'
-                          }`}
+                              activeHeading === heading.id ? 'bg-cyan-500/20 text-cyan-400 font-medium' : 'text-white/70 hover:bg-white/5'
+                            }`}
                         >
-                          {i + 1}. {h.text}
-                        </button>
-                      ))}
+                            {index + 1}. {heading.text}
+                          </button>
+                        ))}
                     </div>
                   )}
                 </div>
@@ -444,7 +444,7 @@ export default function ArticleDetailPage({ params }: { params: Promise<{ slug: 
                 {editedArticle.featuredImage ? (
                   <img src={editedArticle.featuredImage} alt={editedArticle.title} className="w-full h-full object-cover" />
                 ) : (
-                  <Icon name={getCategoryStyle(editedArticle.category).icon as any || 'cpu'} className="w-20 h-20 text-white/20 animate-float" />
+                  <Icon name={(getCategoryStyle(editedArticle.category).icon as IconName) || 'cpu'} className="w-20 h-20 text-white/20 animate-float" />
                 )}
               </div>
 
@@ -506,7 +506,7 @@ export default function ArticleDetailPage({ params }: { params: Promise<{ slug: 
               <div className="flex flex-wrap items-center justify-between gap-4 border-t border-white/10 pt-6">
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-500 to-cyan-500 flex items-center justify-center text-white font-bold text-lg">
-                    {(editedArticle.author || 'A').split(' ').map((n: string) => n[0]).join('')}
+                    {(editedArticle.author || 'A').split(' ').map((word: string) => word[0]).join('')}
                   </div>
                   <div>
                     <p 
@@ -550,16 +550,16 @@ export default function ArticleDetailPage({ params }: { params: Promise<{ slug: 
                   </p>
                 ) : (
                   <nav className="space-y-2">
-                    {parsedHeadings.map((h, i) => (
+                    {parsedHeadings.map((heading, index) => (
                       <button
                         type="button"
-                        key={`${h.id}-${i}`}
-                        onClick={() => handleScrollToHeading(h.id)}
+                        key={`${heading.id}-${index}`}
+                        onClick={() => handleScrollToHeading(heading.id)}
                         className={`block w-full text-left text-sm py-1.5 border-l-2 pl-3 transition-colors ${
-                          activeHeading === h.id ? 'text-cyan-400 border-cyan-400 font-medium' : 'text-white/45 hover:text-cyan-400 border-transparent'
+                          activeHeading === heading.id ? 'text-cyan-400 border-cyan-400 font-medium' : 'text-white/45 hover:text-cyan-400 border-transparent'
                         }`}
                       >
-                        {i + 1}. {h.text}
+                        {index + 1}. {heading.text}
                       </button>
                     ))}
                   </nav>
@@ -628,21 +628,21 @@ export default function ArticleDetailPage({ params }: { params: Promise<{ slug: 
               <div className="mt-10">
                 <h3 className="font-display text-2xl font-semibold text-white mb-4">Galeri Dokumentasi</h3>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
-                  {editedArticle.gallery.map((img: any, idx: number) => (
+                  {editedArticle.gallery.map((image, idx) => (
                     <div
-                      key={img.id || idx}
-                      onClick={() => openLightbox(img)}
+                      key={image.id || idx}
+                      onClick={() => openLightbox(image)}
                       className="cursor-pointer group relative rounded-xl overflow-hidden aspect-square border border-white/[0.05] bg-[#080812]"
                     >
-                      {img.url ? (
-                        <img src={img.url} alt={img.caption} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                      {image.url ? (
+                        <img src={image.url} alt={image.caption} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
                       ) : (
-                        <div className={`absolute inset-0 bg-gradient-to-br ${img.gradient || 'from-cyan-700/50 to-emerald-800/50'} flex items-center justify-center`}>
+                        <div className={`absolute inset-0 bg-gradient-to-br ${image.gradient || 'from-cyan-700/50 to-emerald-800/50'} flex items-center justify-center`}>
                           <Icon name="image" className="w-8 h-8 text-white/30" />
                         </div>
                       )}
                       <div className="absolute inset-0 bg-black/40 group-hover:bg-black/20 transition-colors" />
-                      <div className="absolute bottom-2 left-2 right-2 px-2 py-1 rounded bg-black/60 text-[10px] text-white truncate">{img.caption}</div>
+                      <div className="absolute bottom-2 left-2 right-2 px-2 py-1 rounded bg-black/60 text-[10px] text-white truncate">{image.caption}</div>
                     </div>
                   ))}
                 </div>
