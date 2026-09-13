@@ -10,7 +10,7 @@ import {
   updateLandingPageSettings,
   type LandingPageSettings 
 } from '@/lib/repositories/settings.repo'
-import { uploadSettingsImage, uploadGalleryImage, uploadOptimizedArticleImage } from '@/lib/firebase/storage'
+import { uploadSettingsImage, uploadGalleryImage, uploadOptimizedArticleImage } from '@/lib/infra/storage'
 
 // ============ DATA DEFAULT / FALLBACK ============
 const defaultHeroData = {

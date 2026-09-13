@@ -16,7 +16,7 @@ import {
 } from '@/lib/repositories/articles.repo'
 import { getForms } from '@/lib/repositories/forms.repo'
 import { storage } from '@/lib/firebaseClient'
-import { uploadOptimizedArticleImage } from '@/lib/firebase/storage'
+import { uploadOptimizedArticleImage } from '@/lib/infra/storage'
 import { ref, uploadBytes, getDownloadURL, listAll } from 'firebase/storage'
 import { SmartUploadArticleModal } from '@/components/dashboard/articles/SmartUploadArticleModal'
 import { exportArticleToJson } from '@/lib/cms/smartArticleParser'

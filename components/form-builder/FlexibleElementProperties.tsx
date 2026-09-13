@@ -14,7 +14,7 @@ import {
   IndicatorItem,
   IndicatorScale,
 } from './ElementTypes'
-import { uploadImage } from '@/lib/firebase/storage'
+import { uploadImage } from '@/lib/infra/storage'
 
 interface FlexibleElementPropertiesProps {
   element: FlexibleQuestion | null

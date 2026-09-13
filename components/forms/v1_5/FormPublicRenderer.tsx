@@ -646,7 +646,7 @@ function PublicFileUpload({
     setUploadProgress(10)
 
     try {
-      const { uploadResponseFile } = await import('@/lib/firebase/storage')
+      const { uploadResponseFile } = await import('@/lib/infra/storage')
       const url = await uploadResponseFile(
         file,
         'public_response',

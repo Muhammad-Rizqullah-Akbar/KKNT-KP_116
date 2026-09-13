@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthorizationContext } from '@/lib/auth/server'
-import { saveBase64MediaToFileOrStorage } from '@/lib/firebase/mediaOffloader'
+import { saveBase64MediaToFileOrStorage } from '@/lib/infra/media-offloader'
 
 /**
  * POST /api/v1_5/upload

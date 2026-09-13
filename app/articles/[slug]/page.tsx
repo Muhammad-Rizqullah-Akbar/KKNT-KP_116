@@ -14,7 +14,7 @@ import {
   type ArticleData 
 } from '@/lib/repositories/articles.repo'
 import { auth, storage } from '@/lib/firebaseClient'
-import { uploadOptimizedArticleImage } from '@/lib/firebase/storage'
+import { uploadOptimizedArticleImage } from '@/lib/infra/storage'
 import { onAuthStateChanged } from 'firebase/auth'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 

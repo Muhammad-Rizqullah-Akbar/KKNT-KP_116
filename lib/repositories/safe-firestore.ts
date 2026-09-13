@@ -71,7 +71,7 @@ function sanitizeFirestoreData(data: any): any {
   return sanitized
 }
 
-import { recursivelyOffloadBase64Media } from '@/lib/firebase/mediaOffloader'
+import { recursivelyOffloadBase64Media } from '@/lib/infra/media-offloader'
 
 export async function safeSetDoc(collectionName: string, docId: string, data: any): Promise<void> {
   let cleanData = sanitizeFirestoreData(data)
