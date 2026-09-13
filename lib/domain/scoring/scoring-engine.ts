@@ -1,7 +1,7 @@
 import type { BuilderQuestion, FormAspect, ScoringConfig, GradeThreshold, RecommendationConfig } from '@/lib/forms/v1_5/builderState'
-import type { QuestionScoreResult, AspectScoreResult, ResponseResultDoc, IndicatorScoreItem } from '@/lib/forms/v1_5/scoring/scoringTypes'
-import { resolveGradeThreshold } from '@/lib/forms/v1_5/scoring/thresholdEngine'
-import { resolveRecommendationArticleIds } from '@/lib/forms/v1_5/scoring/recommendationEngine'
+import type { QuestionScoreResult, AspectScoreResult, ResponseResultDoc, IndicatorScoreItem } from './scoring-types'
+import { resolveGradeThreshold } from './threshold-engine'
+import { resolveRecommendationArticleIds } from './recommendation-engine'
 
 export function expandScaleLabel(label: any): string {
   if (label === undefined || label === null || label === '') return '-'

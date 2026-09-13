@@ -10,7 +10,7 @@ import {
   getScoredStages,
   getUnscoredStages,
 } from './ElementTypes'
-import { ScoringEngine, ScoringResult } from '@/lib/scoring/scoringEngine'
+import { ScoringEngine, ScoringResult } from '@/lib/domain/scoring/preview-engine'
 import { getDefaultScoring, getDefaultValidation } from './ElementTypes'
 
 interface PreviewModalProps {

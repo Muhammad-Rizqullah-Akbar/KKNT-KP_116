@@ -1,6 +1,6 @@
 import type { PublicFormProjection } from '@/lib/forms/v1_5/types'
 import type { DistributionOwnerType } from '@/lib/forms/v1_5/distributionTypes'
-import type { ResponseResultDoc } from '@/lib/forms/v1_5/scoring/scoringTypes'
+import type { ResponseResultDoc } from '@/lib/domain/scoring/scoring-types'
 
 export type ResponseStatus = 'in_progress' | 'submitted' | 'abandoned' | 'invalid'
 

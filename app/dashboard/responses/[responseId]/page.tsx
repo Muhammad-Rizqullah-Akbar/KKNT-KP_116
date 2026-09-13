@@ -6,7 +6,7 @@ import Image from 'next/image'
 import { Topbar } from '@/components/dashboard/Topbar'
 import { Icon } from '@/components/ui/Icons'
 import type { ResponseDoc } from '@/lib/forms/v1_5/responseTypes'
-import { isBiodataAspect } from '@/lib/forms/v1_5/scoring/scoringEngine'
+import { isBiodataAspect } from '@/lib/domain/scoring/scoring-engine'
 import { extractRespondentName, extractRespondentEmail } from '@/lib/forms/v1_5/respondentUtils'
 
 interface PageProps {

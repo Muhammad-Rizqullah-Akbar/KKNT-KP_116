@@ -5,7 +5,7 @@ import type { BuilderState, BuilderQuestion } from '@/lib/forms/v1_5/builderStat
 import { updateQuestion } from '@/lib/forms/v1_5/builderState'
 import type { CanonicalForm } from '@/lib/forms/v1_5/types'
 import { validateCanonicalForm, type FormValidationIssue } from '@/lib/forms/v1_5/validation'
-import { calculateResponseScore } from '@/lib/forms/v1_5/scoring/scoringEngine'
+import { calculateResponseScore } from '@/lib/domain/scoring/scoring-engine'
 import { toPublicFormProjection } from '@/lib/forms/v1_5/legacyAdapter'
 import { Icon } from '@/components/ui/Icons'
 import { GradeThresholdConfigurator } from '../GradeThresholdConfigurator'

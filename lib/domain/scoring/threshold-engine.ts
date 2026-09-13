@@ -1,5 +1,5 @@
 import type { GradeThreshold } from '@/lib/forms/v1_5/builderState'
-import type { GradeResult } from '@/lib/forms/v1_5/scoring/scoringTypes'
+import type { GradeResult } from './scoring-types'
 
 /**
  * Deterministic grade threshold resolver.

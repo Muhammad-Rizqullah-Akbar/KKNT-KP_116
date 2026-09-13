@@ -13,7 +13,7 @@ import {
   getFormVersionSnapshotsFromDb,
 } from '@/lib/repositories/v1_5-forms.repo'
 import { validateResponseAnswers } from '@/lib/forms/v1_5/response.validation'
-import { calculateResponseScore } from '@/lib/forms/v1_5/scoring/scoringEngine'
+import { calculateResponseScore } from '@/lib/domain/scoring/scoring-engine'
 import { toPublicFormProjection } from '@/lib/forms/v1_5/legacyAdapter'
 import type { AuthorizationContext } from '@/lib/auth/server'
 import type {
@@ -24,7 +24,7 @@ import type {
   SubmitResponseParams,
   ResponseFilterOptions,
 } from '@/lib/forms/v1_5/responseTypes'
-import type { ResponseResultDoc, RecommendationItem } from '@/lib/forms/v1_5/scoring/scoringTypes'
+import type { ResponseResultDoc, RecommendationItem } from '@/lib/domain/scoring/scoring-types'
 
 import { randomBytes, randomUUID } from 'crypto'
 

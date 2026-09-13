@@ -5,7 +5,7 @@ import type { Question, QuestionType, ScoringConfig } from '@/lib/forms/v1_5/typ
 import type { FormAspect, BuilderQuestion } from '@/lib/forms/v1_5/builderState'
 import type { DetailedIndicator } from './LikertScaleEditor'
 import { QUESTION_TYPES } from '@/lib/forms/v1_5/types'
-import { calculateQuestionScore } from '@/lib/forms/v1_5/scoring/scoringEngine'
+import { calculateQuestionScore } from '@/lib/domain/scoring/scoring-engine'
 import { Icon } from '@/components/ui/Icons'
 
 interface AnswerKeyInspectorProps {

@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import type { BuilderState } from '@/lib/forms/v1_5/builderState'
 import { computeBalancedAspectWeights, updateScoring } from '@/lib/forms/v1_5/builderState'
 import { Icon } from '@/components/ui/Icons'
-import { calculateQuestionScore } from '@/lib/forms/v1_5/scoring/scoringEngine'
+import { calculateQuestionScore } from '@/lib/domain/scoring/scoring-engine'
 
 interface Step4PublishProps {
   state: BuilderState

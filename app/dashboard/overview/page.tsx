@@ -286,7 +286,7 @@ function AdminOverviewDashboard() {
           return null
         }
 
-        const { ScoringEngine } = await import('@/lib/scoring/scoringEngine')
+        const { ScoringEngine } = await import('@/lib/domain/scoring/preview-engine')
 
         let rawCombined: any[] = Array.isArray(responsesData) ? [...responsesData] : []
         if (v15RespRes.ok && v15RespRes.data && Array.isArray(v15RespRes.data.responses)) {

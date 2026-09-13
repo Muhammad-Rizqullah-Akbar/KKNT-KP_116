@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test, describe } from 'node:test'
-import { ScoringEngine } from '../../lib/scoring/scoringEngine'
+import { ScoringEngine } from '../../lib/domain/scoring/preview-engine'
 
 describe('ScoringEngine Regression Matrix', () => {
 
@@ -37,7 +37,7 @@ describe('ScoringEngine Regression Matrix', () => {
   })
 
   test('Calculate V1.5 score for indicator-table with text label answers', () => {
-    const { calculateQuestionScore } = require('../../lib/forms/v1_5/scoring/scoringEngine')
+    const { calculateQuestionScore } = require('../../lib/domain/scoring/scoring-engine')
 
     const question = {
       questionId: 'q_table_1',
@@ -68,7 +68,7 @@ describe('ScoringEngine Regression Matrix', () => {
   })
 
   test('Calculate V1.5 aspect scores for Form Builder config indicator-table structure', () => {
-    const { calculateAspectScores } = require('../../lib/forms/v1_5/scoring/scoringEngine')
+    const { calculateAspectScores } = require('../../lib/domain/scoring/scoring-engine')
 
     const aspects = [
       { aspectId: 'asp_1', title: 'Aspek Hygiene', isScored: true },
@@ -109,7 +109,7 @@ describe('ScoringEngine Regression Matrix', () => {
   })
 
   test('Calculate V1.5 score for indicator-table with numbered prefix scale labels', () => {
-    const { calculateQuestionScore } = require('../../lib/forms/v1_5/scoring/scoringEngine')
+    const { calculateQuestionScore } = require('../../lib/domain/scoring/scoring-engine')
 
     const question = {
       questionId: 'q_table_prefix',
@@ -138,7 +138,7 @@ describe('ScoringEngine Regression Matrix', () => {
   })
 
   test('Calculate V1.5 score for legacy Pengetahuan (Knowledge) single-choice with config.correctAnswer label', () => {
-    const { calculateQuestionScore } = require('../../lib/forms/v1_5/scoring/scoringEngine')
+    const { calculateQuestionScore } = require('../../lib/domain/scoring/scoring-engine')
 
     const question = {
       questionId: 'q_peng_1',
@@ -168,7 +168,7 @@ describe('ScoringEngine Regression Matrix', () => {
   })
 
   test('Calculate V1.5 score for legacy Pengetahuan question with numeric index correctAnswer', () => {
-    const { calculateQuestionScore } = require('../../lib/forms/v1_5/scoring/scoringEngine')
+    const { calculateQuestionScore } = require('../../lib/domain/scoring/scoring-engine')
 
     const question = {
       questionId: 'q_peng_idx',
@@ -192,7 +192,7 @@ describe('ScoringEngine Regression Matrix', () => {
   })
 
   test('Exclude Data Responden & Sumber Informasi biodata aspects from scoring summary', () => {
-    const { isBiodataAspect, calculateResponseScore } = require('../../lib/forms/v1_5/scoring/scoringEngine')
+    const { isBiodataAspect, calculateResponseScore } = require('../../lib/domain/scoring/scoring-engine')
 
     assert.equal(isBiodataAspect('Data Responden'), true, 'Data Responden should be recognized as biodata')
     assert.equal(isBiodataAspect('Sumber Informasi & Media'), true, 'Sumber Informasi should be recognized as biodata')

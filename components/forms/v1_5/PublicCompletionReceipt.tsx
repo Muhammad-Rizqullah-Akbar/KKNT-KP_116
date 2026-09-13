@@ -4,7 +4,7 @@ import React from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Icon } from '@/components/ui/Icons'
-import { isBiodataAspect } from '@/lib/forms/v1_5/scoring/scoringEngine'
+import { isBiodataAspect } from '@/lib/domain/scoring/scoring-engine'
 
 interface PublicCompletionReceiptProps {
   responseId?: string
