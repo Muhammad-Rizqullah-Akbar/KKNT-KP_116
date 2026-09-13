@@ -230,32 +230,32 @@ const defaultSampleArticles = [
         const rawArticles = await getArticles()
 
         const published = rawArticles
-          .filter((a: ArticleData) => a.status === 'Published')
-          .map((a: ArticleData) => ({
-            id: a.id,
-            title: a.title,
-            slug: a.slug,
-            excerpt: a.excerpt,
-            category: a.category || 'Keamanan Pangan',
-            author: a.author,
-            authorBio: a.authorBio,
-            date: a.date,
-            readTime: a.readTime || 5,
-            views: a.views || 0,
-            image: a.featuredImage || null,
-            gradient: categoryGradients[a.category] || categoryGradients['Keamanan Pangan'],
-            icon: categoryIcons[a.category] || 'cpu',
+          .filter((article: ArticleData) => article.status === 'Published')
+          .map((article: ArticleData) => ({
+            id: article.id,
+            title: article.title,
+            slug: article.slug,
+            excerpt: article.excerpt,
+            category: article.category || 'Keamanan Pangan',
+            author: article.author,
+            authorBio: article.authorBio,
+            date: article.date,
+            readTime: article.readTime || 5,
+            views: article.views || 0,
+            image: article.featuredImage || null,
+            gradient: categoryGradients[article.category] || categoryGradients['Keamanan Pangan'],
+            icon: categoryIcons[article.category] || 'cpu',
             iconColor:
-              a.category === 'Keamanan Pangan'
+              article.category === 'Keamanan Pangan'
                 ? 'text-emerald-400'
-                : a.category === 'Regulasi'
+                : article.category === 'Regulasi'
                 ? 'text-purple-400'
-                : a.category === 'Tips & Trik'
+                : article.category === 'Tips & Trik'
                 ? 'text-amber-400'
                 : 'text-cyan-400',
-            content: a.content,
-            tags: a.tags ? a.tags.map((t) => (t.startsWith('#') ? t : `#${t}`)) : [],
-            gallery: a.gallery || []
+            content: article.content,
+            tags: article.tags ? article.tags.map((tag) => (tag.startsWith('#') ? tag : `#${tag}`)) : [],
+            gallery: article.gallery || []
           }))
 
         if (published.length > 0) {
@@ -305,7 +305,7 @@ const defaultSampleArticles = [
       try {
         await incrementArticleViews(article.id)
         setArticles((prev) =>
-          prev.map((a) => (a.id === article.id ? { ...a, views: (a.views || 0) + 1 } : a))
+          prev.map((item) => (item.id === article.id ? { ...item, views: (item.views || 0) + 1 } : item))
         )
       } catch (err) {
         console.error('Gagal menambah views:', err)
