@@ -1,0 +1,30 @@
+name: Refactor
+description: Perubahan struktur / restructure kode
+title: "[REFACTOR] "
+labels: ["type:refactor", "status:needs-triage"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Deskripsi Refactor
+      description: Apa yang diubah & kenapa?
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria
+      description: Kriteria selesai (Definition of Done)
+    validations:
+      required: true
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Prioritas
+      options:
+        - priority:critical
+        - priority:high
+        - priority:medium
+        - priority:low
+    validations:
+      required: true

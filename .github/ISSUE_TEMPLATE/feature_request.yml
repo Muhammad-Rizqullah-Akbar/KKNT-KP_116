@@ -1,0 +1,35 @@
+name: Feature Request
+description: Usulkan fitur baru
+title: "[FEATURE] "
+labels: ["type:feature", "status:needs-triage"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Deskripsi Fitur
+      description: Apa yang Anda inginkan?
+    validations:
+      required: true
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivasi
+      description: Kenapa fitur ini berguna?
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Solusi yang Diusulkan
+      description: Bagaimana cara kerjanya?
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Prioritas
+      options:
+        - priority:critical
+        - priority:high
+        - priority:medium
+        - priority:low
+    validations:
+      required: true

@@ -46,3 +46,22 @@ AGENTS.md
 agents.md
 flow.html
 app/flow.html
+
+# ===== LOKAL-ONLY (JANGAN ke GitHub — dokumentasi & artefak kerja) =====
+# Dokumentasi analisis, blueprint, laporan
+/documentation-reports/
+# Diagram (draw.io, generator, hasil render)
+/diagram-and-visualization/
+# Data export produksi (read-only, mengandung data riil)
+/data/
+# Risk registry (dokumen lokal)
+/risk-registry.md
+# Test artifacts (hasil playwright, report)
+/test-suites/results/
+# Scratch/temp script (seed/verify emulator, latency probe)
+*.tmp.js
+# Upload lokal (media user)
+/public/uploads/
+# Log emulator firestore
+/firestore-debug.log
+

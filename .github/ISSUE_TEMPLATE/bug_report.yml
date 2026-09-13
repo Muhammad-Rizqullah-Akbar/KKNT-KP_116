@@ -1,0 +1,43 @@
+name: Bug Report
+description: Laporkan bug / masalah
+title: "[BUG] "
+labels: ["type:bug", "status:needs-triage"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Deskripsi Bug
+      description: Apa yang terjadi?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Langkah Reproduksi
+      description: Langkah detail untuk memunculkan bug
+      placeholder: "1. Buka ...\n2. Klik ...\n3. ..."
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Perilaku yang Diharapkan
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Perilaku Aktual
+    validations:
+      required: true
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Prioritas
+      options:
+        - priority:critical
+        - priority:high
+        - priority:medium
+        - priority:low
+    validations:
+      required: true

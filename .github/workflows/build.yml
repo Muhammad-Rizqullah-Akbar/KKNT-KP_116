@@ -1,0 +1,34 @@
+name: Build
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    name: Next.js build (Turbopack)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: npm-cache-${{ hashFiles('package-lock.json') }}
+          restore-keys: npm-cache-
+
+      - name: Cache .next build
+        uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: next-cache-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
+          restore-keys: next-cache-${{ hashFiles('package-lock.json') }}-
+
+      - run: npm ci
+      - run: npm run build
