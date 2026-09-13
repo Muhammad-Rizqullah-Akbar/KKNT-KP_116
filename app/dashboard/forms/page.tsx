@@ -19,6 +19,10 @@ import {
 import { useAuth } from '@/context/AuthContext'
 import { queryKeys } from '@/lib/query-keys'
 import { useToast } from '@/lib/hooks/use-toast'
+import { filterForms, buildDuplicateTitle, buildDuplicateCode, type LegacyStatusFilter, type LegacyViewMode } from './forms-utils'
+import FormsFilterBar from './forms-filter-bar'
+import FormCard from './forms-card'
+import FormTableRow from './forms-table-row'
 
 export default function LegacyFormsPage() {
   const { user, userData, userRole, loading } = useAuth()
@@ -52,9 +56,9 @@ export default function LegacyFormsPage() {
 
   // Filters & Tabs
   const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState<'all' | 'published' | 'draft'>('all')
+  const [statusFilter, setStatusFilter] = useState<LegacyStatusFilter>('all')
   const [selectedGroupId, setSelectedGroupId] = useState<string>('all')
-  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid')
+  const [viewMode, setViewMode] = useState<LegacyViewMode>('grid')
 
   // Preview State
   const [previewForm, setPreviewForm] = useState<LegacyFormData | null>(null)
@@ -65,19 +69,7 @@ export default function LegacyFormsPage() {
 
   // Filtered List
   const filteredForms = useMemo(() => {
-    return forms.filter((form) => {
-      const term = searchTerm.toLowerCase()
-      const matchesSearch =
-        (form.title || '').toLowerCase().includes(term) ||
-        (form.code || '').toLowerCase().includes(term) ||
-        (form.category || '').toLowerCase().includes(term) ||
-        (form.target || '').toLowerCase().includes(term)
-
-      const matchesStatus = statusFilter === 'all' || form.status === statusFilter
-      const matchesGroup = selectedGroupId === 'all' || form.groupId === selectedGroupId
-
-      return matchesSearch && matchesStatus && matchesGroup
-    })
+    return filterForms(forms, searchTerm, statusFilter, selectedGroupId)
   }, [forms, searchTerm, statusFilter, selectedGroupId])
 
   // Toggle Status
@@ -98,15 +90,8 @@ export default function LegacyFormsPage() {
     if (!form.id) return
     setIsDuplicating(form.id)
     try {
-      const copyCode = `${form.code || 'FORM'}_COPY_${Math.random().toString(36).substring(2, 6).toUpperCase()}`
-      const rawTitle = form.title || 'Formulir'
-      let baseTitle = rawTitle.replace(/^\[Salinan[^\]]*\]\s*/i, '').replace(/^Salinan\s*[-–:]\s*/i, '').trim()
-      let cleanTitle = baseTitle
-      if (/pre[-_\s]*test/i.test(baseTitle)) {
-        cleanTitle = baseTitle.replace(/pre[-_\s]*test/gi, 'Post-Test')
-      } else if (!/post[-_\s]*test/i.test(baseTitle)) {
-        cleanTitle = `${baseTitle} (Post-Test)`
-      }
+      const copyCode = buildDuplicateCode(form.code || '')
+      const cleanTitle = buildDuplicateTitle(form.title || 'Formulir')
 
       const duplicated = await createForm({
         title: cleanTitle,
@@ -195,78 +180,17 @@ export default function LegacyFormsPage() {
         </div>
 
         {/* Filter & View Switcher Bar */}
-        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Search */}
-            <div className="relative flex-1 sm:flex-initial">
-              <Icon name="search" className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-              <input
-                type="text"
-                placeholder="Cari judul V1.0 / kode..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 pr-4 py-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500 w-full sm:w-64"
-              />
-            </div>
-
-            {/* Status Pills */}
-            <div className="flex items-center p-1 bg-slate-900 border border-slate-800 rounded-xl text-xs">
-              {(['all', 'published', 'draft'] as const).map((status) => (
-                <button
-                  key={status}
-                  onClick={() => setStatusFilter(status)}
-                  className={`px-3 py-1.5 rounded-lg font-semibold capitalize transition-all ${
-                    statusFilter === status
-                      ? 'bg-indigo-600/30 text-indigo-200 border border-indigo-500/40 shadow-sm'
-                      : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  {status === 'all' ? 'Semua Status' : status === 'published' ? 'Terpublikasi' : 'Draft'}
-                </button>
-              ))}
-            </div>
-
-            {/* Form Group Filter */}
-            {groups.length > 0 && (
-              <select
-                value={selectedGroupId}
-                onChange={(e) => setSelectedGroupId(e.target.value)}
-                className="px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-300 focus:outline-none focus:border-indigo-500 cursor-pointer"
-              >
-                <option value="all">Semua Kelompok Form</option>
-                {groups.map((group) => (
-                  <option key={group.id} value={group.id}>
-                    {group.title} ({group.code})
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
-
-          {/* Grid / Table Toggle */}
-          <div className="flex items-center gap-1 p-1 bg-slate-900 border border-slate-800 rounded-xl self-end md:self-auto">
-            <button
-              onClick={() => setViewMode('grid')}
-              className={`p-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 ${
-                viewMode === 'grid' ? 'bg-indigo-600/30 text-indigo-300 border border-indigo-500/40' : 'text-slate-400'
-              }`}
-              title="Tampilan Kartu (Grid)"
-            >
-              <Icon name="grid" className="w-4 h-4" />
-              <span className="hidden sm:inline">Kartu</span>
-            </button>
-            <button
-              onClick={() => setViewMode('table')}
-              className={`p-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 ${
-                viewMode === 'table' ? 'bg-indigo-600/30 text-indigo-300 border border-indigo-500/40' : 'text-slate-400'
-              }`}
-              title="Tampilan Tabel (List)"
-            >
-              <Icon name="list" className="w-4 h-4" />
-              <span className="hidden sm:inline">Tabel</span>
-            </button>
-          </div>
-        </div>
+        <FormsFilterBar
+          searchTerm={searchTerm}
+          statusFilter={statusFilter}
+          selectedGroupId={selectedGroupId}
+          viewMode={viewMode}
+          groups={groups}
+          setSearchTerm={setSearchTerm}
+          setStatusFilter={setStatusFilter}
+          setSelectedGroupId={setSelectedGroupId}
+          setViewMode={setViewMode}
+        />
 
         {/* Content View */}
         {isLoading ? (
@@ -302,124 +226,18 @@ export default function LegacyFormsPage() {
         ) : viewMode === 'grid' ? (
           /* CARD GRID VIEW (Distinct V1.0 Design) */
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {filteredForms.map((form) => {
-              const isPublished = form.status === 'published'
-              const qCount = form.questions?.length || 0
-
-              return (
-                <div
-                  key={form.id}
-                  className="rounded-3xl bg-slate-900/80 border border-slate-800/80 hover:border-indigo-500/40 p-5 flex flex-col justify-between space-y-4 transition-all hover:shadow-xl hover:shadow-indigo-500/5 group"
-                >
-                  <div className="space-y-3">
-                    {/* Header Badges */}
-                    <div className="flex items-center justify-between gap-2">
-                      <button
-                        type="button"
-                        onClick={() => copyFormCode(form.code || form.id || '')}
-                        className="font-mono text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-950 text-indigo-300 border border-indigo-500/30 hover:border-indigo-500/60 transition-colors flex items-center gap-1.5"
-                        title="Klik untuk salin kode kuesioner"
-                      >
-                        <Icon name="copy" className="w-3 h-3 text-indigo-400" />
-                        <span>{form.code || form.id}</span>
-                      </button>
-
-                      <span
-                        className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-md uppercase border ${
-                          isPublished
-                            ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
-                            : 'bg-amber-500/10 text-amber-300 border-amber-500/30'
-                        }`}
-                      >
-                        {form.status}
-                      </span>
-                    </div>
-
-                    {/* Title & Description */}
-                    <div>
-                      <h3 className="text-base font-bold text-slate-100 group-hover:text-indigo-300 transition-colors line-clamp-2">
-                        {form.title || 'Kuesioner V1.0 Tanpa Judul'}
-                      </h3>
-                      <p className="text-xs text-slate-400 mt-1 line-clamp-2">
-                        {form.description || 'Tidak ada deskripsi kuesioner.'}
-                      </p>
-                    </div>
-
-                    {/* Metadata Details */}
-                    <div className="pt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-400 font-mono">
-                      <span className="px-2 py-0.5 rounded bg-slate-950 border border-slate-800">
-                        {form.category || 'Umum'}
-                      </span>
-                      <span>•</span>
-                      <span>{qCount} Soal</span>
-                      <span>•</span>
-                      <span className="text-emerald-400 font-bold">{form.filledCount || 0} Terisi</span>
-                    </div>
-                  </div>
-
-                  {/* Actions Footer */}
-                  <div className="pt-4 border-t border-slate-800/80 flex items-center justify-between gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleToggleStatus(form.id, form.status)}
-                      className={`px-3 py-1.5 rounded-xl border text-xs font-semibold transition-colors ${
-                        isPublished
-                          ? 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
-                          : 'bg-emerald-950/40 hover:bg-emerald-900/50 text-emerald-300 border-emerald-500/40'
-                      }`}
-                    >
-                      {isPublished ? 'Ubah ke Draft' : 'Publikasikan'}
-                    </button>
-
-                    <div className="flex items-center gap-1.5">
-                      {/* Preview Button */}
-                      <button
-                        type="button"
-                        onClick={() => setPreviewForm(form)}
-                        className="p-2 rounded-xl bg-slate-800 hover:bg-cyan-600/30 text-slate-300 hover:text-cyan-300 border border-slate-700 hover:border-cyan-500/40 transition-colors"
-                        title="Pratinjau Kuesioner (Preview)"
-                      >
-                        <Icon name="eye" className="w-4 h-4 text-cyan-400" />
-                      </button>
-
-                      {/* Duplicate / Salin Button */}
-                      <button
-                        type="button"
-                        onClick={() => handleDuplicateForm(form)}
-                        disabled={isDuplicating === form.id}
-                        className="p-2 rounded-xl bg-slate-800 hover:bg-purple-600/30 text-slate-300 hover:text-purple-300 border border-slate-700 hover:border-purple-500/40 transition-colors disabled:opacity-50"
-                        title="Duplikasi / Salin Kuesioner"
-                      >
-                        {isDuplicating === form.id ? (
-                          <Icon name="loader" className="w-4 h-4 text-purple-400 animate-spin" />
-                        ) : (
-                          <Icon name="copy" className="w-4 h-4 text-purple-400" />
-                        )}
-                      </button>
-
-                      {/* Edit Button */}
-                      <Link
-                        href={`/dashboard/form-builder?id=${form.id}`}
-                        className="p-2 rounded-xl bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white border border-slate-700 transition-colors"
-                        title="Buka Editor Form Builder V1.0"
-                      >
-                        <Icon name="pencil" className="w-4 h-4" />
-                      </Link>
-
-                      {/* Delete Button */}
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteForm(form.id, form.title)}
-                        className="p-2 rounded-xl bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-300 border border-slate-700 hover:border-rose-800 transition-colors"
-                        title="Hapus Kuesioner V1.0"
-                      >
-                        <Icon name="trash" className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
+            {filteredForms.map((form) => (
+              <FormCard
+                key={form.id}
+                form={form}
+                isDuplicating={isDuplicating === form.id}
+                onCopyCode={copyFormCode}
+                onToggleStatus={handleToggleStatus}
+                onPreview={setPreviewForm}
+                onDuplicate={handleDuplicateForm}
+                onDelete={handleDeleteForm}
+              />
+            ))}
           </div>
         ) : (
           /* TABLE VIEW */
@@ -437,107 +255,18 @@ export default function LegacyFormsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/80">
-                  {filteredForms.map((form) => {
-                    const isPublished = form.status === 'published'
-
-                    return (
-                      <tr key={form.id} className="hover:bg-slate-800/40 transition-colors">
-                        <td className="px-5 py-4 space-y-0.5 max-w-xs">
-                          <div className="font-bold text-slate-100 text-sm truncate">{form.title || 'Formulir V1.0'}</div>
-                          <button
-                            type="button"
-                            onClick={() => copyFormCode(form.code || form.id || '')}
-                            className="font-mono text-[11px] text-indigo-400 hover:underline flex items-center gap-1"
-                            title="Klik untuk salin kode"
-                          >
-                            <span>Kode: {form.code || form.id}</span>
-                            <Icon name="copy" className="w-3 h-3 text-indigo-400/70" />
-                          </button>
-                        </td>
-
-                        <td className="px-5 py-4 space-y-0.5">
-                          <div className="text-slate-200 font-semibold">{form.category || 'Umum'}</div>
-                          <div className="text-[11px] text-slate-400">{form.target || 'Masyarakat'}</div>
-                        </td>
-
-                        <td className="px-5 py-4">
-                          <span
-                            className={`px-2.5 py-1 rounded-md text-[11px] font-extrabold uppercase border ${
-                              isPublished
-                                ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
-                                : 'bg-amber-500/10 text-amber-300 border-amber-500/30'
-                            }`}
-                          >
-                            {form.status}
-                          </span>
-                        </td>
-
-                        <td className="px-5 py-4 text-slate-400 font-mono">
-                          {form.questions?.length || 0} Pertanyaan
-                        </td>
-
-                        <td className="px-5 py-4 font-mono font-bold text-emerald-400">
-                          {form.filledCount || 0} pengisian
-                        </td>
-
-                        <td className="px-5 py-4 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <button
-                              type="button"
-                              onClick={() => handleToggleStatus(form.id, form.status)}
-                              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold"
-                            >
-                              {isPublished ? 'Ubah ke Draft' : 'Publikasikan'}
-                            </button>
-
-                            {/* Preview Button */}
-                            <button
-                              type="button"
-                              onClick={() => setPreviewForm(form)}
-                              className="p-2 rounded-xl bg-slate-800 hover:bg-cyan-600/30 text-slate-300 hover:text-cyan-300 border border-slate-700 transition-colors"
-                              title="Pratinjau Kuesioner (Preview)"
-                            >
-                              <Icon name="eye" className="w-4 h-4 text-cyan-400" />
-                            </button>
-
-                            {/* Duplicate / Salin Button */}
-                            <button
-                              type="button"
-                              onClick={() => handleDuplicateForm(form)}
-                              disabled={isDuplicating === form.id}
-                              className="p-2 rounded-xl bg-slate-800 hover:bg-purple-600/30 text-slate-300 hover:text-purple-300 border border-slate-700 transition-colors disabled:opacity-50"
-                              title="Duplikasi / Salin Kuesioner"
-                            >
-                              {isDuplicating === form.id ? (
-                                <Icon name="loader" className="w-4 h-4 text-purple-400 animate-spin" />
-                              ) : (
-                                <Icon name="copy" className="w-4 h-4 text-purple-400" />
-                              )}
-                            </button>
-
-                            {/* Edit Button */}
-                            <Link
-                              href={`/dashboard/form-builder?id=${form.id}`}
-                              className="p-2 rounded-xl bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white border border-slate-700 transition-colors"
-                              title="Edit Form V1.0"
-                            >
-                              <Icon name="pencil" className="w-4 h-4" />
-                            </Link>
-
-                            {/* Delete Button */}
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteForm(form.id, form.title)}
-                              className="p-2 rounded-xl bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-300 border border-slate-700 hover:border-rose-800 transition-colors"
-                              title="Hapus Form V1.0"
-                            >
-                              <Icon name="trash" className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
+                  {filteredForms.map((form) => (
+                    <FormTableRow
+                      key={form.id}
+                      form={form}
+                      isDuplicating={isDuplicating === form.id}
+                      onCopyCode={copyFormCode}
+                      onToggleStatus={handleToggleStatus}
+                      onPreview={setPreviewForm}
+                      onDuplicate={handleDuplicateForm}
+                      onDelete={handleDeleteForm}
+                    />
+                  ))}
                 </tbody>
               </table>
             </div>
