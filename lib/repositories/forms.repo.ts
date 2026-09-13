@@ -53,21 +53,7 @@ export const getForms = async (): Promise<FormData[]> => {
   try {
     const formsRef = collection(firestore, 'forms')
     const snapshot = await getDocs(formsRef)
-    const legacyForms = snapshot.docs.map((doc) => deserializeFormData(doc))
-
-    try {
-      const v15Ref = collection(firestore, 'v1_5_forms')
-      const v15Snap = await getDocs(v15Ref)
-      v15Snap.docs.forEach((docSnap) => {
-        if (!legacyForms.some((f) => f.id === docSnap.id)) {
-          legacyForms.push(deserializeFormData(docSnap))
-        }
-      })
-    } catch {
-      // Gracefully ignore if v1_5_forms collection does not exist
-    }
-
-    return legacyForms
+    return snapshot.docs.map((doc) => deserializeFormData(doc))
   } catch (error) {
     console.error('Error getting forms:', error)
     throw error
@@ -93,11 +79,6 @@ export const getFormById = async (formId: string): Promise<FormData | null> => {
     if (docSnap.exists()) {
       return deserializeFormData(docSnap)
     }
-    const v15Ref = doc(firestore, 'v1_5_forms', formId)
-    const v15Snap = await getDoc(v15Ref)
-    if (v15Snap.exists()) {
-      return deserializeFormData(v15Snap)
-    }
     return null
   } catch (error) {
     console.error('Error getting form by id:', error)
@@ -112,12 +93,6 @@ export const getFormByCode = async (code: string): Promise<FormData | null> => {
     const snapshot = await getDocs(q)
     if (!snapshot.empty) {
       return deserializeFormData(snapshot.docs[0])
-    }
-    const v15Ref = collection(firestore, 'v1_5_forms')
-    const q15 = query(v15Ref, where('code', '==', code))
-    const snap15 = await getDocs(q15)
-    if (!snap15.empty) {
-      return deserializeFormData(snap15.docs[0])
     }
     return null
   } catch (error) {
@@ -137,16 +112,6 @@ export const getPublishedFormByCode = async (code: string): Promise<FormData | n
     const snapshot = await getDocs(q)
     if (!snapshot.empty) {
       return deserializeFormData(snapshot.docs[0])
-    }
-    const v15Ref = collection(firestore, 'v1_5_forms')
-    const q15 = query(
-      v15Ref,
-      where('code', '==', code),
-      where('status', '==', 'published')
-    )
-    const snap15 = await getDocs(q15)
-    if (!snap15.empty) {
-      return deserializeFormData(snap15.docs[0])
     }
     return null
   } catch (error) {
@@ -198,10 +163,6 @@ export const deleteForm = async (formId: string): Promise<void> => {
   try {
     const docRef = doc(firestore, 'forms', formId)
     await deleteDoc(docRef)
-    try {
-      const v15Ref = doc(firestore, 'v1_5_forms', formId)
-      await deleteDoc(v15Ref)
-    } catch (_) {}
   } catch (error) {
     console.error('Error deleting form:', error)
     throw error

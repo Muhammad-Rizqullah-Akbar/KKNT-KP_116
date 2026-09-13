@@ -37,11 +37,8 @@ export async function getFormAndDistributionOptions(): Promise<{
   distributions: DistributionOptionMeta[]
 }> {
   try {
-    const [rawForms, rawV15Forms, rawGroups, rawV15Distributions, rawDistributions, rawUsers] = await Promise.all([
+    const [rawForms, rawDistributions, rawUsers] = await Promise.all([
       safeGetCollectionDocs('forms'),
-      safeGetCollectionDocs('v1_5_forms'),
-      safeGetCollectionDocs('formGroups'),
-      safeGetCollectionDocs('v1_5_distributions'),
       safeGetCollectionDocs('distributions'),
       safeGetCollectionDocs('users'),
     ])
@@ -65,28 +62,6 @@ export async function getFormAndDistributionOptions(): Promise<{
         title: title.replace(/^form_[\w\-]+/g, 'Formulir Evaluasi Pangan'),
         versionNumber: 1.0,
         versionLabel: 'V1.0 Legacy',
-      })
-    })
-
-    rawV15Forms.forEach((d) => {
-      const title = d.data.metadata?.title || d.data.title || d.data.name || 'Formulir Evaluasi Pangan'
-      const versionNumber = d.data.activeVersionNumber || 1.5
-      formsList.push({
-        formId: d.id,
-        title: title.replace(/^form_[\w\-]+/g, 'Formulir Evaluasi Pangan'),
-        versionNumber,
-        versionLabel: `V1.5 (v${versionNumber})`,
-      })
-    })
-
-    rawGroups.forEach((d) => {
-      const title = d.data.title || d.data.name || d.data.code || 'Kelompok Kader'
-      distList.push({
-        distributionId: d.id,
-        code: d.data.code || 'V1-GROUP',
-        title: title.replace(/^dist_[\w\-]+/g, 'Kelompok Kader'),
-        ownerName: 'Admin System',
-        ownerType: 'super_admin',
       })
     })
 
@@ -128,7 +103,6 @@ export async function getFormAndDistributionOptions(): Promise<{
       })
     }
 
-    rawV15Distributions.forEach(processDistDoc)
     rawDistributions.forEach(processDistDoc)
 
     return {
@@ -243,11 +217,6 @@ export async function deleteResponseDoc(responseId: string): Promise<void> {
     await safeDeleteDoc(RESPONSES_COLLECTION, responseId)
   } catch (e) {
     console.warn(`safeDeleteDoc warning for ${RESPONSES_COLLECTION}:`, e)
-  }
-  try {
-    await safeDeleteDoc('v1_5_responses', responseId)
-  } catch (e) {
-    console.warn('safeDeleteDoc warning for v1_5_responses:', e)
   }
 }
 

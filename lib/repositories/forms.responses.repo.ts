@@ -144,18 +144,6 @@ export const getAllResponses = async (): Promise<FormResponse[]> => {
       ...doc.data(),
     })) as FormResponse[]
 
-    try {
-      const v15Ref = collection(firestore, 'v1_5_responses')
-      const v15Snap = await getDocs(query(v15Ref, orderBy('submittedAt', 'desc')))
-      v15Snap.docs.forEach((docSnap) => {
-        if (!list.some((r) => r.id === docSnap.id)) {
-          list.push({ id: docSnap.id, ...docSnap.data() } as any)
-        }
-      })
-    } catch {
-      // Gracefully ignore if v1_5_responses does not exist
-    }
-
     list.sort((a, b) => {
       const tA = new Date(a.submittedAt || (a as any).createdAt || 0).getTime()
       const tB = new Date(b.submittedAt || (b as any).createdAt || 0).getTime()

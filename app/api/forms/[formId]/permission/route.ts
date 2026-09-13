@@ -28,12 +28,9 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     const body = await request.json()
     const { allowCadreDistribution, activeVersionId, activeVersionNumber } = body
 
-    const [existing, existingV15] = await Promise.all([
-      safeGetDoc('forms', formId),
-      safeGetDoc('v1_5_forms', formId),
-    ])
+    const existing = await safeGetDoc('forms', formId)
 
-    const currentData = existingV15?.data || existing?.data || {}
+    const currentData = existing?.data || {}
     const newCadrePerm = typeof allowCadreDistribution === 'boolean' ? allowCadreDistribution : (currentData.allowCadreDistribution ?? true)
     const newVersionId = activeVersionId || currentData.activeVersionId
     const newVersionNumber = activeVersionNumber || currentData.activeVersionNumber
@@ -52,10 +49,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       updatedBy: authContext.uid,
     }
 
-    await Promise.all([
-      safeSetDoc('v1_5_forms', formId, updatedData),
-      safeSetDoc('forms', formId, updatedData),
-    ])
+    await safeSetDoc('forms', formId, updatedData)
 
     return NextResponse.json({
       success: true,

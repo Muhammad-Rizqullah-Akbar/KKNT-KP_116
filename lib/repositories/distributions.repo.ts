@@ -159,9 +159,4 @@ export async function deleteDistributionDoc(distributionId: string): Promise<voi
   } catch (e) {
     console.warn(`safeDeleteDoc warning for ${DISTRIBUTIONS_COLLECTION}:`, e)
   }
-  try {
-    await safeDeleteDoc('v1_5_distributions', distributionId)
-  } catch (e) {
-    console.warn('safeDeleteDoc warning for v1_5_distributions:', e)
-  }
 }

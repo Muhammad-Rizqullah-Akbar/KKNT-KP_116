@@ -16,26 +16,9 @@ export async function getFormAggregateFromDb(formId: string): Promise<FormAggreg
   const norm = (formId || '').trim().toUpperCase()
   let docObj = await safeGetDoc(FORMS_COLLECTION, formId)
   if (!docObj) {
-    docObj = await safeGetDoc('v1_5_forms', formId)
-  }
-  if (!docObj) {
     const allForms = await safeGetCollectionDocs(FORMS_COLLECTION)
     docObj =
       allForms.find(
-        (d) =>
-          d.id === formId ||
-          d.data?.formId === formId ||
-          d.data?.code === formId ||
-          (d.data?.code && d.data.code.toUpperCase() === norm) ||
-          (d.data?.normalizedCode && d.data.normalizedCode === norm) ||
-          (d.data?.posttestCode && d.data.posttestCode.toUpperCase() === norm) ||
-          (d.data?.pretestCode && d.data.pretestCode.toUpperCase() === norm)
-      ) || null
-  }
-  if (!docObj) {
-    const allV15 = await safeGetCollectionDocs('v1_5_forms')
-    docObj =
-      allV15.find(
         (d) =>
           d.id === formId ||
           d.data?.formId === formId ||
@@ -60,15 +43,8 @@ export async function listFormAggregatesFromDb(options?: {
   search?: string
 }): Promise<FormAggregateDoc[]> {
   const docs1 = await safeGetCollectionDocs(FORMS_COLLECTION)
-  const docs2 = await safeGetCollectionDocs('v1_5_forms')
 
-  const combinedMap = new Map<string, { id: string; data: any }>()
-  docs1.forEach((d) => combinedMap.set(d.id, d))
-  docs2.forEach((d) => {
-    if (!combinedMap.has(d.id)) combinedMap.set(d.id, d)
-  })
-
-  const docs = Array.from(combinedMap.values())
+  const docs = docs1
   let forms = docs.map((doc) => normalizeFormAggregate(doc.id, doc.data))
 
   if (options?.status && options.status !== 'all') {

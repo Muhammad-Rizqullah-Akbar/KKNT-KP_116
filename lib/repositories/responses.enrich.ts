@@ -9,12 +9,9 @@ import { cleanString, calculateScoreWithV1Engine, mapAnswersToHumanReadable } fr
  */
 export async function enrichResponsesWithFormScoring(docs: ResponseDoc[]): Promise<ResponseDoc[]> {
   try {
-    const [rawForms, rawV15Forms, rawGroups, rawV15Distributions, rawDistributions, rawUsers] =
+    const [rawForms, rawDistributions, rawUsers] =
       await Promise.all([
         safeGetCollectionDocs('forms'),
-        safeGetCollectionDocs('v1_5_forms'),
-        safeGetCollectionDocs('formGroups'),
-        safeGetCollectionDocs('v1_5_distributions'),
         safeGetCollectionDocs('distributions'),
         safeGetCollectionDocs('users'),
       ])
@@ -29,7 +26,6 @@ export async function enrichResponsesWithFormScoring(docs: ResponseDoc[]): Promi
     })
 
     const formMap: Record<string, any> = {}
-    const groupMap: Record<string, any> = {}
     const distMap: Record<string, any> = {}
 
     rawForms.forEach((d) => {
@@ -41,12 +37,6 @@ export async function enrichResponsesWithFormScoring(docs: ResponseDoc[]): Promi
         formMap[cleanString(d.data.title)] = item
       }
     })
-    rawV15Forms.forEach((d) => {
-      formMap[d.id] = { id: d.id, ...d.data }
-    })
-    rawGroups.forEach((d) => {
-      groupMap[d.id] = d.data.title || d.data.name || d.data.code
-    })
 
     const mapDistDoc = (d: { id: string; data: any }) => {
       distMap[d.id] = { id: d.id, ...d.data }
@@ -54,7 +44,6 @@ export async function enrichResponsesWithFormScoring(docs: ResponseDoc[]): Promi
       if (d.data.distributionCode) distMap[d.data.distributionCode] = { id: d.id, ...d.data }
     }
 
-    rawV15Distributions.forEach(mapDistDoc)
     rawDistributions.forEach(mapDistDoc)
 
     return docs.map((doc) => {
@@ -71,9 +60,6 @@ export async function enrichResponsesWithFormScoring(docs: ResponseDoc[]): Promi
 
       const distributionCode = doc.distributionCode || dist.code || 'V1-DIST'
       let rawDistTitle = dist.title || dist.targetGroup
-      if (!rawDistTitle && form?.groupId && groupMap[form.groupId]) {
-        rawDistTitle = groupMap[form.groupId]
-      }
       if (!rawDistTitle) {
         rawDistTitle = 'Pendampingan Kader Lapangan'
       }
