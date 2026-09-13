@@ -21,7 +21,8 @@ import { ref, uploadBytes, getDownloadURL, listAll } from 'firebase/storage'
 import { SmartUploadArticleModal } from '@/features/dashboard/components/modals/SmartUploadArticleModal'
 import { exportArticleToJson } from '@/lib/domain/articles/smart-article-parser'
 import { queryKeys } from '@/lib/query-keys'
-import { TOAST_DURATION_MS, TOAST_DURATION_LONG_MS, VIEW_COOLDOWN_MS } from '@/lib/constants'
+import { TOAST_DURATION_LONG_MS } from '@/lib/constants'
+import { useToast } from '@/lib/hooks/use-toast'
 
 // ============ TIPE DATA & KONSTANTA ============
 type GalleryImage = { id: string; url?: string; caption: string; gradient: string }
@@ -50,6 +51,9 @@ type Article = {
   featuredImage: string
   tags: string[]
   gallery: GalleryImage[]
+  embeddedDistributionCode?: string
+  pretestCode?: string
+  posttestCode?: string
 }
 
 type MediaItem = { name: string; url: string }
@@ -115,8 +119,7 @@ export default function ArticlesAdminPage() {
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null)
   const [articleToDeleteId, setArticleToDeleteId] = useState<string | null>(null)
   const [isEditing, setIsEditing] = useState(false)
-  const [showSuccess, setShowSuccess] = useState(false)
-  const [successMessage, setSuccessMessage] = useState('')
+  const { visible: showSuccess, message: successMessage, show: showToast } = useToast()
   const [uploadingImage, setUploadingImage] = useState(false)
 
   // Hamburger Popover TOC Dropdown State
@@ -215,9 +218,7 @@ export default function ArticlesAdminPage() {
   const handleConfirmCloseSaveDraft = () => {
     setIsConfirmCloseOpen(false)
     setIsModalOpen(false)
-    setSuccessMessage('Draft artikel sementara Anda aman tersimpan di browser!')
-    setShowSuccess(true)
-    setTimeout(() => setShowSuccess(false), TOAST_DURATION_MS)
+    showToast('Draft artikel sementara Anda aman tersimpan di browser!')
   }
 
   const handleConfirmCloseDiscardDraft = () => {
@@ -244,7 +245,7 @@ export default function ArticlesAdminPage() {
   }
 
   const toggleSelectAllCurrentPage = (currentList: Article[]) => {
-    const validIds = currentList.map((a) => a.id).filter((id): id is string => Boolean(id))
+    const validIds = currentList.map((article) => article.id).filter((id): id is string => Boolean(id))
     const allSelected = validIds.every((id) => selectedArticleIds.includes(id))
 
     if (allSelected) {
@@ -259,12 +260,10 @@ export default function ArticlesAdminPage() {
     setIsBulkDeleting(true)
     try {
       await Promise.all(selectedArticleIds.map((id) => deleteArticle(id)))
-      setSuccessMessage(`${selectedArticleIds.length} artikel berhasil dihapus secara massal!`)
-      setShowSuccess(true)
+      showToast(`${selectedArticleIds.length} artikel berhasil dihapus secara massal!`)
       setSelectedArticleIds([])
       setIsBulkDeleteModalOpen(false)
       queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.articles(user?.uid, userData?.role) })
-      setTimeout(() => setShowSuccess(false), TOAST_DURATION_MS)
     } catch (err: any) {
       console.error('Gagal menghapus secara massal:', err)
       alert('Gagal menghapus beberapa artikel.')
@@ -296,35 +295,35 @@ export default function ArticlesAdminPage() {
     if (!articlesQuery.data) return null
     const { data, catData, formsList } = articlesQuery.data
 
-    const fetchedForms = formsList.map((f: any) => ({
-      id: f.id || '',
-      code: f.code || f.id || '',
-      title: f.title || 'Form Kuesioner',
+    const fetchedForms = formsList.map((form) => ({
+      id: form.id || '',
+      code: form.code || form.id || '',
+      title: form.title || 'Form Kuesioner',
     }))
-    const fetchedCatNames = catData.map((c) => c.name).filter(Boolean)
-    const articleCatNames = data.map((d) => d.category).filter(Boolean)
+    const fetchedCatNames = catData.map((category) => category.name).filter(Boolean)
+    const articleCatNames = data.map((article) => article.category).filter(Boolean)
     const mergedCategories = Array.from(new Set([...fetchedCatNames, ...articleCatNames, ...extraCategories, 'Keamanan Pangan', 'Edukasi']))
 
-    let formattedData = data.map((doc: any) => ({
-      id: doc.id,
-      authorUid: doc.authorUid || doc.authorId || doc.createdBy || '',
-      title: doc.title || '',
-      slug: doc.slug || '',
-      author: doc.author || '',
-      authorBio: doc.authorBio || '',
-      category: doc.category || (mergedCategories[0] || 'Keamanan Pangan'),
-      status: doc.status || 'Draft',
-      views: doc.views || 0,
-      date: doc.date || doc.createdAt || new Date().toISOString(),
-      readTime: doc.readTime || 5,
-      excerpt: doc.excerpt || '',
-      content: doc.content || '',
-      featuredImage: doc.featuredImage || '',
-      tags: Array.isArray(doc.tags) ? doc.tags : [],
-      gallery: Array.isArray(doc.gallery) ? doc.gallery : [],
-      embeddedDistributionCode: doc.embeddedDistributionCode || '',
-      pretestCode: doc.pretestCode || '',
-      posttestCode: doc.posttestCode || doc.embeddedDistributionCode || '',
+    let formattedData = data.map((article) => ({
+      id: article.id,
+      authorUid: article.authorUid || article.authorId || article.createdBy || '',
+      title: article.title || '',
+      slug: article.slug || '',
+      author: article.author || '',
+      authorBio: article.authorBio || '',
+      category: article.category || (mergedCategories[0] || 'Keamanan Pangan'),
+      status: article.status || 'Draft',
+      views: article.views || 0,
+      date: article.date || article.createdAt || new Date().toISOString(),
+      readTime: article.readTime || 5,
+      excerpt: article.excerpt || '',
+      content: article.content || '',
+      featuredImage: article.featuredImage || '',
+      tags: Array.isArray(article.tags) ? article.tags : [],
+      gallery: Array.isArray(article.gallery) ? article.gallery : [],
+      embeddedDistributionCode: article.embeddedDistributionCode || '',
+      pretestCode: article.pretestCode || '',
+      posttestCode: article.posttestCode || article.embeddedDistributionCode || '',
     }))
 
     // Strictly filter to author's own articles if user has cadre role
@@ -333,9 +332,9 @@ export default function ArticlesAdminPage() {
       const userEmail = (user?.email || '').toLowerCase().trim()
       const userDisplayName = (userData?.displayName || '').toLowerCase().trim()
 
-      formattedData = formattedData.filter((a: any) => {
-        if (a.authorUid && userUid && a.authorUid === userUid) return true
-        const authLower = String(a.author || '').toLowerCase().trim()
+      formattedData = formattedData.filter((article) => {
+        if (article.authorUid && userUid && article.authorUid === userUid) return true
+        const authLower = String(article.author || '').toLowerCase().trim()
         if (userEmail && authLower === userEmail) return true
         if (userDisplayName && userDisplayName.length > 2 && authLower === userDisplayName) return true
         return false
@@ -381,9 +380,7 @@ export default function ArticlesAdminPage() {
       setUploadingImage(true)
       const res = await uploadOptimizedArticleImage(file, 'articles')
       fetchMediaLibrary()
-      setSuccessMessage(`⚡ Gambar terkompresi otomatis (${res.savedPercent}% hemat storage)!`)
-      setShowSuccess(true)
-      setTimeout(() => setShowSuccess(false), TOAST_DURATION_LONG_MS)
+      showToast(`⚡ Gambar terkompresi otomatis (${res.savedPercent}% hemat storage)!`, TOAST_DURATION_LONG_MS)
       return res.url
     } catch (error) {
       console.error('Gagal mengunggah file:', error)
@@ -454,10 +451,10 @@ export default function ArticlesAdminPage() {
 
   const stats = useMemo(() => {
     const total = articles.length
-    const published = articles.filter(a => a.status === 'Published').length
-    const draft = articles.filter(a => a.status === 'Draft').length
-    const views = articles.reduce((acc, a) => acc + (a.views || 0), 0)
-    const categories = new Set(articles.map(a => a.category)).size
+    const published = articles.filter(article => article.status === 'Published').length
+    const draft = articles.filter(article => article.status === 'Draft').length
+    const views = articles.reduce((acc, article) => acc + (article.views || 0), 0)
+    const categories = new Set(articles.map(article => article.category)).size
     return { total, published, draft, views, categories }
   }, [articles])
 
@@ -557,18 +554,18 @@ export default function ArticlesAdminPage() {
       const blocks: ContentBlock[] = []
       if (Array.isArray(parsed.blocks)) {
         for (let idx = 0; idx < parsed.blocks.length; idx++) {
-          const b = parsed.blocks[idx]
-          let imageUrl = b.imageUrl || ''
+          const block = parsed.blocks[idx]
+          let imageUrl = block.imageUrl || ''
           if (imageUrl.startsWith('data:image')) {
             imageUrl = await autoUploadBase64ToStorage(imageUrl, `block_${idx}`)
           }
           blocks.push({
-            id: b.id || `b_${Date.now()}_${idx}`,
-            type: ['p', 'h2', 'quote', 'list', 'image'].includes(b.type) ? b.type : 'p',
-            value: b.value || '',
-            quoteAuthor: b.quoteAuthor || '',
+            id: block.id || `b_${Date.now()}_${idx}`,
+            type: ['p', 'h2', 'quote', 'list', 'image'].includes(block.type) ? block.type : 'p',
+            value: block.value || '',
+            quoteAuthor: block.quoteAuthor || '',
             imageUrl,
-            imageCaption: b.imageCaption || '',
+            imageCaption: block.imageCaption || '',
           })
         }
       } else {
@@ -581,15 +578,15 @@ export default function ArticlesAdminPage() {
       const gallery: GalleryImage[] = []
       if (Array.isArray(parsed.gallery)) {
         for (let idx = 0; idx < parsed.gallery.length; idx++) {
-          const g = parsed.gallery[idx]
-          let url = g.url || ''
+          const image = parsed.gallery[idx]
+          let url = image.url || ''
           if (url.startsWith('data:image')) {
             url = await autoUploadBase64ToStorage(url, `gallery_${idx}`)
           }
           gallery.push({
-            id: g.id || `g_${Date.now()}_${idx}`,
+            id: image.id || `g_${Date.now()}_${idx}`,
             url,
-            caption: g.caption || 'Foto dokumentasi',
+            caption: image.caption || 'Foto dokumentasi',
             gradient: galleryGradients[idx % galleryGradients.length],
           })
         }
@@ -622,24 +619,24 @@ export default function ArticlesAdminPage() {
         })
       }
 
-      blocks.forEach((b, idx) => {
-        if (b.imageUrl && (b.imageUrl.startsWith('MARK:') || b.imageUrl === 'MARK')) {
+      blocks.forEach((block, idx) => {
+        if (block.imageUrl && (block.imageUrl.startsWith('MARK:') || block.imageUrl === 'MARK')) {
           foundMarkers.push({
-            key: b.imageUrl,
-            label: `Gambar/Infografis Blok #${idx + 1} (${b.imageCaption || b.imageUrl})`,
+            key: block.imageUrl,
+            label: `Gambar/Infografis Blok #${idx + 1} (${block.imageCaption || block.imageUrl})`,
             targetType: 'block',
-            blockId: b.id,
+            blockId: block.id,
           })
         }
       })
 
-      gallery.forEach((g, idx) => {
-        if (g.url && (g.url.startsWith('MARK:') || g.url === 'MARK')) {
+      gallery.forEach((image, idx) => {
+        if (image.url && (image.url.startsWith('MARK:') || image.url === 'MARK')) {
           foundMarkers.push({
-            key: g.url,
-            label: `Foto Galeri Dokumentasi #${idx + 1} (${g.caption || g.url})`,
+            key: image.url,
+            label: `Foto Galeri Dokumentasi #${idx + 1} (${image.caption || image.url})`,
             targetType: 'gallery',
-            galleryId: g.id,
+            galleryId: image.id,
           })
         }
       })
@@ -711,12 +708,12 @@ export default function ArticlesAdminPage() {
       })
       const blob = new Blob([jsonStr], { type: 'application/json' })
       const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `${(article.slug || 'artikel_edukasi').replace(/[^a-z0-9]/gi, '_')}.json`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = `${(article.slug || 'artikel_edukasi').replace(/[^a-z0-9]/gi, '_')}.json`
+      document.body.appendChild(anchor)
+      anchor.click()
+      document.body.removeChild(anchor)
       URL.revokeObjectURL(url)
     } catch (err: any) {
       alert('Gagal mengekspor artikel: ' + err.message)
@@ -747,9 +744,9 @@ export default function ArticlesAdminPage() {
           if (marker.targetType === 'featured') {
             updatedFeatured = finalUrl
           } else if (marker.targetType === 'block' && marker.blockId) {
-            updatedBlocks = updatedBlocks.map((b) => (b.id === marker.blockId ? { ...b, imageUrl: finalUrl } : b))
+            updatedBlocks = updatedBlocks.map((block) => (block.id === marker.blockId ? { ...block, imageUrl: finalUrl } : block))
           } else if (marker.targetType === 'gallery' && marker.galleryId) {
-            updatedGallery = updatedGallery.map((g) => (g.id === marker.galleryId ? { ...g, url: finalUrl } : g))
+            updatedGallery = updatedGallery.map((image) => (image.id === marker.galleryId ? { ...image, url: finalUrl } : image))
           }
         }
       }
@@ -773,10 +770,10 @@ export default function ArticlesAdminPage() {
   const downloadJsonTemplate = () => {
     const blob = new Blob([JSON.stringify(sampleJsonTemplate, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'template_artikel_edukasi.json'
-    a.click()
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = 'template_artikel_edukasi.json'
+    anchor.click()
     URL.revokeObjectURL(url)
   }
 
@@ -793,9 +790,7 @@ export default function ArticlesAdminPage() {
           if (parsed && parsed.formData && !parsed.isEditing) {
             setFormData(parsed.formData)
             setIsModalOpen(true)
-            setSuccessMessage('Draft artikel sementara sebelumnya berhasil dipulihkan!')
-            setShowSuccess(true)
-            setTimeout(() => setShowSuccess(false), TOAST_DURATION_MS)
+            showToast('Draft artikel sementara sebelumnya berhasil dipulihkan!')
             return
           }
         } catch (e) {
@@ -805,7 +800,7 @@ export default function ArticlesAdminPage() {
     }
 
     setFormData({
-      title: 'Judul Artikel Edukasi Baru', category: 'Teknologi', author: userData?.displayName || user?.email || 'Kader Edukator', authorBio: (userData as any)?.organization || 'Kader Edukator BPOM', status: 'Draft',
+      title: 'Judul Artikel Edukasi Baru', category: 'Teknologi', author: userData?.displayName || user?.email || 'Kader Edukator', authorBio: userData?.organization || 'Kader Edukator BPOM', status: 'Draft',
       readTime: 5, featuredImage: '', excerpt: 'Tuliskan ringkasan singkat artikel edukasi di sini...', tags: '#Pangan, #Edukasi', embeddedDistributionCode: '', pretestCode: '', posttestCode: '', gallery: [],
       blocks: [
         { id: 'b1', type: 'h2', value: '1. Pendahuluan Keamanan Pangan' },
@@ -827,9 +822,7 @@ export default function ArticlesAdminPage() {
           if (parsed && parsed.formData && parsed.isEditing && parsed.selectedArticleId === article.id) {
             setFormData(parsed.formData)
             setIsModalOpen(true)
-            setSuccessMessage('Draft editan artikel sementara berhasil dipulihkan!')
-            setShowSuccess(true)
-            setTimeout(() => setShowSuccess(false), TOAST_DURATION_MS)
+            showToast('Draft editan artikel sementara berhasil dipulihkan!')
             return
           }
         } catch (e) {
@@ -848,9 +841,9 @@ export default function ArticlesAdminPage() {
       featuredImage: article.featuredImage || '',
       excerpt: article.excerpt || '',
       tags: article.tags ? article.tags.join(', ') : '',
-      embeddedDistributionCode: (article as any).embeddedDistributionCode || '',
-      pretestCode: (article as any).pretestCode || '',
-      posttestCode: (article as any).posttestCode || (article as any).embeddedDistributionCode || '',
+      embeddedDistributionCode: article.embeddedDistributionCode || '',
+      pretestCode: article.pretestCode || '',
+      posttestCode: article.posttestCode || article.embeddedDistributionCode || '',
       gallery: article.gallery || [],
       blocks: htmlToBlocks(article.content),
     })
@@ -874,16 +867,16 @@ export default function ArticlesAdminPage() {
         slug: formData.title.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
         category: formData.category,
         author: formData.author || userData?.displayName || user?.email || 'Penulis KKPD-KP',
-        authorBio: formData.authorBio || (userData as any)?.organization || 'BPOM / Cadre Edukator',
+        authorBio: formData.authorBio || userData?.organization || 'BPOM / Cadre Edukator',
         authorUid: user?.uid || '',
         authorRole: userData?.role || 'public',
-        authorOrganization: (userData as any)?.organization || (userData as any)?.partnershipName || '',
+        authorOrganization: userData?.organization || (userData as any)?.partnershipName || '',
         status: finalStatus,
         readTime: formData.readTime,
         featuredImage: formData.featuredImage,
         excerpt: formData.excerpt,
         content: compiledContent,
-        tags: formData.tags.split(',').map(t => t.trim()).filter(t => t),
+        tags: formData.tags.split(',').map(tag => tag.trim()).filter(tag => tag),
         embeddedDistributionCode: formData.posttestCode?.trim() || formData.embeddedDistributionCode?.trim() || '',
         pretestCode: formData.pretestCode?.trim() || '',
         posttestCode: formData.posttestCode?.trim() || formData.embeddedDistributionCode?.trim() || '',
@@ -893,10 +886,10 @@ export default function ArticlesAdminPage() {
 
       if (isEditing && selectedArticle && selectedArticle.id) {
         await updateArticle(selectedArticle.id, payload as Partial<ArticleData>)
-        setSuccessMessage('Artikel berhasil diperbarui!')
+        showToast('Artikel berhasil diperbarui!')
       } else {
         await createArticle({ ...payload, views: 0 } as ArticleData)
-        setSuccessMessage('Artikel baru berhasil dibuat!')
+        showToast('Artikel baru berhasil dibuat!')
       }
 
       if (typeof window !== 'undefined') {
@@ -904,9 +897,7 @@ export default function ArticlesAdminPage() {
       }
       setIsModalOpen(false)
       setIsPreviewOpen(false)
-      setShowSuccess(true)
       queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.articles(user?.uid, userData?.role) })
-      setTimeout(() => setShowSuccess(false), TOAST_DURATION_MS)
     } catch (error) {
       console.error('Gagal menyimpan:', error)
       alert('Gagal menyimpan ke database')
@@ -925,10 +916,8 @@ export default function ArticlesAdminPage() {
     if (articleToDeleteId) {
       try {
         await deleteArticle(articleToDeleteId)
-        setSuccessMessage('Artikel berhasil dihapus!')
-        setShowSuccess(true)
+        showToast('Artikel berhasil dihapus!')
         queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.articles(user?.uid, userData?.role) })
-        setTimeout(() => setShowSuccess(false), TOAST_DURATION_MS)
       } catch (error) {
         console.error('Gagal menghapus:', error)
       }
@@ -946,24 +935,24 @@ export default function ArticlesAdminPage() {
   }
 
   const updateBlockValue = (id: string, value: string) => {
-    setFormData(prev => ({ ...prev, blocks: prev.blocks.map(b => b.id === id ? { ...b, value } : b) }))
+    setFormData(prev => ({ ...prev, blocks: prev.blocks.map(block => block.id === id ? { ...block, value } : block) }))
   }
 
   const updateBlockAuthor = (id: string, quoteAuthor: string) => {
-    setFormData(prev => ({ ...prev, blocks: prev.blocks.map(b => b.id === id ? { ...b, quoteAuthor } : b) }))
+    setFormData(prev => ({ ...prev, blocks: prev.blocks.map(block => block.id === id ? { ...block, quoteAuthor } : block) }))
   }
 
   const updateBlockImageCaption = (id: string, imageCaption: string) => {
-    setFormData(prev => ({ ...prev, blocks: prev.blocks.map(b => b.id === id ? { ...b, imageCaption } : b) }))
+    setFormData(prev => ({ ...prev, blocks: prev.blocks.map(block => block.id === id ? { ...block, imageCaption } : block) }))
   }
 
   const removeBlock = (id: string) => {
     if (formData.blocks.length === 1) return
-    setFormData(prev => ({ ...prev, blocks: prev.blocks.filter(b => b.id !== id) }))
+    setFormData(prev => ({ ...prev, blocks: prev.blocks.filter(block => block.id !== id) }))
   }
 
   const moveBlock = (id: string, direction: 'up' | 'down') => {
-    const index = formData.blocks.findIndex(b => b.id === id)
+    const index = formData.blocks.findIndex(block => block.id === id)
     if (direction === 'up' && index === 0) return
     if (direction === 'down' && index === formData.blocks.length - 1) return
 
@@ -978,21 +967,21 @@ export default function ArticlesAdminPage() {
   const updateGalleryUrl = (id: string, url: string) => {
     setFormData(prev => ({
       ...prev,
-      gallery: prev.gallery.map(g => g.id === id ? { ...g, url } : g)
+      gallery: prev.gallery.map(image => image.id === id ? { ...image, url } : image)
     }))
   }
 
   const updateGalleryCaption = (id: string, caption: string) => {
     setFormData(prev => ({
       ...prev,
-      gallery: prev.gallery.map(g => g.id === id ? { ...g, caption } : g)
+      gallery: prev.gallery.map(image => image.id === id ? { ...image, caption } : image)
     }))
   }
 
   const removeGalleryImage = (id: string) => {
     setFormData(prev => ({
       ...prev,
-      gallery: prev.gallery.filter(g => g.id !== id)
+      gallery: prev.gallery.filter(image => image.id !== id)
     }))
   }
 
@@ -1008,10 +997,10 @@ export default function ArticlesAdminPage() {
   const formatDate = (dateStr: string) => dateStr ? new Date(dateStr).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) : ''
 
   const previewHeadings = useMemo(() => {
-    return formData.blocks.filter(b => b.type === 'h2' && b.value.trim() !== '').map((b, i) => ({
-      blockId: b.id,
+    return formData.blocks.filter(block => block.type === 'h2' && block.value.trim() !== '').map((block, i) => ({
+      blockId: block.id,
       id: `section-${i + 1}`,
-      text: b.value
+      text: block.value
     }))
   }, [formData.blocks])
 
@@ -1162,7 +1151,7 @@ export default function ArticlesAdminPage() {
                       type="checkbox"
                       checked={
                         paginatedArticles.length > 0 &&
-                        paginatedArticles.every((a) => a.id && selectedArticleIds.includes(a.id))
+                        paginatedArticles.every((article) => article.id && selectedArticleIds.includes(article.id))
                       }
                       onChange={() => toggleSelectAllCurrentPage(paginatedArticles)}
                       className="rounded border-slate-700 bg-slate-900 text-cyan-500 focus:ring-cyan-400 w-4 h-4 cursor-pointer"
@@ -1207,7 +1196,7 @@ export default function ArticlesAdminPage() {
                         <button onClick={() => handleEdit(article)} className="p-2 rounded-lg hover:bg-white/[0.05]" title="Edit Form">
                           <Icon name="pencil" className="w-4 h-4 text-white/50 hover:text-cyan-400" />
                         </button>
-                        <button onClick={() => { setSelectedArticle(article); setFormData({ title: article.title, category: article.category, author: article.author, authorBio: article.authorBio, status: article.status, readTime: article.readTime, featuredImage: article.featuredImage, excerpt: article.excerpt, tags: article.tags ? article.tags.join(', ') : '', embeddedDistributionCode: (article as any).embeddedDistributionCode || '', pretestCode: (article as any).pretestCode || '', posttestCode: (article as any).posttestCode || (article as any).embeddedDistributionCode || '', gallery: article.gallery || [], blocks: htmlToBlocks(article.content) }); setIsPreviewOpen(true); document.body.style.overflow = 'hidden'; }} className="p-2 rounded-lg hover:bg-white/[0.05]" title="Live Editor Preview">
+                        <button onClick={() => { setSelectedArticle(article); setFormData({ title: article.title, category: article.category, author: article.author, authorBio: article.authorBio, status: article.status, readTime: article.readTime, featuredImage: article.featuredImage, excerpt: article.excerpt, tags: article.tags ? article.tags.join(', ') : '', embeddedDistributionCode: article.embeddedDistributionCode || '', pretestCode: article.pretestCode || '', posttestCode: article.posttestCode || article.embeddedDistributionCode || '', gallery: article.gallery || [], blocks: htmlToBlocks(article.content) }); setIsPreviewOpen(true); document.body.style.overflow = 'hidden'; }} className="p-2 rounded-lg hover:bg-white/[0.05]" title="Live Editor Preview">
                           <Icon name="eye" className="w-4 h-4 text-white/50 hover:text-sky-400" />
                         </button>
                         <button onClick={() => handleExportArticleJson(article)} className="p-2 rounded-lg hover:bg-white/[0.05]" title="Unduh File Draf (.json)">
@@ -1603,7 +1592,7 @@ export default function ArticlesAdminPage() {
                                   const val = e.target.value
                                   setFormData(prev => ({
                                     ...prev,
-                                    blocks: prev.blocks.map(b => b.id === block.id ? { ...b, imageUrl: val } : b)
+                                    blocks: prev.blocks.map(item => item.id === block.id ? { ...item, imageUrl: val } : item)
                                   }))
                                 }}
                                 placeholder="URL gambar..."
@@ -1625,7 +1614,7 @@ export default function ArticlesAdminPage() {
                                         if (url) {
                                           setFormData(prev => ({
                                             ...prev,
-                                            blocks: prev.blocks.map(b => b.id === block.id ? { ...b, imageUrl: url } : b)
+                                            blocks: prev.blocks.map(item => item.id === block.id ? { ...item, imageUrl: url } : item)
                                           }))
                                         }
                                       }
@@ -1638,7 +1627,7 @@ export default function ArticlesAdminPage() {
                                   onClick={() => openMediaLibrary((url) => {
                                     setFormData(prev => ({
                                       ...prev,
-                                      blocks: prev.blocks.map(b => b.id === block.id ? { ...b, imageUrl: url } : b)
+                                      blocks: prev.blocks.map(item => item.id === block.id ? { ...item, imageUrl: url } : item)
                                     }))
                                   })}
                                   className="px-3 py-1.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] text-xs font-semibold text-white/80"
@@ -1855,16 +1844,16 @@ export default function ArticlesAdminPage() {
                     <span className="text-[10px] font-bold text-cyan-300 block">Form Kuesioner Pretest (Atas Artikel):</span>
                     {availableForms.length > 0 && (
                       <select
-                        value={availableForms.find((f) => f.code === formData.pretestCode || f.id === formData.pretestCode)?.code || ''}
+                        value={availableForms.find((form) => form.code === formData.pretestCode || form.id === formData.pretestCode)?.code || ''}
                         onChange={(e) => {
                           if (e.target.value) setFormData({ ...formData, pretestCode: e.target.value.toUpperCase() })
                         }}
                         className="w-full px-3 py-1.5 rounded-xl bg-slate-950 border border-cyan-500/30 text-cyan-300 text-xs focus:outline-none mb-1 cursor-pointer font-sans"
                       >
                         <option value="">-- Pilih Form Kuesioner Database --</option>
-                        {availableForms.map((f) => (
-                          <option key={`pre_${f.id}`} value={f.code} className="bg-[#0e0e1a]">
-                            {f.title} ({f.code})
+                        {availableForms.map((form) => (
+                          <option key={`pre_${form.id}`} value={form.code} className="bg-[#0e0e1a]">
+                            {form.title} ({form.code})
                           </option>
                         ))}
                       </select>
@@ -1883,7 +1872,7 @@ export default function ArticlesAdminPage() {
                     <span className="text-[10px] font-bold text-purple-300 block">Form Kuesioner Posttest (Bawah Artikel):</span>
                     {availableForms.length > 0 && (
                       <select
-                        value={availableForms.find((f) => f.code === formData.posttestCode || f.id === formData.posttestCode)?.code || ''}
+                        value={availableForms.find((form) => form.code === formData.posttestCode || form.id === formData.posttestCode)?.code || ''}
                         onChange={(e) => {
                           if (e.target.value) {
                             const val = e.target.value.toUpperCase()
@@ -1893,9 +1882,9 @@ export default function ArticlesAdminPage() {
                         className="w-full px-3 py-1.5 rounded-xl bg-slate-950 border border-purple-500/30 text-purple-300 text-xs focus:outline-none mb-1 cursor-pointer font-sans"
                       >
                         <option value="">-- Pilih Form Kuesioner Database --</option>
-                        {availableForms.map((f) => (
-                          <option key={`post_${f.id}`} value={f.code} className="bg-[#0e0e1a]">
-                            {f.title} ({f.code})
+                        {availableForms.map((form) => (
+                          <option key={`post_${form.id}`} value={form.code} className="bg-[#0e0e1a]">
+                            {form.title} ({form.code})
                           </option>
                         ))}
                       </select>
@@ -1950,13 +1939,13 @@ export default function ArticlesAdminPage() {
                       <p className="text-xs text-white/40 py-2">Belum ada H2 Sub-Judul pada artikel ini.</p>
                     ) : (
                       <div className="space-y-1 max-h-60 overflow-y-auto">
-                        {previewHeadings.map((h, i) => (
+                        {previewHeadings.map((heading, i) => (
                           <button
-                            key={h.blockId}
-                            onClick={() => scrollToHeadingBlock(h.blockId)}
+                            key={heading.blockId}
+                            onClick={() => scrollToHeadingBlock(heading.blockId)}
                             className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-white/70 hover:text-cyan-300 hover:bg-cyan-500/10 truncate font-mono block"
                           >
-                            {i + 1}. {h.text}
+                            {i + 1}. {heading.text}
                           </button>
                         ))}
                       </div>
@@ -2133,7 +2122,7 @@ export default function ArticlesAdminPage() {
                               <img src={block.imageUrl} alt="Media" className="w-full rounded-2xl border border-white/[0.08]" />
                             ) : (
                               <div className="w-full h-40 bg-white/[0.02] border border-dashed border-white/20 rounded-2xl flex items-center justify-center">
-                                <button onClick={() => openMediaLibrary((url) => setFormData(prev => ({ ...prev, blocks: prev.blocks.map(b => b.id === block.id ? { ...b, imageUrl: url } : b) })))} className="px-3 py-1.5 bg-cyan-600/30 text-cyan-300 text-xs rounded-lg">Pilih Foto</button>
+                                <button onClick={() => openMediaLibrary((url) => setFormData(prev => ({ ...prev, blocks: prev.blocks.map(item => item.id === block.id ? { ...item, imageUrl: url } : item) })))} className="px-3 py-1.5 bg-cyan-600/30 text-cyan-300 text-xs rounded-lg">Pilih Foto</button>
                               </div>
                             )}
                             <figcaption contentEditable suppressContentEditableWarning onBlur={(e) => updateBlockImageCaption(block.id, e.currentTarget.innerText)} className="text-center text-xs text-white/40 mt-2 italic editable-focus p-1">
