@@ -8,6 +8,7 @@ import { safeFetchJson } from '@/lib/infra/safe-fetch'
 import { Icon, type IconName } from '@/components/ui/Icons'
 import { Topbar } from '@/features/dashboard/components/layout/Topbar'
 import { queryKeys } from '@/lib/query-keys'
+import { useToast } from '@/lib/hooks'
 
 type UserRole = 'super_admin' | 'cadre' | 'partnership' | null
 
@@ -102,7 +103,7 @@ export default function UserManagementPage() {
   })
 
   const [error, setError] = useState<string | null>(null)
-  const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const { visible, message, show } = useToast()
 
   // Surface fetch errors (from useQuery) alongside mutation errors
   const displayError = error ?? (usersError ? (usersError as Error).message : null)
@@ -141,7 +142,7 @@ export default function UserManagementPage() {
 
   // Filtered Partnership list for Cadre assignment
   const partnershipUsers = useMemo(() => {
-    return users.filter((u) => u.role === 'partnership')
+    return users.filter((account) => account.role === 'partnership')
   }, [users])
 
   // Hierarchically Sorted Users List: super_admin -> admin -> internal_bpom -> (partnership -> cadre_mitra) -> independent_cadres
@@ -263,10 +264,9 @@ export default function UserManagementPage() {
         prev.filter((u) => u.uid !== selectedUser.uid)
       )
       setSelectedUids((prev) => prev.filter((id) => id !== selectedUser.uid))
-      setSuccessMessage(`✅ Akun ${selectedUser.email} berhasil dihapus.`)
+      show(`✅ Akun ${selectedUser.email} berhasil dihapus.`)
       setShowDeleteModal(false)
       setSelectedUser(null)
-      setTimeout(() => setSuccessMessage(null), 3500)
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -295,10 +295,9 @@ export default function UserManagementPage() {
       queryClient.setQueryData<User[]>(['users'], (prev = []) =>
         prev.filter((u) => !selectedUids.includes(u.uid))
       )
-      setSuccessMessage(`✅ Berhasil menghapus ${data.deletedCount || selectedUids.length} akun pengguna terpilih.`)
+      show(`✅ Berhasil menghapus ${data.deletedCount || selectedUids.length} akun pengguna terpilih.`)
       setSelectedUids([])
       setShowBulkDeleteModal(false)
-      setTimeout(() => setSuccessMessage(null), 3500)
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -311,7 +310,6 @@ export default function UserManagementPage() {
     e.preventDefault()
     setIsRegistering(true)
     setError(null)
-    setSuccessMessage(null)
 
     try {
       const response = await fetch('/api/auth/register', {
@@ -334,7 +332,7 @@ export default function UserManagementPage() {
         throw new Error(data.message || 'Registrasi user baru gagal.')
       }
 
-      setSuccessMessage(`✅ Akun ${registerEmail} (${registerRole}) berhasil didaftarkan!`)
+      show(`✅ Akun ${registerEmail} (${registerRole}) berhasil didaftarkan!`)
       setRegisterEmail('')
       setRegisterPassword('')
       setRegisterDisplayName('')
@@ -390,10 +388,9 @@ export default function UserManagementPage() {
             : u
         )
       )
-      setSuccessMessage(`✅ Akun ${selectedUser.email} berhasil diperbarui.`)
+      show(`✅ Akun ${selectedUser.email} berhasil diperbarui.`)
       setShowEditModal(false)
       setSelectedUser(null)
-      setTimeout(() => setSuccessMessage(null), 3500)
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -459,10 +456,10 @@ export default function UserManagementPage() {
           </div>
         )}
 
-        {successMessage && (
+        {visible && (
           <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-3 animate-fadeIn">
             <Icon name="checkCircle" className="w-5 h-5 shrink-0 text-emerald-400" />
-            <span>{successMessage}</span>
+            <span>{message}</span>
           </div>
         )}
 
@@ -570,9 +567,9 @@ export default function UserManagementPage() {
                   className="w-full bg-slate-950 border border-cyan-500/40 text-slate-200 rounded-xl px-3 py-2.5"
                 >
                   <option value="">-- Kader Independen / Tanpa Mitra Induk --</option>
-                  {partnershipUsers.map((p) => (
-                    <option key={p.uid} value={p.uid}>
-                      Mitra: {p.displayName} ({p.organization || p.email})
+                  {partnershipUsers.map((partner) => (
+                    <option key={partner.uid} value={partner.uid}>
+                      Mitra: {partner.displayName} ({partner.organization || partner.email})
                     </option>
                   ))}
                 </select>
