@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Topbar } from '@/features/dashboard/components/layout/Topbar'
 import { Icon } from '@/components/ui/Icons'
 import Link from 'next/link'
-import { type FormResponse, type FormData } from '@/lib/repositories/forms.repo'
 import { useAuth } from '@/context/AuthContext'
 import { safeFetchJson } from '@/lib/infra/safe-fetch'
 import { getArticles } from '@/lib/repositories/articles.repo'
@@ -22,69 +22,61 @@ const colorSchemes: Record<string, string[]> = {
 // Dedicated Dashboard View for Cadre Lapangan
 function CadreOverviewDashboard() {
   const { user, userData } = useAuth()
-  const [loading, setLoading] = useState(true)
-  const [myDists, setMyDists] = useState<any[]>([])
-  const [myResponses, setMyResponses] = useState<any[]>([])
-  const [myArticlesCount, setMyArticlesCount] = useState<number>(0)
 
-  useEffect(() => {
-    const loadCadreData = async () => {
-      setLoading(true)
-      try {
-        const [distRes, respRes, artData] = await Promise.all([
-          safeFetchJson('/api/distributions'),
-          safeFetchJson('/api/responses'),
-          getArticles().catch(() => []),
-        ])
+  const { data: cadreData } = useQuery({
+    queryKey: ['dashboard', 'overview', 'cadre', user?.uid, userData?.displayName],
+    enabled: !!user,
+    queryFn: async () => {
+      const [distRes, respRes, artData] = await Promise.all([
+        safeFetchJson('/api/distributions'),
+        safeFetchJson('/api/responses'),
+        getArticles().catch(() => []),
+      ])
 
-        const userUid = user?.uid
-        const userEmail = (user?.email || '').toLowerCase().trim()
-        const userName = (userData?.displayName || '').toLowerCase().trim()
+      const userUid = user?.uid
+      const userEmail = (user?.email || '').toLowerCase().trim()
+      const userName = (userData?.displayName || '').toLowerCase().trim()
 
-        let dists: any[] = []
-        if (distRes.ok && distRes.data && Array.isArray(distRes.data.distributions)) {
-          dists = distRes.data.distributions.filter(
-            (d: any) => d.createdBy === userUid || d.cadreId === userUid || d.ownerId === userUid
-          )
-        }
-        setMyDists(dists)
-
-        const myCodesSet = new Set<string>()
-        dists.forEach((d) => {
-          if (d.code) myCodesSet.add(String(d.code).toLowerCase().trim())
-          if (d.distributionId) myCodesSet.add(String(d.distributionId).toLowerCase().trim())
-        })
-
-        let resps: any[] = []
-        if (respRes.ok && respRes.data && Array.isArray(respRes.data.responses)) {
-          resps = respRes.data.responses.filter((r: any) => {
-            const code = String(r.distributionCode || r.code || '').toLowerCase().trim()
-            return (code !== '' && myCodesSet.has(code)) || r.createdBy === userUid || r.cadreId === userUid
-          })
-        }
-        setMyResponses(resps)
-
-        let count = 0
-        if (Array.isArray(artData)) {
-          count = artData.filter((a: any) => {
-            if (a.authorId && userUid && a.authorId === userUid) return true
-            if (a.createdBy && userUid && a.createdBy === userUid) return true
-            const authLower = String(a.author || '').toLowerCase().trim()
-            if (userEmail && authLower === userEmail) return true
-            if (userName && userName.length > 2 && authLower === userName) return true
-            return false
-          }).length
-        }
-        setMyArticlesCount(count)
-      } catch (err) {
-        console.error('Error loading cadre overview:', err)
-      } finally {
-        setLoading(false)
+      let dists: any[] = []
+      if (distRes.ok && distRes.data && Array.isArray(distRes.data.distributions)) {
+        dists = distRes.data.distributions.filter(
+          (d: any) => d.createdBy === userUid || d.cadreId === userUid || d.ownerId === userUid
+        )
       }
-    }
 
-    if (user) loadCadreData()
-  }, [user, userData])
+      const myCodesSet = new Set<string>()
+      dists.forEach((d) => {
+        if (d.code) myCodesSet.add(String(d.code).toLowerCase().trim())
+        if (d.distributionId) myCodesSet.add(String(d.distributionId).toLowerCase().trim())
+      })
+
+      let resps: any[] = []
+      if (respRes.ok && respRes.data && Array.isArray(respRes.data.responses)) {
+        resps = respRes.data.responses.filter((r: any) => {
+          const code = String(r.distributionCode || r.code || '').toLowerCase().trim()
+          return (code !== '' && myCodesSet.has(code)) || r.createdBy === userUid || r.cadreId === userUid
+        })
+      }
+
+      let count = 0
+      if (Array.isArray(artData)) {
+        count = artData.filter((a: any) => {
+          if (a.authorId && userUid && a.authorId === userUid) return true
+          if (a.createdBy && userUid && a.createdBy === userUid) return true
+          const authLower = String(a.author || '').toLowerCase().trim()
+          if (userEmail && authLower === userEmail) return true
+          if (userName && userName.length > 2 && authLower === userName) return true
+          return false
+        }).length
+      }
+
+      return { myDists: dists, myResponses: resps, myArticlesCount: count }
+    },
+  })
+
+  const myDists = cadreData?.myDists ?? []
+  const myResponses = cadreData?.myResponses ?? []
+  const myArticlesCount = cadreData?.myArticlesCount ?? 0
 
   const stats = useMemo(() => {
     const totalRespondents = myResponses.length
@@ -189,195 +181,187 @@ export default function OverviewPage() {
 
 function AdminOverviewDashboard() {
   const [selectedFormId, setSelectedFormId] = useState<string>('all')
-  const [responses, setResponses] = useState<FormResponse[]>([])
-  const [forms, setForms] = useState<FormData[]>([])
   const [widgets, setWidgets] = useState<any[]>([])
   const [accountingStacks, setAccountingStacks] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
 
   // Fetch Database Responses & Forms
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true)
-      try {
-        const { getForms, getAllResponses } = await import('@/lib/repositories/forms.repo')
-        const { safeFetchJson } = await import('@/lib/infra/safe-fetch')
-        const [responsesData, formsData, v15RespRes] = await Promise.all([
-          getAllResponses().catch(() => []),
-          getForms().catch(() => []),
-          safeFetchJson('/api/responses'),
-        ])
+  const { data: overviewData, isLoading: loading } = useQuery({
+    queryKey: ['dashboard', 'overview', 'admin'],
+    queryFn: async () => {
+      const { getForms, getAllResponses } = await import('@/lib/repositories/forms.repo')
+      const { safeFetchJson } = await import('@/lib/infra/safe-fetch')
+      const [responsesData, formsData, v15RespRes] = await Promise.all([
+        getAllResponses().catch(() => []),
+        getForms().catch(() => []),
+        safeFetchJson('/api/responses'),
+      ])
 
-        const cleanString = (str: string) => str.toLowerCase().replace(/[^a-z0-9]/g, '').trim()
+      const cleanString = (str: string) => str.toLowerCase().replace(/[^a-z0-9]/g, '').trim()
 
-        const mapAnswersToQuestionIds = (rawAnswers: Record<string, any>, form: any): Record<string, any> => {
-          if (!form || !form.questions) return rawAnswers
-          const mapped: Record<string, any> = {}
-          const questionById: Record<string, any> = {}
-          const questionByLabel: Record<string, any> = {}
-          const questionByCleanLabel: Record<string, any> = {}
+      const mapAnswersToQuestionIds = (rawAnswers: Record<string, any>, form: any): Record<string, any> => {
+        if (!form || !form.questions) return rawAnswers
+        const mapped: Record<string, any> = {}
+        const questionById: Record<string, any> = {}
+        const questionByLabel: Record<string, any> = {}
+        const questionByCleanLabel: Record<string, any> = {}
 
-          form.questions.forEach((q: any) => {
-            if (q.id) questionById[q.id] = q
-            if (q.questionId) questionById[q.questionId] = q
-            const label = (q.question || q.prompt || q.title || q.label || '').trim()
-            if (label) {
-              questionByLabel[label] = q
-              questionByCleanLabel[cleanString(label)] = q
-            }
-          })
+        form.questions.forEach((q: any) => {
+          if (q.id) questionById[q.id] = q
+          if (q.questionId) questionById[q.questionId] = q
+          const label = (q.question || q.prompt || q.title || q.label || '').trim()
+          if (label) {
+            questionByLabel[label] = q
+            questionByCleanLabel[cleanString(label)] = q
+          }
+        })
 
-          for (const [key, value] of Object.entries(rawAnswers)) {
-            let q = questionByLabel[key] || questionByCleanLabel[cleanString(key)] || questionById[key]
-            if (!q) {
-              for (const [lbl, ques] of Object.entries(questionByLabel)) {
-                if (key.includes(lbl) || cleanString(key).includes(cleanString(lbl))) {
-                  q = ques
-                  break
-                }
+        for (const [key, value] of Object.entries(rawAnswers)) {
+          let q = questionByLabel[key] || questionByCleanLabel[cleanString(key)] || questionById[key]
+          if (!q) {
+            for (const [lbl, ques] of Object.entries(questionByLabel)) {
+              if (key.includes(lbl) || cleanString(key).includes(cleanString(lbl))) {
+                q = ques
+                break
               }
             }
-            if (q) {
-              const type = q.answerType || q.type || 'short-text'
-              if ((type === 'indicator-table' || type === 'likert') && typeof value === 'object' && value !== null && !Array.isArray(value)) {
-                const indicators = q.config?.indicators || q.presentation?.indicators || q.indicators || []
-                const statements = q.config?.statements || q.options || []
-                const rows = indicators.length > 0 ? indicators.map((ind: any) => ind.label || ind) : statements
-                for (const [rowLabel, rowVal] of Object.entries(value)) {
-                  const rowIndex = rows.findIndex((rStr: string) => rStr === rowLabel || cleanString(rStr) === cleanString(rowLabel))
-                  if (rowIndex !== -1) {
-                    mapped[`${q.id || q.questionId}-${rowIndex}`] = rowVal
-                  }
+          }
+          if (q) {
+            const type = q.answerType || q.type || 'short-text'
+            if ((type === 'indicator-table' || type === 'likert') && typeof value === 'object' && value !== null && !Array.isArray(value)) {
+              const indicators = q.config?.indicators || q.presentation?.indicators || q.indicators || []
+              const statements = q.config?.statements || q.options || []
+              const rows = indicators.length > 0 ? indicators.map((ind: any) => ind.label || ind) : statements
+              for (const [rowLabel, rowVal] of Object.entries(value)) {
+                const rowIndex = rows.findIndex((rStr: string) => rStr === rowLabel || cleanString(rStr) === cleanString(rowLabel))
+                if (rowIndex !== -1) {
+                  mapped[`${q.id || q.questionId}-${rowIndex}`] = rowVal
                 }
-              } else {
-                mapped[q.id || q.questionId] = value
               }
             } else {
-              mapped[key] = value
+              mapped[q.id || q.questionId] = value
             }
-          }
-          return mapped
-        }
-
-        const findMatchingForm = (response: any, formsList: any[]) => {
-          if (response.formId) {
-            const match = formsList.find((f) => f.id === response.formId || f.formId === response.formId || f.docId === response.formId)
-            if (match) return match
-          }
-          const codeToMatch = (response.distributionCode || response.formCode || response.code || '').trim().toUpperCase()
-          if (codeToMatch) {
-            const match = formsList.find((f) => {
-              const fCode = (f.code || f.formCode || f.normalizedCode || '').trim().toUpperCase()
-              const fPre = (f.pretestCode || '').trim().toUpperCase()
-              const fPost = (f.posttestCode || '').trim().toUpperCase()
-              const fDist = (f.embeddedDistributionCode || '').trim().toUpperCase()
-              return (fCode && fCode === codeToMatch) || (fPre && fPre === codeToMatch) || (fPost && fPost === codeToMatch) || (fDist && fDist === codeToMatch)
-            })
-            if (match) return match
-          }
-          if (response.formTitle) {
-            const cleanRespTitle = response.formTitle.trim().toLowerCase()
-            const match = formsList.find((f) => {
-              const fTitle = (f.title || f.metadata?.title || '').trim().toLowerCase()
-              return fTitle && (fTitle === cleanRespTitle || fTitle.includes(cleanRespTitle) || cleanRespTitle.includes(fTitle))
-            })
-            if (match) return match
-          }
-          return null
-        }
-
-        const { ScoringEngine } = await import('@/lib/domain/scoring/preview-engine')
-
-        let rawCombined: any[] = Array.isArray(responsesData) ? [...responsesData] : []
-        if (v15RespRes.ok && v15RespRes.data && Array.isArray(v15RespRes.data.responses)) {
-          rawCombined = [...rawCombined, ...v15RespRes.data.responses]
-        }
-
-        const responseMap = new Map<string, any>()
-        rawCombined.forEach((r) => {
-          const id = r.responseId || r.id || (r as any).docId
-          if (id && !responseMap.has(id)) {
-            responseMap.set(id, r)
-          } else if (!id) {
-            responseMap.set(JSON.stringify(r.answers || {}) + (r.submittedAt || ''), r)
-          }
-        })
-        const uniqueResponses = Array.from(responseMap.values())
-
-        const transformedResponses = uniqueResponses.map((r: any) => {
-          const form = findMatchingForm(r, formsData)
-          const mappedAnswers = mapAnswersToQuestionIds(r.answers || {}, form || null)
-
-          let calculatedScore = 0
-          if (form && form.questions && form.questions.length > 0) {
-            try {
-              const questionsWithScoring = form.questions.map((q: any) => {
-                const type = q.answerType || q.type || 'short-text'
-                let scheme: 'none' | 'binary' | 'likert' | 'rating' | 'indicator' = 'none'
-                if (type === 'single-choice' || type === 'dropdown' || type === 'binary' || type === 'multiple-choice') scheme = 'binary'
-                else if (type === 'indicator-table' || type === 'likert') scheme = 'indicator'
-                else if (type === 'rating') scheme = 'rating'
-                return { ...q, scoring: q.scoring || { scheme, weight: 1 } }
-              })
-
-              const scoring = form.scoring || { totalPoints: 100, mode: 'auto', distribution: {}, overrides: {}, allowOverride: true, autoBalance: true }
-              const validation = form.validation || { mode: 'all_required', exceptions: [], allowOverride: true }
-              const stages = form.stages && form.stages.length > 0 ? form.stages : [{ id: 'default', name: 'Semua Pertanyaan', order: 0, questionIds: form.questions.map((q: any) => q.id), includeInScoring: true }]
-
-              const engine = new ScoringEngine(questionsWithScoring, scoring as any, validation as any, stages as any)
-              const result = engine.calculateScore(mappedAnswers)
-              if (result && typeof result.percentage === 'number' && !isNaN(result.percentage)) {
-                calculatedScore = Math.round(result.percentage)
-              }
-            } catch {}
-          }
-
-          const storedScore =
-            typeof r.score === 'number' && r.score > 0
-              ? r.score
-              : typeof r.result?.percentage === 'number' && r.result.percentage > 0
-              ? r.result.percentage
-              : typeof r.totalScore === 'number' && r.totalScore > 0
-              ? r.totalScore
-              : null
-
-          const finalScore = storedScore !== null ? storedScore : calculatedScore
-
-          return {
-            ...r,
-            score: finalScore,
-            matchedForm: form,
-          }
-        })
-
-        setResponses(transformedResponses)
-        setForms(formsData)
-
-        if (typeof window !== 'undefined') {
-          const savedWidgets = localStorage.getItem('dashboard_widgets_cms_config_v5') || localStorage.getItem('dashboard_widgets_config')
-          if (savedWidgets) {
-            try {
-              const parsed = JSON.parse(savedWidgets)
-              if (Array.isArray(parsed)) setWidgets(parsed.filter((w: any) => w.enabled))
-            } catch {}
-          }
-
-          const savedStacks = localStorage.getItem('dashboard_accounting_stack_v5')
-          if (savedStacks) {
-            try {
-              const parsed = JSON.parse(savedStacks)
-              if (Array.isArray(parsed)) setAccountingStacks(parsed.filter((s: any) => s.enabled !== false))
-            } catch {}
+          } else {
+            mapped[key] = value
           }
         }
-      } catch (error) {
-        console.error('Error loading dashboard overview data:', error)
-      } finally {
-        setLoading(false)
+        return mapped
       }
-    }
-    fetchData()
-  }, [])
+
+      const findMatchingForm = (response: any, formsList: any[]) => {
+        if (response.formId) {
+          const match = formsList.find((f) => f.id === response.formId || f.formId === response.formId || f.docId === response.formId)
+          if (match) return match
+        }
+        const codeToMatch = (response.distributionCode || response.formCode || response.code || '').trim().toUpperCase()
+        if (codeToMatch) {
+          const match = formsList.find((f) => {
+            const fCode = (f.code || f.formCode || f.normalizedCode || '').trim().toUpperCase()
+            const fPre = (f.pretestCode || '').trim().toUpperCase()
+            const fPost = (f.posttestCode || '').trim().toUpperCase()
+            const fDist = (f.embeddedDistributionCode || '').trim().toUpperCase()
+            return (fCode && fCode === codeToMatch) || (fPre && fPre === codeToMatch) || (fPost && fPost === codeToMatch) || (fDist && fDist === codeToMatch)
+          })
+          if (match) return match
+        }
+        if (response.formTitle) {
+          const cleanRespTitle = response.formTitle.trim().toLowerCase()
+          const match = formsList.find((f) => {
+            const fTitle = (f.title || f.metadata?.title || '').trim().toLowerCase()
+            return fTitle && (fTitle === cleanRespTitle || fTitle.includes(cleanRespTitle) || cleanRespTitle.includes(fTitle))
+          })
+          if (match) return match
+        }
+        return null
+      }
+
+      const { ScoringEngine } = await import('@/lib/domain/scoring/preview-engine')
+
+      let rawCombined: any[] = Array.isArray(responsesData) ? [...responsesData] : []
+      if (v15RespRes.ok && v15RespRes.data && Array.isArray(v15RespRes.data.responses)) {
+        rawCombined = [...rawCombined, ...v15RespRes.data.responses]
+      }
+
+      const responseMap = new Map<string, any>()
+      rawCombined.forEach((r) => {
+        const id = r.responseId || r.id || (r as any).docId
+        if (id && !responseMap.has(id)) {
+          responseMap.set(id, r)
+        } else if (!id) {
+          responseMap.set(JSON.stringify(r.answers || {}) + (r.submittedAt || ''), r)
+        }
+      })
+      const uniqueResponses = Array.from(responseMap.values())
+
+      const transformedResponses = uniqueResponses.map((r: any) => {
+        const form = findMatchingForm(r, formsData)
+        const mappedAnswers = mapAnswersToQuestionIds(r.answers || {}, form || null)
+
+        let calculatedScore = 0
+        if (form && form.questions && form.questions.length > 0) {
+          try {
+            const questionsWithScoring = form.questions.map((q: any) => {
+              const type = q.answerType || q.type || 'short-text'
+              let scheme: 'none' | 'binary' | 'likert' | 'rating' | 'indicator' = 'none'
+              if (type === 'single-choice' || type === 'dropdown' || type === 'binary' || type === 'multiple-choice') scheme = 'binary'
+              else if (type === 'indicator-table' || type === 'likert') scheme = 'indicator'
+              else if (type === 'rating') scheme = 'rating'
+              return { ...q, scoring: q.scoring || { scheme, weight: 1 } }
+            })
+
+            const scoring = form.scoring || { totalPoints: 100, mode: 'auto', distribution: {}, overrides: {}, allowOverride: true, autoBalance: true }
+            const validation = form.validation || { mode: 'all_required', exceptions: [], allowOverride: true }
+            const stages = form.stages && form.stages.length > 0 ? form.stages : [{ id: 'default', name: 'Semua Pertanyaan', order: 0, questionIds: form.questions.map((q: any) => q.id), includeInScoring: true }]
+
+            const engine = new ScoringEngine(questionsWithScoring, scoring as any, validation as any, stages as any)
+            const result = engine.calculateScore(mappedAnswers)
+            if (result && typeof result.percentage === 'number' && !isNaN(result.percentage)) {
+              calculatedScore = Math.round(result.percentage)
+            }
+          } catch {}
+        }
+
+        const storedScore =
+          typeof r.score === 'number' && r.score > 0
+            ? r.score
+            : typeof r.result?.percentage === 'number' && r.result.percentage > 0
+            ? r.result.percentage
+            : typeof r.totalScore === 'number' && r.totalScore > 0
+            ? r.totalScore
+            : null
+
+        const finalScore = storedScore !== null ? storedScore : calculatedScore
+
+        return {
+          ...r,
+          score: finalScore,
+          matchedForm: form,
+        }
+      })
+
+      if (typeof window !== 'undefined') {
+        const savedWidgets = localStorage.getItem('dashboard_widgets_cms_config_v5') || localStorage.getItem('dashboard_widgets_config')
+        if (savedWidgets) {
+          try {
+            const parsed = JSON.parse(savedWidgets)
+            if (Array.isArray(parsed)) setWidgets(parsed.filter((w: any) => w.enabled))
+          } catch {}
+        }
+
+        const savedStacks = localStorage.getItem('dashboard_accounting_stack_v5')
+        if (savedStacks) {
+          try {
+            const parsed = JSON.parse(savedStacks)
+            if (Array.isArray(parsed)) setAccountingStacks(parsed.filter((s: any) => s.enabled !== false))
+          } catch {}
+        }
+      }
+
+      return { responses: transformedResponses, forms: formsData }
+    },
+  })
+
+  const responses = overviewData?.responses ?? []
+  const forms = overviewData?.forms ?? []
 
   // Helper to match response against selectedFormId
   const matchSelectedForm = (r: any, targetId: string) => {
