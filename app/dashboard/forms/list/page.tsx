@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useMemo } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Topbar } from '@/features/dashboard/components/layout/Topbar'
@@ -67,9 +68,72 @@ export default function V15FormsDashboardPage() {
   const { user, userRole } = useAuth()
   const isGlobalRole = ['super_admin', 'super_admin', 'super_admin'].includes(userRole || '')
 
-  const [forms, setForms] = useState<FormAggregateDoc[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const queryClient = useQueryClient()
+
+  // ============ SERVER-STATE (TanStack Query) ============
+  const formsQuery = useQuery<FormAggregateDoc[]>({
+    queryKey: ['forms', 'list'],
+    queryFn: async () => {
+      const [formsRes, distRes, respRes] = await Promise.all([
+        safeFetchJson('/api/forms'),
+        safeFetchJson('/api/distributions'),
+        safeFetchJson('/api/responses'),
+      ])
+
+      if (!(formsRes.ok && formsRes.data && Array.isArray(formsRes.data.forms))) {
+        throw new Error(formsRes.error || 'Gagal memuat daftar formulir.')
+      }
+
+      const allDists: any[] = distRes.ok && distRes.data && Array.isArray(distRes.data.distributions) ? distRes.data.distributions : []
+      const allResps: any[] = respRes.ok && respRes.data && Array.isArray(respRes.data.responses) ? respRes.data.responses : []
+
+      // Lookup map for distribution code / ID -> formId
+      const distCodeToFormIdMap = new Map<string, string>()
+      allDists.forEach((d: any) => {
+        const targetFormId = d.formId || d.form?.formId
+        if (targetFormId) {
+          if (d.code) distCodeToFormIdMap.set(String(d.code).toLowerCase().trim(), targetFormId)
+          if (d.distributionCode) distCodeToFormIdMap.set(String(d.distributionCode).toLowerCase().trim(), targetFormId)
+          if (d.distributionId) distCodeToFormIdMap.set(String(d.distributionId).toLowerCase().trim(), targetFormId)
+        }
+      })
+
+      const enrichedForms = formsRes.data.forms
+        .filter((f: any) => Boolean(f?.formId) && (Boolean(f?.activeVersionId) || Boolean(f?.aspects) || Boolean(f?.metadata)))
+        .map((f: any) => {
+          const formIdStr = String(f.formId || f.id || '').trim()
+
+          // Count active distributions for this form
+          const activeDistributionCount = allDists.filter(
+            (d: any) => String(d.formId || d.form?.formId || '').trim() === formIdStr
+          ).length
+
+          // Count responses for this form
+          const responseCount = allResps.filter((r: any) => {
+            const rFormId = String(r.formId || r.metadata?.formId || '').trim()
+            if (rFormId && rFormId === formIdStr) return true
+
+            const code = String(r.distributionCode || r.code || r.metadata?.distributionCode || '').toLowerCase().trim()
+            if (code && distCodeToFormIdMap.has(code)) {
+              return distCodeToFormIdMap.get(code) === formIdStr
+            }
+            return false
+          }).length
+
+          return {
+            ...f,
+            activeDistributionCount,
+            responseCount,
+          }
+        })
+
+      return enrichedForms as FormAggregateDoc[]
+    },
+  })
+
+  const forms = formsQuery.data ?? []
+  const isLoading = formsQuery.isLoading
+  const error = formsQuery.error ? (formsQuery.error as Error).message : null
 
   // Lifecycle Tab & Filter State
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
@@ -231,74 +295,7 @@ export default function V15FormsDashboardPage() {
   }, [searchTerm])
 
   // Concurrent Fetch to Load Form Metadata, Distributions, & Responses Integration
-  const fetchForms = async () => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      const [formsRes, distRes, respRes] = await Promise.all([
-        safeFetchJson('/api/forms'),
-        safeFetchJson('/api/distributions'),
-        safeFetchJson('/api/responses'),
-      ])
-
-      if (formsRes.ok && formsRes.data && Array.isArray(formsRes.data.forms)) {
-        const allDists: any[] = distRes.ok && distRes.data && Array.isArray(distRes.data.distributions) ? distRes.data.distributions : []
-        const allResps: any[] = respRes.ok && respRes.data && Array.isArray(respRes.data.responses) ? respRes.data.responses : []
-
-        // Lookup map for distribution code / ID -> formId
-        const distCodeToFormIdMap = new Map<string, string>()
-        allDists.forEach((d: any) => {
-          const targetFormId = d.formId || d.form?.formId
-          if (targetFormId) {
-            if (d.code) distCodeToFormIdMap.set(String(d.code).toLowerCase().trim(), targetFormId)
-            if (d.distributionCode) distCodeToFormIdMap.set(String(d.distributionCode).toLowerCase().trim(), targetFormId)
-            if (d.distributionId) distCodeToFormIdMap.set(String(d.distributionId).toLowerCase().trim(), targetFormId)
-          }
-        })
-
-        const enrichedForms = formsRes.data.forms
-          .filter((f: any) => Boolean(f?.formId) && (Boolean(f?.activeVersionId) || Boolean(f?.aspects) || Boolean(f?.metadata)))
-          .map((f: any) => {
-            const formIdStr = String(f.formId || f.id || '').trim()
-
-            // Count active distributions for this form
-            const activeDistributionCount = allDists.filter(
-              (d: any) => String(d.formId || d.form?.formId || '').trim() === formIdStr
-            ).length
-
-            // Count responses for this form
-            const responseCount = allResps.filter((r: any) => {
-              const rFormId = String(r.formId || r.metadata?.formId || '').trim()
-              if (rFormId && rFormId === formIdStr) return true
-
-              const code = String(r.distributionCode || r.code || r.metadata?.distributionCode || '').toLowerCase().trim()
-              if (code && distCodeToFormIdMap.has(code)) {
-                return distCodeToFormIdMap.get(code) === formIdStr
-              }
-              return false
-            }).length
-
-            return {
-              ...f,
-              activeDistributionCount,
-              responseCount,
-            }
-          })
-
-        setForms(enrichedForms)
-      } else {
-        setError(formsRes.error || 'Gagal memuat daftar formulir.')
-      }
-    } catch (err: any) {
-      setError(err.message || 'Gagal terhubung ke server.')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    fetchForms()
-  }, [])
+  const fetchForms = () => formsQuery.refetch()
 
   // Categories list derived from forms
   const categories = useMemo(() => {
@@ -432,8 +429,8 @@ export default function V15FormsDashboardPage() {
 
       if (res.ok && res.data?.success) {
         showToast(`Izin distribusi kader & mitra untuk "${form.metadata?.title || form.formId}" diubah menjadi: ${newVal ? 'DIIZINKAN' : 'DIBATASI'}`)
-        setForms((prev) =>
-          prev.map((item) =>
+        queryClient.setQueryData<FormAggregateDoc[]>(['forms', 'list'], (prev) =>
+          (prev ?? []).map((item) =>
             item.formId === form.formId
               ? { ...item, allowCadreDistribution: newVal, metadata: { ...item.metadata, allowCadreDistribution: newVal } }
               : item
