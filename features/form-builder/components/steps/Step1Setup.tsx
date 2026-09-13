@@ -8,6 +8,8 @@ import type { AssessmentOutputMode, CanonicalForm } from '@/lib/domain/forms/typ
 import { validateCanonicalForm } from '@/lib/domain/forms/validation'
 import { Icon } from '@/components/ui/Icons'
 import { AddAspectModal, ConfirmDeleteModal } from '../modals/FormBuilderModals'
+import { FormMetadataSection } from './FormMetadataSection'
+import { ResultModeSection } from './ResultModeSection'
 
 interface Step1SetupProps {
   state: BuilderState
@@ -162,196 +164,21 @@ export function Step1Setup({ state, onChange, onContinue }: Step1SetupProps) {
       )}
 
       {/* SECTION 1: FORM METADATA */}
-      <div className="p-6 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-md space-y-5">
-        <div className="border-b border-slate-800 pb-3">
-          <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2">
-            <Icon name="info" className="w-4 h-4 text-cyan-400" />
-            <span>Informasi Dasar Formulir</span>
-          </h3>
-          <p className="text-xs text-slate-400 mt-0.5">Detail judul dan petunjuk bagi responden sebelum mengisi kuesioner.</p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          <div className="space-y-1.5 md:col-span-2">
-            <label className="text-xs font-semibold text-slate-300">Judul Penilaian / Kuesioner *</label>
-            <input
-              type="text"
-              value={metadata.title}
-              onChange={(e) => handleMetadataChange('title', e.target.value)}
-              placeholder="Contoh: Audit Keamanan Pangan Kantin Sekolah V1.5"
-              className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 transition-all"
-            />
-          </div>
-
-          <div className="space-y-1.5 md:col-span-2">
-            <label className="text-xs font-semibold text-slate-300">Deskripsi Singkat</label>
-            <textarea
-              rows={2}
-              value={metadata.description || ''}
-              onChange={(e) => handleMetadataChange('description', e.target.value)}
-              placeholder="Jelaskan tujuan evaluasi atau pengawasan ini..."
-              className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 transition-all resize-none"
-            />
-          </div>
-
-          {/* Kategori Evaluasi */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-300">Kategori Evaluasi</label>
-            <div className="space-y-2">
-              <select
-                value={isCustomCategory || categoryOptions.length === 0 ? 'custom' : currentCat || categoryOptions[0]}
-                onChange={(e) => {
-                  if (e.target.value === 'custom') {
-                    setIsCustomCategory(true)
-                  } else {
-                    setIsCustomCategory(false)
-                    handleMetadataChange('category', e.target.value)
-                  }
-                }}
-                className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs font-semibold text-slate-100 focus:outline-none focus:border-cyan-500/50 transition-all"
-              >
-                {categoryOptions.map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat}
-                  </option>
-                ))}
-                <option value="custom">
-                  {categoryOptions.length === 0 ? 'Belum Ada Kategori Terdaftar — Ketik Baru' : 'Ketik Kategori Baru...'}
-                </option>
-              </select>
-
-              {(isCustomCategory || categoryOptions.length === 0) && (
-                <input
-                  type="text"
-                  autoFocus
-                  value={currentCat}
-                  onChange={(e) => handleMetadataChange('category', e.target.value)}
-                  placeholder="Tuliskan nama kategori evaluasi baru..."
-                  className="w-full px-4 py-2 rounded-xl bg-slate-900 border border-cyan-500/40 text-xs text-cyan-200 placeholder-slate-500 focus:outline-none"
-                />
-              )}
-            </div>
-          </div>
-
-          {/* Sasaran Responden */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-300">Sasaran Responden</label>
-            <div className="space-y-2">
-              <select
-                value={isCustomTarget || targetOptions.length === 0 ? 'custom' : currentTgt || targetOptions[0]}
-                onChange={(e) => {
-                  if (e.target.value === 'custom') {
-                    setIsCustomTarget(true)
-                  } else {
-                    setIsCustomTarget(false)
-                    handleMetadataChange('target', e.target.value)
-                  }
-                }}
-                className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs font-semibold text-slate-100 focus:outline-none focus:border-cyan-500/50 transition-all"
-              >
-                {targetOptions.map((tgt) => (
-                  <option key={tgt} value={tgt}>
-                    {tgt}
-                  </option>
-                ))}
-                <option value="custom">
-                  {targetOptions.length === 0 ? 'Belum Ada Sasaran Terdaftar — Ketik Baru' : 'Ketik Sasaran Responden Baru...'}
-                </option>
-              </select>
-
-              {(isCustomTarget || targetOptions.length === 0) && (
-                <input
-                  type="text"
-                  autoFocus
-                  value={currentTgt}
-                  onChange={(e) => handleMetadataChange('target', e.target.value)}
-                  placeholder="Tuliskan sasaran responden baru..."
-                  className="w-full px-4 py-2 rounded-xl bg-slate-900 border border-cyan-500/40 text-xs text-cyan-200 placeholder-slate-500 focus:outline-none"
-                />
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
+      <FormMetadataSection
+        metadata={metadata}
+        currentCat={currentCat}
+        currentTgt={currentTgt}
+        categoryOptions={categoryOptions}
+        targetOptions={targetOptions}
+        isCustomCategory={isCustomCategory}
+        isCustomTarget={isCustomTarget}
+        setIsCustomCategory={setIsCustomCategory}
+        setIsCustomTarget={setIsCustomTarget}
+        onMetadataChange={handleMetadataChange}
+      />
 
       {/* SECTION 2: RESULT MODE SELECTION */}
-      <div className="p-6 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-md space-y-5">
-        <div className="border-b border-slate-800 pb-3">
-          <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2">
-            <Icon name="award" className="w-4 h-4 text-purple-400" />
-            <span>Mode Penyajian Hasil Assessment (Result Mode)</span>
-          </h3>
-          <p className="text-xs text-slate-400 mt-0.5">Pilih bagaimana hasil skor akhir akan disajikan kepada responden dan pengawas.</p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Card 1: PER_ASPECT */}
-          <button
-            type="button"
-            onClick={() => handleSelectOutputMode('per_aspect')}
-            className={`p-4 rounded-xl border text-left flex flex-col justify-between transition-all ${
-              currentOutputMode === 'per_aspect'
-                ? 'bg-cyan-500/10 border-cyan-500/50 shadow-md shadow-cyan-500/10'
-                : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
-            }`}
-          >
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase text-cyan-400">Mode 01</span>
-                {currentOutputMode === 'per_aspect' && <Icon name="checkCircle" className="w-4 h-4 text-cyan-400" />}
-              </div>
-              <h4 className="text-sm font-bold text-slate-100">Per-Aspek (Independent)</h4>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                Setiap Aspek menghasilkan skor persentase mandiri. Tidak memerlukan penghitungan total nilai akhir.
-              </p>
-            </div>
-          </button>
-
-          {/* Card 2: OVERALL */}
-          <button
-            type="button"
-            onClick={() => handleSelectOutputMode('overall')}
-            className={`p-4 rounded-xl border text-left flex flex-col justify-between transition-all ${
-              currentOutputMode === 'overall'
-                ? 'bg-purple-500/10 border-purple-500/50 shadow-md shadow-purple-500/10'
-                : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
-            }`}
-          >
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase text-purple-400">Mode 02</span>
-                {currentOutputMode === 'overall' && <Icon name="checkCircle" className="w-4 h-4 text-purple-400" />}
-              </div>
-              <h4 className="text-sm font-bold text-slate-100">Keseluruhan (Overall)</h4>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                Menyajikan satu nilai persentase akumulasi akhir berdasarkan pembobotan aspek.
-              </p>
-            </div>
-          </button>
-
-          {/* Card 3: BOTH */}
-          <button
-            type="button"
-            onClick={() => handleSelectOutputMode('both')}
-            className={`p-4 rounded-xl border text-left flex flex-col justify-between transition-all ${
-              currentOutputMode === 'both'
-                ? 'bg-emerald-500/10 border-emerald-500/50 shadow-md shadow-emerald-500/10'
-                : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
-            }`}
-          >
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase text-emerald-400">Rekomendasi BPOM</span>
-                {currentOutputMode === 'both' && <Icon name="checkCircle" className="w-4 h-4 text-emerald-400" />}
-              </div>
-              <h4 className="text-sm font-bold text-slate-100">Per-Aspek & Overall (Both)</h4>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                Menampilkan rincian skor tiap Aspek sekaligus akumulasi nilai akhir keseluruhan.
-              </p>
-            </div>
-          </button>
-        </div>
-      </div>
+      <ResultModeSection currentOutputMode={currentOutputMode} onSelectOutputMode={handleSelectOutputMode} />
 
       {/* SECTION 3: DYNAMIC ASPECT STRUCTURE & WEIGHTS */}
       <div className="p-6 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-md space-y-5">
