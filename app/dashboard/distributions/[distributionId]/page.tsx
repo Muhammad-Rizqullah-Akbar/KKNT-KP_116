@@ -1,6 +1,7 @@
 'use client'
 
-import React, { useEffect, useState, use } from 'react'
+import React, { useState, use } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Topbar } from '@/features/dashboard/components/layout/Topbar'
@@ -14,9 +15,7 @@ interface PageProps {
 export default function DistributionDetailPage({ params }: PageProps) {
   const { distributionId } = use(params)
   const router = useRouter()
-  const [distribution, setDistribution] = useState<DistributionDoc | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const queryClient = useQueryClient()
   const [toastMessage, setToastMessage] = useState<string | null>(null)
 
   const showToast = (msg: string) => {
@@ -24,27 +23,26 @@ export default function DistributionDetailPage({ params }: PageProps) {
     setTimeout(() => setToastMessage(null), 3500)
   }
 
-  const loadDistribution = async () => {
-    setIsLoading(true)
-    setError(null)
-    try {
+  const {
+    data: distribution,
+    isLoading,
+    error: distributionError,
+  } = useQuery<DistributionDoc | null>({
+    queryKey: ['distribution', distributionId],
+    queryFn: async () => {
       const res = await fetch(`/api/distributions/${distributionId}`)
       const data = await res.json()
       if (data.success && data.distribution) {
-        setDistribution(data.distribution)
-      } else {
-        setError(data.message || 'Gagal memuat detail distribusi.')
+        return data.distribution as DistributionDoc
       }
-    } catch (err: any) {
-      setError(err.message || 'Terjadi kesalahan jaringan.')
-    } finally {
-      setIsLoading(false)
-    }
-  }
+      throw new Error(data.message || 'Gagal memuat detail distribusi.')
+    },
+  })
 
-  useEffect(() => {
-    loadDistribution()
-  }, [distributionId])
+  const error = distributionError ? (distributionError as Error).message : null
+
+  const invalidateDistribution = () =>
+    queryClient.invalidateQueries({ queryKey: ['distribution', distributionId] })
 
   const handleTogglePause = async () => {
     if (!distribution) return
@@ -57,7 +55,7 @@ export default function DistributionDetailPage({ params }: PageProps) {
         throw new Error(data.message || 'Gagal mengubah status.')
       }
       showToast(data.message)
-      loadDistribution()
+      invalidateDistribution()
     } catch (err: any) {
       showToast(`Error: ${err.message}`)
     }
