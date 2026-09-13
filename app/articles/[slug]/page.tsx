@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Icon } from '@/components/ui/Icons'
+import { sanitizeHtml } from '@/lib/infra/sanitize-html'
 
 // Import Repositori Firestore & Firebase Auth
 import { 
@@ -607,7 +608,7 @@ export default function ArticleDetailPage({ params }: { params: Promise<{ slug: 
               contentEditable={isEditMode}
               suppressContentEditableWarning
               className={isEditMode ? 'editable-active' : ''}
-              dangerouslySetInnerHTML={{ __html: editedArticle.content }} 
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(editedArticle.content) }} 
             />
 
             {/* TAGS */}

@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import Link from 'next/link'
 import { Icon } from '@/components/ui/Icons'
+import { sanitizeHtml } from '@/lib/infra/sanitize-html'
 
 interface ArticleModalProps {
   article: any
@@ -102,7 +103,7 @@ export function ArticleModal({ article, isOpen, onClose, categoryBadgeColors }: 
           <div className="prose prose-invert max-w-none text-slate-100 text-sm leading-relaxed space-y-4 font-sans">
             <div
               className="[&>p]:text-slate-200 [&>p]:leading-relaxed [&>p]:mb-3 [&>h2]:text-white [&>h2]:font-extrabold [&>h2]:text-lg [&>h2]:mt-6 [&>h2]:mb-2 [&>blockquote]:p-4 [&>blockquote]:rounded-2xl [&>blockquote]:bg-emerald-950/30 [&>blockquote]:border-l-4 [&>blockquote]:border-emerald-500 [&>blockquote]:text-emerald-200 [&>ul]:list-disc [&>ul]:pl-5 [&>ul]:space-y-1 [&>ul]:text-slate-200"
-              dangerouslySetInnerHTML={{ __html: article.content || '<p>Isi artikel edukasi...</p>' }}
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(article.content || '<p>Isi artikel edukasi...</p>') }}
             />
           </div>
 
