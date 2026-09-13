@@ -10,6 +10,7 @@ import { Topbar } from '@/features/dashboard/components/layout/Topbar'
 import { Icon } from '@/components/ui/Icons'
 import type { DistributionDoc } from '@/lib/domain/distributions/distribution-types'
 import { queryKeys } from '@/lib/query-keys'
+import { useToast } from '@/lib/hooks'
 
 export default function UserProfileProgressPage() {
   const { user, userData, refreshUserData } = useAuth()
@@ -23,12 +24,7 @@ export default function UserProfileProgressPage() {
   const [editPartnershipType, setEditPartnershipType] = useState(userData?.partnershipType || 'Sekolah')
   const [editPhone, setEditPhone] = useState(userData?.phone || '')
   const [isSaving, setIsSaving] = useState(false)
-  const [toastMessage, setToastMessage] = useState<string | null>(null)
-
-  const showToast = (msg: string) => {
-    setToastMessage(msg)
-    setTimeout(() => setToastMessage(null), 3500)
-  }
+  const { visible, message, show } = useToast()
 
   // Load User Data & Activity Progress (re-fetches when user / userData change)
   const {
@@ -65,11 +61,11 @@ export default function UserProfileProgressPage() {
         const userEmail = (currentUser?.email || '').toLowerCase().trim()
         const userDisplayName = (currentUserData?.displayName || currentUser?.displayName || '').toLowerCase().trim()
 
-        const myArticles = allArticles.filter((a) => {
-          if ((a as any).authorId && userUid && (a as any).authorId === userUid) return true
-          if ((a as any).createdBy && userUid && (a as any).createdBy === userUid) return true
+        const myArticles = allArticles.filter((article) => {
+          if (article.authorId && userUid && article.authorId === userUid) return true
+          if (article.createdBy && userUid && article.createdBy === userUid) return true
 
-          const authorLower = (a.author || '').toLowerCase().trim()
+          const authorLower = (article.author || '').toLowerCase().trim()
           if (userEmail && authorLower === userEmail) return true
           if (userDisplayName && userDisplayName.length > 2 && authorLower === userDisplayName) return true
 
@@ -190,10 +186,10 @@ export default function UserProfileProgressPage() {
         throw new Error(data.message || 'Gagal menyimpan perubahan profil.')
       }
 
-      showToast('Profil dan informasi akun berhasil diperbarui!')
+      show('Profil dan informasi akun berhasil diperbarui!')
       if (refreshUserData) refreshUserData()
     } catch (err: any) {
-      showToast(`Error: ${err.message}`)
+      show(`Error: ${err.message}`)
     } finally {
       setIsSaving(false)
     }
@@ -566,9 +562,9 @@ export default function UserProfileProgressPage() {
       </div>
 
       {/* Toast */}
-      {toastMessage && (
+      {visible && (
         <div className="fixed bottom-6 right-6 z-50 p-4 rounded-xl bg-slate-900 border border-slate-700 text-slate-100 text-xs font-semibold shadow-2xl animate-in slide-in-from-bottom-3">
-          {toastMessage}
+          {message}
         </div>
       )}
     </div>
