@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Topbar } from '@/features/dashboard/components/Topbar'
+import { Topbar } from '@/features/dashboard/components/layout/Topbar'
 import { Icon, type IconName } from '@/components/ui/Icons'
 import { Button } from '@/components/shared/Button'
 import { getAllResponses, getForms, getFormGroups, type FormResponse, type FormData as LegacyFormData, type FormGroup } from '@/lib/repositories/forms.repo'

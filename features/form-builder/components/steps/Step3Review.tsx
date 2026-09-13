@@ -8,14 +8,14 @@ import { validateCanonicalForm, type FormValidationIssue } from '@/lib/domain/fo
 import { calculateResponseScore } from '@/lib/domain/scoring/scoring-engine'
 import { toPublicFormProjection } from '@/lib/domain/forms/legacy-adapter'
 import { Icon } from '@/components/ui/Icons'
-import { GradeThresholdConfigurator } from '../GradeThresholdConfigurator'
-import { AnswerKeyInspector } from '../AnswerKeyInspector'
-import { DiagnosticAuditorBanner } from './step3-diagnostic-banner'
-import { SimulationPresetPicker, type SimulationPreset } from './step3-simulation-preset-picker'
-import { RespondentIdentityCard, type RespondentIdentity } from './step3-respondent-identity-card'
-import { OverallScoreCard } from './step3-overall-score-card'
-import { AspectResultsPanel } from './step3-aspect-results-panel'
-import { RespondentPreview } from './step3-respondent-preview'
+import { GradeThresholdConfigurator } from '../config-panels/GradeThresholdConfigurator'
+import { AnswerKeyInspector } from '../question-editor/AnswerKeyInspector'
+import { DiagnosticAuditorBanner } from '././step3-diagnostic-banner'
+import { SimulationPresetPicker, type SimulationPreset } from '././step3-simulation-preset-picker'
+import { RespondentIdentityCard, type RespondentIdentity } from '././step3-respondent-identity-card'
+import { OverallScoreCard } from '././step3-overall-score-card'
+import { AspectResultsPanel } from '././step3-aspect-results-panel'
+import { RespondentPreview } from '././step3-respondent-preview'
 
 interface Step3ReviewProps {
   state: BuilderState

@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
-import { Topbar } from '@/features/dashboard/components/Topbar'
+import { Topbar } from '@/features/dashboard/components/layout/Topbar'
 import { Icon } from '@/components/ui/Icons'
 import { 
   getLandingPageSettings, 

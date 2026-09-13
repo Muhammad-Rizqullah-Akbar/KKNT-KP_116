@@ -3,8 +3,8 @@
 import type { BuilderState } from '@/lib/domain/forms/builder-state'
 import type { PublicCanonicalForm } from '@/lib/domain/forms/types'
 import { Icon } from '@/components/ui/Icons'
-import { PreviewQuestionCard } from './step3-preview-question-card'
-import type { SimulationPreset } from './step3-simulation-preset-picker'
+import { PreviewQuestionCard } from '././step3-preview-question-card'
+import type { SimulationPreset } from '././step3-simulation-preset-picker'
 
 interface RespondentPreviewProps {
   state: BuilderState

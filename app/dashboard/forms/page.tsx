@@ -3,9 +3,9 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Topbar } from '@/features/dashboard/components/Topbar'
+import { Topbar } from '@/features/dashboard/components/layout/Topbar'
 import { Icon } from '@/components/ui/Icons'
-import { PreviewModal } from '@/features/form-builder/components/PreviewModal'
+import { PreviewModal } from '@/features/form-builder/components/preview/PreviewModal'
 import {
   getForms,
   getFormGroups,

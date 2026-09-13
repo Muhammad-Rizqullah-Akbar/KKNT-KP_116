@@ -1,7 +1,7 @@
 'use client'
 
 import type { BuilderQuestion } from '@/lib/domain/forms/builder-state'
-import type { SimulationPreset } from './step3-simulation-preset-picker'
+import type { SimulationPreset } from '././step3-simulation-preset-picker'
 
 interface PreviewQuestionCardProps {
   question: BuilderQuestion

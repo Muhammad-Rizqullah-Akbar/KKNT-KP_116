@@ -14,7 +14,7 @@ import type { ComponentType } from 'react'
  * Only loads when user actually opens the builder
  */
 export const LazyFormBuilderV2 = dynamic(
-  () => import('@/features/form-builder/components/FormBuilderV2').then(mod => mod.FormBuilderV2),
+  () => import('@/features/form-builder/components/builder-core/FormBuilderV2').then(mod => mod.FormBuilderV2),
   {
     loading: () => (
       <div className="flex items-center justify-center h-64">
@@ -31,7 +31,7 @@ export const LazyFormBuilderV2 = dynamic(
  * Lazy load PreviewModal - used only when preview button clicked
  */
 export const LazyPreviewModal = dynamic(
-  () => import('@/features/form-builder/components/PreviewModal').then(mod => mod.PreviewModal),
+  () => import('@/features/form-builder/components/preview/PreviewModal').then(mod => mod.PreviewModal),
   {
     loading: () => (
       <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
@@ -48,7 +48,7 @@ export const LazyPreviewModal = dynamic(
  * Lazy load SmartUploadArticleModal
  */
 export const LazySmartUploadArticleModal = dynamic(
-  () => import('@/features/dashboard/components/SmartUploadArticleModal').then(mod => mod.SmartUploadArticleModal),
+  () => import('@/features/dashboard/components/modals/SmartUploadArticleModal').then(mod => mod.SmartUploadArticleModal),
   {
     loading: () => (
       <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
@@ -63,7 +63,7 @@ export const LazySmartUploadArticleModal = dynamic(
  * Lazy load MitraProgressModal
  */
 export const LazyMitraProgressModal = dynamic(
-  () => import('@/features/dashboard/components/MitraProgressModal').then(mod => mod.MitraProgressModal),
+  () => import('@/features/dashboard/components/modals/MitraProgressModal').then(mod => mod.MitraProgressModal),
   {
     loading: () => (
       <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
@@ -80,7 +80,7 @@ export const LazyMitraProgressModal = dynamic(
  * Lazy load FormPublicRenderer - only needed on public form pages
  */
 export const LazyFormPublicRenderer = dynamic(
-  () => import('@/features/form-builder/components/FormPublicRenderer').then(mod => mod.FormPublicRenderer),
+  () => import('@/features/form-builder/components/preview/FormPublicRenderer').then(mod => mod.FormPublicRenderer),
   {
     ssr: false, // Form interactions are client-side
   }

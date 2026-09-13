@@ -3,7 +3,7 @@
 import React, { use, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Icon } from '@/components/ui/Icons'
-import { PublicCompletionReceipt } from '@/features/form-builder/components/PublicCompletionReceipt'
+import { PublicCompletionReceipt } from '@/features/form-builder/components/preview/PublicCompletionReceipt'
 
 interface ResponsePageProps {
   params: Promise<{ responseId: string }>

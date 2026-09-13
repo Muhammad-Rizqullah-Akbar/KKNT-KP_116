@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect, useRef } from 'react'
-import { Topbar } from '@/features/dashboard/components/Topbar'
+import { Topbar } from '@/features/dashboard/components/layout/Topbar'
 import { Icon } from '@/components/ui/Icons'
 import { useAuth } from '@/context/AuthContext'
 import { SkeletonTable } from '@/components/ui/Skeleton'
@@ -17,7 +17,7 @@ import { getForms } from '@/lib/repositories/forms.repo'
 import { storage } from '@/lib/infra/firebase-client'
 import { uploadOptimizedArticleImage } from '@/lib/infra/storage'
 import { ref, uploadBytes, getDownloadURL, listAll } from 'firebase/storage'
-import { SmartUploadArticleModal } from '@/features/dashboard/components/SmartUploadArticleModal'
+import { SmartUploadArticleModal } from '@/features/dashboard/components/modals/SmartUploadArticleModal'
 import { exportArticleToJson } from '@/lib/domain/articles/smart-article-parser'
 
 // ============ TIPE DATA & KONSTANTA ============

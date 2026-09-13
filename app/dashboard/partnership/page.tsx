@@ -5,9 +5,9 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { safeFetchJson } from '@/lib/infra/safe-fetch'
 import { getArticles, type ArticleData } from '@/lib/repositories/articles.repo'
-import { Topbar } from '@/features/dashboard/components/Topbar'
+import { Topbar } from '@/features/dashboard/components/layout/Topbar'
 import { Icon } from '@/components/ui/Icons'
-import { ProfileProgressModal } from '@/features/dashboard/components/ProfileProgressModal'
+import { ProfileProgressModal } from '@/features/dashboard/components/modals/ProfileProgressModal'
 import { SkeletonCard, SkeletonTable } from '@/components/ui/Skeleton'
 
 type UserProfile = {

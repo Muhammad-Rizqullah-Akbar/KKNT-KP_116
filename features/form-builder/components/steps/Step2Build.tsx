@@ -23,7 +23,7 @@ import {
   updateAspect,
 } from '@/lib/domain/forms/builder-state'
 import type { QuestionType } from '@/lib/domain/forms/types'
-import { QuestionEditor } from '../QuestionEditor'
+import { QuestionEditor } from '../question-editor/QuestionEditor'
 import { Icon } from '@/components/ui/Icons'
 import { AddAspectModal, ConfirmDeleteModal } from '../modals/FormBuilderModals'
 

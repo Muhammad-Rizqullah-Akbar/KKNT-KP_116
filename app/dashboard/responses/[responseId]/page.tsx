@@ -3,7 +3,7 @@
 import React, { useEffect, useState, use } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Topbar } from '@/features/dashboard/components/Topbar'
+import { Topbar } from '@/features/dashboard/components/layout/Topbar'
 import { Icon } from '@/components/ui/Icons'
 import type { ResponseDoc } from '@/lib/domain/responses/response-types'
 import { isBiodataAspect } from '@/lib/domain/scoring/scoring-engine'

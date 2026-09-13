@@ -5,13 +5,13 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
-import { Topbar } from '@/features/dashboard/components/Topbar'
-import { FormToolbar } from '@/features/form-builder/components/FormToolbar'
-import { Canvas } from '@/features/form-builder/components/Canvas'
-import { ResizableToolbar } from '@/features/form-builder/components/ResizableToolbar'
-import { FlexibleElementProperties } from '@/features/form-builder/components/FlexibleElementProperties'
-import { PreviewModal } from '@/features/form-builder/components/PreviewModal'
-import { FormSettingsModal } from '@/features/form-builder/components/FormSettingsModal'
+import { Topbar } from '@/features/dashboard/components/layout/Topbar'
+import { FormToolbar } from '@/features/form-builder/components/canvas/FormToolbar'
+import { Canvas } from '@/features/form-builder/components/canvas/Canvas'
+import { ResizableToolbar } from '@/features/form-builder/components/canvas/ResizableToolbar'
+import { FlexibleElementProperties } from '@/features/form-builder/components/config-panels/FlexibleElementProperties'
+import { PreviewModal } from '@/features/form-builder/components/preview/PreviewModal'
+import { FormSettingsModal } from '@/features/form-builder/components/shared/FormSettingsModal'
 import { Icon } from '@/components/ui/Icons'
 import { 
   FlexibleQuestion, 
@@ -23,7 +23,7 @@ import {
   type FormScoring,
   type ScoringOverride,
   getScoredStages,  // ← NEW IMPORT
-} from '@/features/form-builder/components/ElementTypes'
+} from '@/features/form-builder/components/shared/ElementTypes'
 import { 
   createForm, 
   updateForm, 

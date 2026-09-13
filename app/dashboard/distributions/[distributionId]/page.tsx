@@ -3,7 +3,7 @@
 import React, { useEffect, useState, use } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Topbar } from '@/features/dashboard/components/Topbar'
+import { Topbar } from '@/features/dashboard/components/layout/Topbar'
 import { Icon } from '@/components/ui/Icons'
 import type { DistributionDoc } from '@/lib/domain/distributions/distribution-types'
 
