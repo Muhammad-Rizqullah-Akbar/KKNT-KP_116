@@ -13,6 +13,7 @@ import {
 } from '@/lib/repositories/settings.repo'
 import { uploadSettingsImage, uploadGalleryImage, uploadOptimizedArticleImage } from '@/lib/infra/storage'
 import { queryKeys } from '@/lib/query-keys'
+import { TOAST_DURATION_MS, TOAST_DURATION_LONG_MS } from '@/lib/constants'
 
 // ============ DATA DEFAULT / FALLBACK ============
 const defaultHeroData = {
@@ -144,7 +145,7 @@ export default function SettingsPage() {
       await updateLandingPageSettings({ hero: heroForm })
       setSuccessMessage('Hero Section berhasil diperbarui!')
       setShowSuccess(true)
-      setTimeout(() => setShowSuccess(false), 3000)
+      setTimeout(() => setShowSuccess(false), TOAST_DURATION_MS)
     } catch (error: any) {
       alert('Gagal menyimpan Hero Section: ' + error.message)
     } finally {
@@ -159,7 +160,7 @@ export default function SettingsPage() {
       setHeroForm(prev => ({ ...prev, bgImageUrl: res.url }))
       setSuccessMessage(`Foto background Hero terkompresi (${res.savedPercent}% hemat storage)!`)
       setShowSuccess(true)
-      setTimeout(() => setShowSuccess(false), 3000)
+      setTimeout(() => setShowSuccess(false), TOAST_DURATION_MS)
     } catch (error: any) {
       alert('Gagal mengunggah foto background: ' + error.message)
     } finally {
@@ -174,7 +175,7 @@ export default function SettingsPage() {
       await updateLandingPageSettings({ partnership: partnershipForm })
       setSuccessMessage('Data Partnership & KKN berhasil diperbarui di database!')
       setShowSuccess(true)
-      setTimeout(() => setShowSuccess(false), 3000)
+      setTimeout(() => setShowSuccess(false), TOAST_DURATION_MS)
     } catch (error: any) {
       alert('Gagal menyimpan Partnership: ' + error.message)
     } finally {
@@ -208,7 +209,7 @@ export default function SettingsPage() {
       setGalleryForm(prev => ({ ...prev, imageUrl: res.url }))
       setSuccessMessage(`Foto galeri terkompresi (${res.savedPercent}% hemat storage)!`)
       setShowSuccess(true)
-      setTimeout(() => setShowSuccess(false), 3000)
+      setTimeout(() => setShowSuccess(false), TOAST_DURATION_MS)
     } catch (error: any) {
       alert('Gagal mengunggah foto galeri: ' + error.message)
     } finally {
@@ -248,7 +249,7 @@ export default function SettingsPage() {
       setIsGalleryModalOpen(false)
       setSuccessMessage('Galeri berhasil diperbarui di database!')
       setShowSuccess(true)
-      setTimeout(() => setShowSuccess(false), 3000)
+      setTimeout(() => setShowSuccess(false), TOAST_DURATION_MS)
     } catch (error: any) {
       alert('Gagal menyimpan Galeri: ' + error.message)
     } finally {
@@ -271,7 +272,7 @@ export default function SettingsPage() {
       setGallery(updatedGallery)
       setSuccessMessage('Item galeri berhasil dihapus!')
       setShowSuccess(true)
-      setTimeout(() => setShowSuccess(false), 3000)
+      setTimeout(() => setShowSuccess(false), TOAST_DURATION_MS)
     } catch (error: any) {
       alert('Gagal menghapus Galeri: ' + error.message)
     } finally {

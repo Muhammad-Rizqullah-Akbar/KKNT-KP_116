@@ -131,6 +131,7 @@ const categoryGradients: Record<string, string> = {
 }
 
 import { SmoothScrollProvider } from '@/features/providers/SmoothScrollProvider'
+import { TOAST_DURATION_MS } from '@/lib/constants'
 
 export default function HomePage() {
   // ... rest of page code
@@ -158,7 +159,7 @@ export default function HomePage() {
     setToastMessage(message)
     setToastType(type)
     setShowToast(true)
-    setTimeout(() => setShowToast(false), 3000)
+    setTimeout(() => setShowToast(false), TOAST_DURATION_MS)
   }
 
   // ============ 1. FETCH LANDING PAGE SETTINGS (CMS FIRESTORE) ============
