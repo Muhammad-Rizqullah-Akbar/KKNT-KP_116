@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect, useRef } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Topbar } from '@/features/dashboard/components/layout/Topbar'
 import { Icon } from '@/components/ui/Icons'
 import { useAuth } from '@/context/AuthContext'
@@ -83,8 +84,23 @@ const galleryGradients = [
 // ============ KOMPONEN UTAMA ============
 export default function ArticlesAdminPage() {
   const { user, userData } = useAuth()
-  const [articles, setArticles] = useState<Article[]>([])
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
+
+  // ============ SERVER-STATE (TanStack Query) ============
+  const articlesQuery = useQuery({
+    queryKey: ['dashboard', 'articles', user?.uid, userData?.role, userData?.displayName],
+    queryFn: async () => {
+      const [data, catData, formsList] = await Promise.all([
+        getArticles(),
+        getArticleCategories().catch(() => []),
+        getForms().catch(() => []),
+      ])
+      return { data, catData, formsList }
+    },
+  })
+
+  const [extraCategories, setExtraCategories] = useState<string[]>([])
+  const [applyingImages, setApplyingImages] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterCategory, setFilterCategory] = useState('Semua Kategori')
   const [filterStatus, setFilterStatus] = useState('Semua Status')
@@ -245,7 +261,7 @@ export default function ArticlesAdminPage() {
       setShowSuccess(true)
       setSelectedArticleIds([])
       setIsBulkDeleteModalOpen(false)
-      fetchArticlesData()
+      queryClient.invalidateQueries({ queryKey: ['dashboard', 'articles'] })
       setTimeout(() => setShowSuccess(false), 3000)
     } catch (err: any) {
       console.error('Gagal menghapus secara massal:', err)
@@ -256,12 +272,6 @@ export default function ArticlesAdminPage() {
   }
 
   // Dynamic Categories State From Firestore Database
-  const [dbCategories, setDbCategories] = useState<string[]>([
-    'Keamanan Pangan',
-    'Edukasi',
-    'Regulasi',
-    'Tips & Trik',
-  ])
   const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false)
   const [newCatName, setNewCatName] = useState('')
 
@@ -270,7 +280,7 @@ export default function ArticlesAdminPage() {
     if (!trimmed) return
     try {
       const created = await createArticleCategory(trimmed)
-      setDbCategories((prev) => Array.from(new Set([...prev, created.name])))
+      setExtraCategories((prev) => Array.from(new Set([...prev, created.name])))
       setFormData((prev) => ({ ...prev, category: created.name }))
       setNewCatName('')
       setIsAddCategoryOpen(false)
@@ -279,77 +289,64 @@ export default function ArticlesAdminPage() {
     }
   }
 
-  // Available Forms from Database for Questionnaire Selectors
-  const [availableForms, setAvailableForms] = useState<{ id: string; code: string; title: string }[]>([])
+  // ============ DERIVED DATA FROM QUERY ============
+  const articlesData = useMemo(() => {
+    if (!articlesQuery.data) return null
+    const { data, catData, formsList } = articlesQuery.data
 
-  // FETCH DATA
-  const fetchArticlesData = async () => {
-    setLoading(true)
-    try {
-      const [data, catData, formsList] = await Promise.all([
-        getArticles(),
-        getArticleCategories().catch(() => []),
-        getForms().catch(() => []),
-      ])
+    const fetchedForms = formsList.map((f: any) => ({
+      id: f.id || '',
+      code: f.code || f.id || '',
+      title: f.title || 'Form Kuesioner',
+    }))
+    const fetchedCatNames = catData.map((c) => c.name).filter(Boolean)
+    const articleCatNames = data.map((d) => d.category).filter(Boolean)
+    const mergedCategories = Array.from(new Set([...fetchedCatNames, ...articleCatNames, ...extraCategories, 'Keamanan Pangan', 'Edukasi']))
 
-      const fetchedForms = formsList.map((f: any) => ({
-        id: f.id || '',
-        code: f.code || f.id || '',
-        title: f.title || 'Form Kuesioner',
-      }))
-      setAvailableForms(fetchedForms)
+    let formattedData = data.map((doc: any) => ({
+      id: doc.id,
+      authorUid: doc.authorUid || doc.authorId || doc.createdBy || '',
+      title: doc.title || '',
+      slug: doc.slug || '',
+      author: doc.author || '',
+      authorBio: doc.authorBio || '',
+      category: doc.category || (mergedCategories[0] || 'Keamanan Pangan'),
+      status: doc.status || 'Draft',
+      views: doc.views || 0,
+      date: doc.date || doc.createdAt || new Date().toISOString(),
+      readTime: doc.readTime || 5,
+      excerpt: doc.excerpt || '',
+      content: doc.content || '',
+      featuredImage: doc.featuredImage || '',
+      tags: Array.isArray(doc.tags) ? doc.tags : [],
+      gallery: Array.isArray(doc.gallery) ? doc.gallery : [],
+      embeddedDistributionCode: doc.embeddedDistributionCode || '',
+      pretestCode: doc.pretestCode || '',
+      posttestCode: doc.posttestCode || doc.embeddedDistributionCode || '',
+    }))
 
-      const fetchedCatNames = catData.map((c) => c.name).filter(Boolean)
-      const articleCatNames = data.map((d) => d.category).filter(Boolean)
-      const mergedCategories = Array.from(new Set([...fetchedCatNames, ...articleCatNames, 'Keamanan Pangan', 'Edukasi']))
-      setDbCategories(mergedCategories)
+    // Strictly filter to author's own articles if user has cadre role
+    if (userData?.role === 'cadre') {
+      const userUid = user?.uid
+      const userEmail = (user?.email || '').toLowerCase().trim()
+      const userDisplayName = (userData?.displayName || '').toLowerCase().trim()
 
-      let formattedData = data.map((doc: any) => ({
-        id: doc.id,
-        authorUid: doc.authorUid || doc.authorId || doc.createdBy || '',
-        title: doc.title || '',
-        slug: doc.slug || '',
-        author: doc.author || '',
-        authorBio: doc.authorBio || '',
-        category: doc.category || (mergedCategories[0] || 'Keamanan Pangan'),
-        status: doc.status || 'Draft',
-        views: doc.views || 0,
-        date: doc.date || doc.createdAt || new Date().toISOString(),
-        readTime: doc.readTime || 5,
-        excerpt: doc.excerpt || '',
-        content: doc.content || '',
-        featuredImage: doc.featuredImage || '',
-        tags: Array.isArray(doc.tags) ? doc.tags : [],
-        gallery: Array.isArray(doc.gallery) ? doc.gallery : [],
-        embeddedDistributionCode: doc.embeddedDistributionCode || '',
-        pretestCode: doc.pretestCode || '',
-        posttestCode: doc.posttestCode || doc.embeddedDistributionCode || '',
-      }))
-
-      // Strictly filter to author's own articles if user has cadre role
-      if (userData?.role === 'cadre') {
-        const userUid = user?.uid
-        const userEmail = (user?.email || '').toLowerCase().trim()
-        const userDisplayName = (userData?.displayName || '').toLowerCase().trim()
-
-        formattedData = formattedData.filter((a: any) => {
-          if (a.authorUid && userUid && a.authorUid === userUid) return true
-          const authLower = String(a.author || '').toLowerCase().trim()
-          if (userEmail && authLower === userEmail) return true
-          if (userDisplayName && userDisplayName.length > 2 && authLower === userDisplayName) return true
-          return false
-        })
-      }
-
-      setArticles(formattedData)
-    } catch (error) {
-      console.error('Gagal mengambil data artikel:', error)
-    } finally {
-      setLoading(false)
+      formattedData = formattedData.filter((a: any) => {
+        if (a.authorUid && userUid && a.authorUid === userUid) return true
+        const authLower = String(a.author || '').toLowerCase().trim()
+        if (userEmail && authLower === userEmail) return true
+        if (userDisplayName && userDisplayName.length > 2 && authLower === userDisplayName) return true
+        return false
+      })
     }
-  }
 
-  useEffect(() => { fetchArticlesData() }, [user, userData])
+    return { articles: formattedData as Article[], availableForms: fetchedForms, dbCategories: mergedCategories }
+  }, [articlesQuery.data, userData, user, extraCategories])
+
+  const articles = articlesData?.articles ?? []
+  const availableForms = articlesData?.availableForms ?? []
+  const dbCategories = articlesData?.dbCategories ?? ['Keamanan Pangan', 'Edukasi', 'Regulasi', 'Tips & Trik']
+  const loading = articlesQuery.isLoading
 
   // MEDIA STORAGE HELPERS
   const fetchMediaLibrary = async () => {
@@ -725,7 +722,7 @@ export default function ArticlesAdminPage() {
   }
 
   const handleApplyMatchedImages = async () => {
-    setLoading(true)
+    setApplyingImages(true)
     try {
       let updatedFeatured = formData.featuredImage
       let updatedBlocks = [...formData.blocks]
@@ -767,7 +764,7 @@ export default function ArticlesAdminPage() {
     } catch (err) {
       console.error('Error applying matched images:', err)
     } finally {
-      setLoading(false)
+      setApplyingImages(false)
     }
   }
 
@@ -906,7 +903,7 @@ export default function ArticlesAdminPage() {
       setIsModalOpen(false)
       setIsPreviewOpen(false)
       setShowSuccess(true)
-      fetchArticlesData()
+      queryClient.invalidateQueries({ queryKey: ['dashboard', 'articles'] })
       setTimeout(() => setShowSuccess(false), 3000)
     } catch (error) {
       console.error('Gagal menyimpan:', error)
@@ -928,7 +925,7 @@ export default function ArticlesAdminPage() {
         await deleteArticle(articleToDeleteId)
         setSuccessMessage('Artikel berhasil dihapus!')
         setShowSuccess(true)
-        fetchArticlesData()
+        queryClient.invalidateQueries({ queryKey: ['dashboard', 'articles'] })
         setTimeout(() => setShowSuccess(false), 3000)
       } catch (error) {
         console.error('Gagal menghapus:', error)
