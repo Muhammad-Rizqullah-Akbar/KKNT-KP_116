@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Topbar } from '@/features/dashboard/components/layout/Topbar'
@@ -32,10 +33,20 @@ export default function LegacyFormsPage() {
     }
   }, [loading, userRole, userData, router])
 
-  const [forms, setForms] = useState<LegacyFormData[]>([])
-  const [groups, setGroups] = useState<FormGroup[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  // ============ SERVER-STATE (TanStack Query) ============
+  const legacyQuery = useQuery<{ forms: LegacyFormData[]; groups: FormGroup[] }>({
+    queryKey: ['forms', 'legacy'],
+    queryFn: async () => {
+      const [formsData, groupsData] = await Promise.all([getForms(), getFormGroups()])
+      return { forms: formsData, groups: groupsData }
+    },
+  })
+
+  const forms = legacyQuery.data?.forms ?? []
+  const groups = legacyQuery.data?.groups ?? []
+  const isLoading = legacyQuery.isLoading
+  const error = legacyQuery.error ? (legacyQuery.error as Error).message : null
+  const loadLegacyData = () => legacyQuery.refetch()
 
   // Filters & Tabs
   const [searchTerm, setSearchTerm] = useState('')
@@ -54,26 +65,6 @@ export default function LegacyFormsPage() {
     setToastMessage(msg)
     setTimeout(() => setToastMessage(null), 3500)
   }
-
-  // Fetch Legacy Forms & Form Groups
-  const loadLegacyData = async () => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      const [formsData, groupsData] = await Promise.all([getForms(), getFormGroups()])
-      setForms(formsData)
-      setGroups(groupsData)
-    } catch (err: any) {
-      console.error('Error loading legacy forms:', err)
-      setError(err.message || 'Gagal memuat kuesioner V1.0 dari database Firestore.')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    loadLegacyData()
-  }, [])
 
   // Filtered List
   const filteredForms = useMemo(() => {
