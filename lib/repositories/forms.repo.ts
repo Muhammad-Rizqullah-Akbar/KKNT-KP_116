@@ -532,6 +532,11 @@ export const incrementFilledCount = async (formId: string): Promise<void> => {
 
 // ============ FORM GROUP CRUD ============
 
+/**
+ * @deprecated formGroups akan dihapus pada migrasi data (M3) — target struktur
+ * tidak lagi memakai pengelompokan form terpisah (forms jadi self-contained).
+ * Jangan pakai untuk fitur baru. Fungsi dipertahankan sementara agar dashboard lama tetap jalan.
+ */
 export const getFormGroups = async (): Promise<FormGroup[]> => {
   try {
     const groupsRef = collection(firestore, 'formGroups')
