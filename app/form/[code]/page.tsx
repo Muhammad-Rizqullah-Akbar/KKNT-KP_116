@@ -9,7 +9,7 @@ import { PublicReviewScreen } from '@/components/forms/v1_5/PublicReviewScreen'
 import { PublicCompletionReceipt } from '@/components/forms/v1_5/PublicCompletionReceipt'
 import type { PublicDistributionDTO, PublicResponseSessionDTO } from '@/lib/domain/distributions/distribution-types'
 import { Icon } from '@/components/ui/Icons'
-import { safeFetchJson } from '@/lib/shared/safeFetch'
+import { safeFetchJson } from '@/lib/infra/safe-fetch'
 
 import { isBiodataAspect } from '@/lib/domain/scoring/scoring-engine'
 

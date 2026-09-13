@@ -6,7 +6,7 @@ import { Icon } from '@/components/ui/Icons'
 import Link from 'next/link'
 import { type FormResponse, type FormData } from '@/lib/repositories/forms.repo'
 import { useAuth } from '@/context/AuthContext'
-import { safeFetchJson } from '@/lib/shared/safeFetch'
+import { safeFetchJson } from '@/lib/infra/safe-fetch'
 import { getArticles } from '@/lib/repositories/articles.repo'
 import { SkeletonCard } from '@/components/ui/Skeleton'
 
@@ -201,7 +201,7 @@ function AdminOverviewDashboard() {
       setLoading(true)
       try {
         const { getForms, getAllResponses } = await import('@/lib/repositories/forms.repo')
-        const { safeFetchJson } = await import('@/lib/shared/safeFetch')
+        const { safeFetchJson } = await import('@/lib/infra/safe-fetch')
         const [responsesData, formsData, v15RespRes] = await Promise.all([
           getAllResponses().catch(() => []),
           getForms().catch(() => []),

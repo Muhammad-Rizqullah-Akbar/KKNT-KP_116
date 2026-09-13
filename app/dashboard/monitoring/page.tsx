@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
-import { safeFetchJson } from '@/lib/shared/safeFetch'
+import { safeFetchJson } from '@/lib/infra/safe-fetch'
 import { Topbar } from '@/components/dashboard/Topbar'
 import { Icon } from '@/components/ui/Icons'
 import { ProfileProgressModal } from '@/components/dashboard/ProfileProgressModal'

@@ -11,7 +11,7 @@ import { GallerySection } from '@/components/home/GallerySection'
 import { ArticleModal } from '@/components/home/ArticleModal'
 import { CodeModal } from '@/components/home/CodeModal'
 import { Icon } from '@/components/ui/Icons'
-import { safeFetchJson } from '@/lib/shared/safeFetch'
+import { safeFetchJson } from '@/lib/infra/safe-fetch'
 
 // Import Repositori Firestore
 import {

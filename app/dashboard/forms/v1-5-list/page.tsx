@@ -10,7 +10,7 @@ import { FormPreviewModal } from '@/components/forms/v1_5/FormPreviewModal'
 import type { FormAggregateDoc } from '@/lib/repositories/form-versions.repo'
 import { formAggregateToCanonicalForm } from '@/lib/domain/forms/form-converters'
 import { useAuth } from '@/context/AuthContext'
-import { safeFetchJson } from '@/lib/shared/safeFetch'
+import { safeFetchJson } from '@/lib/infra/safe-fetch'
 import { SkeletonCard, SkeletonTable } from '@/components/ui/Skeleton'
 
 export type DerivedLifecycleStatus = 'draft' | 'ready' | 'published' | 'active' | 'archived'

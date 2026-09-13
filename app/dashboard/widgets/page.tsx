@@ -8,7 +8,7 @@ import { Button } from '@/components/shared/Button'
 import { getAllResponses, getForms, getFormGroups, type FormResponse, type FormData as LegacyFormData, type FormGroup } from '@/lib/repositories/forms.repo'
 import { extractRespondentName, extractRespondentEmail } from '@/lib/domain/responses/respondent-utils'
 import { useAuth } from '@/context/AuthContext'
-import { safeFetchJson } from '@/lib/shared/safeFetch'
+import { safeFetchJson } from '@/lib/infra/safe-fetch'
 
 // ============================================================================
 // CONSTANTS & COLOR PALETTES

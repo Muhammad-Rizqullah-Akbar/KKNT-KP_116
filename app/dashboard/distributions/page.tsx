@@ -8,7 +8,7 @@ import { Icon } from '@/components/ui/Icons'
 import type { DistributionDoc } from '@/lib/domain/distributions/distribution-types'
 import type { FormAggregateDoc } from '@/lib/repositories/form-versions.repo'
 import { useAuth } from '@/context/AuthContext'
-import { safeFetchJson } from '@/lib/shared/safeFetch'
+import { safeFetchJson } from '@/lib/infra/safe-fetch'
 import { SkeletonTable } from '@/components/ui/Skeleton'
 
 export default function DistributionsDashboardPage() {
