@@ -5,6 +5,7 @@ import {
 } from '@/lib/repositories/form-versions.repo'
 import { createFormWorkflow } from '@/lib/domain/forms/form-management.service'
 import { toPublicFormProjection } from '@/lib/domain/forms/legacy-adapter'
+import { formSchema } from '@/lib/schemas'
 
 /**
  * Detect Firestore "database not found" errors and return a clear message
@@ -84,6 +85,14 @@ export async function POST(request: Request) {
     }
     const body = await request.json()
 
+    // Zod boundary validation — tolak data korup di pintu masuk
+    const parsed = formSchema.pick({ metadata: true }).safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json(
+        { success: false, message: 'Metadata formulir tidak valid.', issues: parsed.error.issues },
+        { status: 400 }
+      )
+    }
     if (!body.metadata || !body.metadata.title) {
       return NextResponse.json(
         { success: false, message: 'Metadata formulir dengan judul wajib diisi.' },
