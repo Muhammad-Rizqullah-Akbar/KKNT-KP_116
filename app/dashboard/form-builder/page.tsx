@@ -25,6 +25,7 @@ import {
   getScoredStages,  // ← NEW IMPORT
 } from '@/features/form-builder/components/shared/ElementTypes'
 import { VIEW_COOLDOWN_MS } from '@/lib/constants'
+import { useToast } from '@/lib/hooks/use-toast'
 import { 
   createForm, 
   updateForm, 
@@ -82,7 +83,7 @@ export default function FormBuilderPage() {
   const [isPropertiesOpen, setIsPropertiesOpen] = useState(false)
   const [isPreviewOpen, setIsPreviewOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
-  const [showSuccess, setShowSuccess] = useState(false)
+  const { visible: showSuccess, show: showToast, hide: hideToast } = useToast(VIEW_COOLDOWN_MS)
   const [generatedCode, setGeneratedCode] = useState('')
   const [isMobile, setIsMobile] = useState(false)
 
@@ -155,7 +156,7 @@ export default function FormBuilderPage() {
             // Load stages
             if (form.stages && form.stages.length > 0) {
               // Pastikan semua stage punya includeInScoring
-              const stagesWithScoring = form.stages.map((stage: any) => ({
+              const stagesWithScoring = form.stages.map((stage) => ({
                 ...stage,
                 includeInScoring: stage.includeInScoring !== false,
               }))
@@ -169,9 +170,9 @@ export default function FormBuilderPage() {
             }
             
             // Konversi questions ke FlexibleQuestion[]
-            const loadedElements = (form.questions || []).map((q: any, index: number) => {
-              const answerType = q.answerType || q.type || 'short-text'
-              const config = q.config || {}
+            const loadedElements = (form.questions || []).map((question: any, index: number) => {
+              const answerType = question.answerType || question.type || 'short-text'
+              const config = question.config || {}
               
               const fullConfig = {
                 ...getDefaultConfig(answerType),
@@ -179,19 +180,19 @@ export default function FormBuilderPage() {
               }
               
               return {
-                id: q.id || generateId(),
-                question: q.question || q.label || '',
-                description: q.description || '',
-                required: q.required || false,
-                order: q.order || index,
-                media: q.media || { type: 'none' as const },
+                id: question.id || generateId(),
+                question: question.question || question.label || '',
+                description: question.description || '',
+                required: question.required || false,
+                order: question.order || index,
+                media: question.media || { type: 'none' as const },
                 answerType: answerType,
                 config: fullConfig,
-                isIdentifier: q.isIdentifier || false,
-                identifierType: q.identifierType || 'none',
-                scoring: q.scoring || { scheme: 'none' as const, weight: 1 },
-                stageId: q.stageId || null,
-                overridePoints: q.overridePoints || null,
+                isIdentifier: question.isIdentifier || false,
+                identifierType: question.identifierType || 'none',
+                scoring: question.scoring || { scheme: 'none' as const, weight: 1 },
+                stageId: question.stageId || null,
+                overridePoints: question.overridePoints || null,
               } as FlexibleQuestion
             })
             
@@ -266,7 +267,7 @@ export default function FormBuilderPage() {
   }, [elements, stages])
 
   const handleDropFromToolbar = useCallback((elementType: string, targetIndex?: number) => {
-    const answerType = ANSWER_TYPES.find(t => t.value === elementType)
+    const answerType = ANSWER_TYPES.find(candidate => candidate.value === elementType)
     if (answerType) {
       handleAddElement({ type: answerType.value }, targetIndex)
     } else {
@@ -367,9 +368,9 @@ export default function FormBuilderPage() {
       return
     }
     
-    const removedStage = stages.find(s => s.id === stageId)
+    const removedStage = stages.find(stage => stage.id === stageId)
     if (removedStage && removedStage.questionIds.length > 0) {
-      const firstStageId = stages.find(s => s.id !== stageId)?.id
+      const firstStageId = stages.find(stage => stage.id !== stageId)?.id
       if (firstStageId) {
         setElements(prev => 
           prev.map(el => 
@@ -387,7 +388,7 @@ export default function FormBuilderPage() {
       distribution: newDistribution,
     }))
     
-    setStages(stages.filter(s => s.id !== stageId))
+    setStages(stages.filter(stage => stage.id !== stageId))
     updateStageQuestionIds(elements)
   }, [stages, elements, scoring.distribution])
 
@@ -586,7 +587,7 @@ export default function FormBuilderPage() {
         setIsNewGroup(false)
         resetGroupForm()
       } else if (selectedGroup) {
-        const group = groups.find(g => g.id === selectedGroup)
+        const group = groups.find(group => group.id === selectedGroup)
         groupCode = group?.code || null
       }
 
@@ -639,11 +640,7 @@ export default function FormBuilderPage() {
       }
 
       setGeneratedCode(formCode)
-      setShowSuccess(true)
-      
-      setTimeout(() => {
-        setShowSuccess(false)
-      }, VIEW_COOLDOWN_MS)
+      showToast(formId ? 'Formulir berhasil diperbarui!' : 'Formulir berhasil dibuat!')
     } catch (error: any) {
       console.error('Save error:', error)
       alert(error.message || 'Gagal menyimpan formulir')
@@ -728,7 +725,7 @@ export default function FormBuilderPage() {
               >
                 Salin Kode
               </button>
-              <button onClick={() => setShowSuccess(false)} className="p-1.5 rounded-lg hover:bg-white/[0.05] transition-colors">
+              <button onClick={hideToast} className="p-1.5 rounded-lg hover:bg-white/[0.05] transition-colors">
                 <Icon name="x" className="w-4 h-4 text-white/50" />
               </button>
             </div>
