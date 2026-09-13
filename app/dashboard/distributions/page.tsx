@@ -12,6 +12,7 @@ import { useAuth } from '@/context/AuthContext'
 import { safeFetchJson } from '@/lib/infra/safe-fetch'
 import { SkeletonTable } from '@/components/ui/Skeleton'
 import { queryKeys } from '@/lib/query-keys'
+import { useToast } from '@/lib/hooks'
 
 export default function DistributionsDashboardPage() {
   const router = useRouter()
@@ -19,6 +20,7 @@ export default function DistributionsDashboardPage() {
   const isGlobalRole = ['super_admin'].includes(userRole || '')
   const isPartnershipRole = userRole === 'partnership'
   const isCadreRole = userRole === 'cadre'
+  const toast = useToast()
 
   // ============ SERVER-STATE (TanStack Query) ============
   const distributionsQuery = useQuery<{ distributions: DistributionDoc[]; publishedForms: FormAggregateDoc[] }>({
@@ -36,11 +38,11 @@ export default function DistributionsDashboardPage() {
       let formsList = formRes.ok && formRes.data && Array.isArray(formRes.data.forms) ? formRes.data.forms : []
       const isGlobal = ['super_admin'].includes(userRole || '')
 
-      const permittedForms = formsList.filter((f: any) => {
-        const isPublished = f.status === 'published' || f.metadata?.status === 'published'
+      const permittedForms = formsList.filter((form: FormAggregateDoc) => {
+        const isPublished = form.status === 'published' || form.metadata?.status === 'published'
         if (!isPublished) return false
         if (isGlobal) return true
-        return f.allowCadreDistribution === true || f.metadata?.allowCadreDistribution === true
+        return form.allowCadreDistribution === true || form.metadata?.allowCadreDistribution === true
       })
 
       return { distributions: distRes.data.distributions, publishedForms: permittedForms as FormAggregateDoc[] }
@@ -123,9 +125,9 @@ export default function DistributionsDashboardPage() {
       ])
 
       if (formRes.ok && formRes.data && formRes.data.form) {
-        const f = formRes.data.form
-        setPermissionAllowCadre(f.allowCadreDistribution !== false)
-        setPermissionActiveVersionId(f.activeVersionId || '')
+        const formDetail = formRes.data.form
+        setPermissionAllowCadre(formDetail.allowCadreDistribution !== false)
+        setPermissionActiveVersionId(formDetail.activeVersionId || '')
       }
 
       if (verRes.ok && verRes.data && Array.isArray(verRes.data.versions)) {
@@ -134,7 +136,7 @@ export default function DistributionsDashboardPage() {
         setPermissionVersions([])
       }
     } catch (err) {
-      showToast('Gagal memuat detail versi formulir.')
+      toast.show('Gagal memuat detail versi formulir.')
     } finally {
       setIsLoadingPermissionVersions(false)
     }
@@ -154,26 +156,19 @@ export default function DistributionsDashboardPage() {
       })
 
       if (res.ok && res.data?.success) {
-        showToast('Izin & versi aktif distribusi berhasil diperbarui!')
+        toast.show('Izin & versi aktif distribusi berhasil diperbarui!')
         setIsPermissionModalOpen(false)
         loadData()
       } else {
-        showToast(res.error || 'Gagal memperbarui izin & versi.')
+        toast.show(res.error || 'Gagal memperbarui izin & versi.')
       }
     } catch (err) {
-      showToast('Gagal menyimpan ke server.')
+      toast.show('Gagal menyimpan ke server.')
     } finally {
       setIsSavingPermission(false)
     }
   }
 
-  // Toast
-  const [toastMessage, setToastMessage] = useState<string | null>(null)
-
-  const showToast = (msg: string) => {
-    setToastMessage(msg)
-    setTimeout(() => setToastMessage(null), 3500)
-  }
 
   const openDetailModal = async (distId: string) => {
     setIsDetailLoading(true)
@@ -187,26 +182,26 @@ export default function DistributionsDashboardPage() {
           formSummary: res.data.formSummary,
         })
       } else {
-        showToast(res.error || 'Gagal memuat detail distribusi.')
+        toast.show(res.error || 'Gagal memuat detail distribusi.')
       }
     } catch (err) {
-      showToast('Gagal memuat detail distribusi.')
+      toast.show('Gagal memuat detail distribusi.')
     } finally {
       setIsDetailLoading(false)
     }
   }
 
-  const openEditModal = (d: DistributionDoc) => {
-    setEditingDoc(d)
-    setEditTitle(d.title || '')
-    setEditDescription(d.description || '')
-    setEditStatus(d.status || 'active')
-    setEditVersionMode(d.versionMode || 'active')
-    setEditPinnedVersionId(d.pinnedVersionId || '')
-    setEditExpiresAt(d.expiresAt || '')
+  const openEditModal = (distribution: DistributionDoc) => {
+    setEditingDoc(distribution)
+    setEditTitle(distribution.title || '')
+    setEditDescription(distribution.description || '')
+    setEditStatus(distribution.status || 'active')
+    setEditVersionMode(distribution.versionMode || 'active')
+    setEditPinnedVersionId(distribution.pinnedVersionId || '')
+    setEditExpiresAt(distribution.expiresAt || '')
     setIsEditOpen(true)
-    if (d.formId) {
-      fetchFormVersions(d.formId)
+    if (distribution.formId) {
+      fetchFormVersions(distribution.formId)
     }
   }
 
@@ -229,14 +224,14 @@ export default function DistributionsDashboardPage() {
         body: JSON.stringify(payload),
       })
       if (res.ok && res.data) {
-        showToast('Kode distribusi berhasil diperbarui!')
+        toast.show('Kode distribusi berhasil diperbarui!')
         setIsEditOpen(false)
         loadData()
       } else {
-        showToast(res.error || 'Gagal memperbarui distribusi.')
+        toast.show(res.error || 'Gagal memperbarui distribusi.')
       }
     } catch (err: any) {
-      showToast('Terjadi kesalahan saat menyimpan perubahan.')
+      toast.show('Terjadi kesalahan saat menyimpan perubahan.')
     } finally {
       setIsSavingEdit(false)
     }
@@ -275,16 +270,16 @@ export default function DistributionsDashboardPage() {
 
   // Filtered List Client-Side
   const filteredDistributions = useMemo(() => {
-    return distributions.filter((d) => {
+    return distributions.filter((distribution) => {
       const term = searchTerm.toLowerCase()
       const matchesSearch =
-        (d.title || '').toLowerCase().includes(term) ||
-        (d.code || '').toLowerCase().includes(term) ||
-        (d.ownerName || '').toLowerCase().includes(term) ||
-        (d.formId || '').toLowerCase().includes(term)
+        (distribution.title || '').toLowerCase().includes(term) ||
+        (distribution.code || '').toLowerCase().includes(term) ||
+        (distribution.ownerName || '').toLowerCase().includes(term) ||
+        (distribution.formId || '').toLowerCase().includes(term)
 
-      const matchesStatus = statusFilter === 'all' || d.status === statusFilter
-      const matchesOwner = ownerFilter === 'all' || d.ownerType === ownerFilter
+      const matchesStatus = statusFilter === 'all' || distribution.status === statusFilter
+      const matchesOwner = ownerFilter === 'all' || distribution.ownerType === ownerFilter
 
       return matchesSearch && matchesStatus && matchesOwner
     })
@@ -301,9 +296,9 @@ export default function DistributionsDashboardPage() {
   // Stats
   const stats = useMemo(() => {
     const total = distributions.length
-    const active = distributions.filter((d) => d.status === 'active').length
-    const paused = distributions.filter((d) => d.status === 'paused').length
-    const expired = distributions.filter((d) => d.status === 'expired').length
+    const active = distributions.filter((distribution) => distribution.status === 'active').length
+    const paused = distributions.filter((distribution) => distribution.status === 'paused').length
+    const expired = distributions.filter((distribution) => distribution.status === 'expired').length
     return { total, active, paused, expired }
   }, [distributions])
 
@@ -318,7 +313,7 @@ export default function DistributionsDashboardPage() {
     if (selectedDistIds.length === filteredDistributions.length) {
       setSelectedDistIds([])
     } else {
-      setSelectedDistIds(filteredDistributions.map((d) => d.distributionId))
+      setSelectedDistIds(filteredDistributions.map((distribution) => distribution.distributionId))
     }
   }
 
@@ -326,7 +321,7 @@ export default function DistributionsDashboardPage() {
   const handleCreateDistribution = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedFormId) {
-      showToast('Pilih formulir resmi terlebih dahulu.')
+      toast.show('Pilih formulir resmi terlebih dahulu.')
       return
     }
 
@@ -355,13 +350,13 @@ export default function DistributionsDashboardPage() {
         throw new Error(data.message || 'Gagal membuat kode distribusi.')
       }
 
-      showToast(`Kode distribusi "${data.distribution.code}" berhasil dibuat!`)
+      toast.show(`Kode distribusi "${data.distribution.code}" berhasil dibuat!`)
       setIsCreateModalOpen(false)
       setCustomTitle('')
       setCustomDescription('')
       loadData()
     } catch (err: any) {
-      showToast(`Error: ${err.message}`)
+      toast.show(`Error: ${err.message}`)
     } finally {
       setIsCreating(false)
     }
@@ -374,13 +369,13 @@ export default function DistributionsDashboardPage() {
         method: 'POST',
       })
       if (res.ok && res.data) {
-        showToast(res.data.message || 'Status distribusi berhasil diubah.')
+        toast.show(res.data.message || 'Status distribusi berhasil diubah.')
         loadData()
       } else {
-        showToast(res.error || 'Gagal mengubah status distribusi.')
+        toast.show(res.error || 'Gagal mengubah status distribusi.')
       }
     } catch (err: any) {
-      showToast(`Error: ${err.message}`)
+      toast.show(`Error: ${err.message}`)
     }
   }
 
@@ -409,23 +404,23 @@ export default function DistributionsDashboardPage() {
             safeFetchJson(`/api/distributions/${id}`, { method: 'DELETE' })
           )
         )
-        showToast(`${idsToDelete.length} kode distribusi berhasil dihapus secara masal!`)
+        toast.show(`${idsToDelete.length} kode distribusi berhasil dihapus secara masal!`)
         setSelectedDistIds([])
       } else {
         const res = await safeFetchJson(`/api/distributions/${deleteTargetDoc.id}`, {
           method: 'DELETE',
         })
         if (res.ok && res.data) {
-          showToast(`Kode distribusi "${deleteTargetDoc.code}" berhasil dihapus.`)
+          toast.show(`Kode distribusi "${deleteTargetDoc.code}" berhasil dihapus.`)
           setSelectedDistIds((prev) => prev.filter((id) => id !== deleteTargetDoc.id))
         } else {
-          showToast(res.error || 'Gagal menghapus kode distribusi.')
+          toast.show(res.error || 'Gagal menghapus kode distribusi.')
         }
       }
       setDeleteTargetDoc(null)
       loadData()
     } catch (err: any) {
-      showToast(`Error: ${err.message}`)
+      toast.show(`Error: ${err.message}`)
     } finally {
       setIsExecutingDelete(false)
     }
@@ -436,7 +431,7 @@ export default function DistributionsDashboardPage() {
     const origin = typeof window !== 'undefined' ? window.location.origin : ''
     const url = `${origin}/form/${code}`
     navigator.clipboard.writeText(url)
-    showToast(`Tautan publik "${url}" disalin ke clipboard!`)
+    toast.show(`Tautan publik "${url}" disalin ke clipboard!`)
   }
 
   return (
@@ -607,14 +602,14 @@ export default function DistributionsDashboardPage() {
             </div>
           ) : (
             <div className="divide-y divide-slate-800/80">
-              {paginatedDistributions.map((d) => {
-                const isActive = d.status === 'active'
-                const isPaused = d.status === 'paused'
-                const isChecked = selectedDistIds.includes(d.distributionId)
+              {paginatedDistributions.map((distribution) => {
+                const isActive = distribution.status === 'active'
+                const isPaused = distribution.status === 'paused'
+                const isChecked = selectedDistIds.includes(distribution.distributionId)
 
                 return (
                   <div
-                    key={d.distributionId}
+                    key={distribution.distributionId}
                     className={`p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-colors border-b border-slate-800/50 last:border-0 ${
                       isChecked ? 'bg-slate-800/60' : 'hover:bg-slate-800/30'
                     }`}
@@ -624,14 +619,14 @@ export default function DistributionsDashboardPage() {
                       <input
                         type="checkbox"
                         checked={isChecked}
-                        onChange={() => toggleSelectDist(d.distributionId)}
+                        onChange={() => toggleSelectDist(distribution.distributionId)}
                         className="w-4 h-4 rounded accent-cyan-500 cursor-pointer mt-1 flex-shrink-0"
                       />
 
                       <div className="space-y-1.5">
                         <div className="flex items-center gap-2.5 flex-wrap">
                           <span className="font-mono text-cyan-400 font-extrabold text-sm px-2.5 py-0.5 rounded-lg bg-cyan-950 border border-cyan-500/30">
-                            {d.code}
+                            {distribution.code}
                           </span>
 
                           <span
@@ -643,27 +638,27 @@ export default function DistributionsDashboardPage() {
                                 : 'bg-rose-500/10 text-rose-300 border-rose-500/30'
                             }`}
                           >
-                            {d.status}
+                            {distribution.status}
                           </span>
 
                           <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-950 text-slate-400 border border-slate-800">
-                            {d.versionMode === 'pinned' ? `Pinned (${d.pinnedVersionId})` : 'Auto-Active (Versi Publik Terbaru)'}
+                            {distribution.versionMode === 'pinned' ? `Pinned (${distribution.pinnedVersionId})` : 'Auto-Active (Versi Publik Terbaru)'}
                           </span>
 
                           <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-purple-950/40 text-purple-300 border border-purple-500/30 capitalize">
-                            {d.ownerType === 'super_admin' ? 'BPOM Pusat' : d.ownerType === 'cadre' ? 'Kader Desa' : 'Kemitraan'}
+                            {distribution.ownerType === 'super_admin' ? 'BPOM Pusat' : distribution.ownerType === 'cadre' ? 'Kader Desa' : 'Kemitraan'}
                           </span>
                         </div>
 
-                        <h4 className="text-sm font-bold text-slate-100">{d.title}</h4>
-                        <p className="text-xs text-slate-400 line-clamp-1">{d.description || 'Tidak ada deskripsi tambahan.'}</p>
+                        <h4 className="text-sm font-bold text-slate-100">{distribution.title}</h4>
+                        <p className="text-xs text-slate-400 line-clamp-1">{distribution.description || 'Tidak ada deskripsi tambahan.'}</p>
 
                         <div className="flex items-center gap-3 text-[11px] text-slate-500 font-mono pt-1">
-                          <span>Form ID: {d.formId}</span>
+                          <span>Form ID: {distribution.formId}</span>
                           <span>•</span>
-                          <span>Pemilik: {d.ownerName}</span>
+                          <span>Pemilik: {distribution.ownerName}</span>
                           <span>•</span>
-                          <span>Dibuat: {new Date(d.createdAt).toLocaleDateString('id-ID')}</span>
+                          <span>Dibuat: {new Date(distribution.createdAt).toLocaleDateString('id-ID')}</span>
                         </div>
                       </div>
                     </div>
@@ -672,7 +667,7 @@ export default function DistributionsDashboardPage() {
                     <div className="flex items-center gap-2 self-start md:self-center flex-wrap pl-7 md:pl-0">
                       <button
                         type="button"
-                        onClick={() => openDetailModal(d.distributionId)}
+                        onClick={() => openDetailModal(distribution.distributionId)}
                         className="px-3 py-1.5 rounded-xl bg-purple-950/40 hover:bg-purple-900/60 text-purple-200 border border-purple-500/40 text-xs font-semibold flex items-center gap-1.5 transition-colors"
                       >
                         <Icon name="eye" className="w-3.5 h-3.5 text-purple-300" />
@@ -681,7 +676,7 @@ export default function DistributionsDashboardPage() {
 
                       <button
                         type="button"
-                        onClick={() => openEditModal(d)}
+                        onClick={() => openEditModal(distribution)}
                         className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-colors"
                       >
                         <Icon name="edit" className="w-3.5 h-3.5 text-amber-400" />
@@ -690,7 +685,7 @@ export default function DistributionsDashboardPage() {
 
                       <button
                         type="button"
-                        onClick={() => copyPublicLink(d.code)}
+                        onClick={() => copyPublicLink(distribution.code)}
                         className="px-3 py-1.5 rounded-xl bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-200 border border-cyan-500/40 text-xs font-semibold flex items-center gap-1.5 transition-colors"
                       >
                         <Icon name="copy" className="w-3.5 h-3.5" />
@@ -698,7 +693,7 @@ export default function DistributionsDashboardPage() {
                       </button>
 
                       <a
-                        href={`/form/${d.code}`}
+                        href={`/form/${distribution.code}`}
                         target="_blank"
                         rel="noreferrer"
                         className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-colors"
@@ -709,7 +704,7 @@ export default function DistributionsDashboardPage() {
 
                       <button
                         type="button"
-                        onClick={() => handleTogglePause(d.distributionId)}
+                        onClick={() => handleTogglePause(distribution.distributionId)}
                         className={`px-3 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-colors ${
                           isPaused
                             ? 'bg-emerald-950/40 hover:bg-emerald-900/50 text-emerald-200 border-emerald-500/40'
@@ -722,7 +717,7 @@ export default function DistributionsDashboardPage() {
 
                       <button
                         type="button"
-                        onClick={() => handleDeleteClick(d.distributionId, d.code, d.title)}
+                        onClick={() => handleDeleteClick(distribution.distributionId, distribution.code, distribution.title)}
                         className="px-3 py-1.5 rounded-xl bg-rose-950/40 hover:bg-rose-900/60 text-rose-200 border border-rose-500/40 text-xs font-semibold flex items-center gap-1.5 transition-colors"
                         title="Hapus Kode Distribusi Permanen"
                       >
@@ -834,17 +829,17 @@ export default function DistributionsDashboardPage() {
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-60 overflow-y-auto pr-1">
-                    {publishedForms.map((f) => {
-                      const isSelected = selectedFormId === f.formId
-                      const aspectCount = f.aspects?.length || 0
-                      const questionCount = f.questions?.length || 0
+                    {publishedForms.map((form) => {
+                      const isSelected = selectedFormId === form.formId
+                      const aspectCount = form.aspects?.length || 0
+                      const questionCount = form.questions?.length || 0
 
                       return (
                         <div
-                          key={f.formId}
+                          key={form.formId}
                           onClick={() => {
-                            setSelectedFormId(f.formId)
-                            fetchFormVersions(f.formId)
+                            setSelectedFormId(form.formId)
+                            fetchFormVersions(form.formId)
                           }}
                           className={`cursor-pointer p-3.5 rounded-2xl border transition-all space-y-2 relative group ${
                             isSelected
@@ -855,7 +850,7 @@ export default function DistributionsDashboardPage() {
                           {/* Selection badge check */}
                           <div className="flex items-center justify-between gap-2">
                             <span className="text-[10px] font-mono font-extrabold px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-500/30">
-                              v{f.activeVersionNumber || 1.5}
+                              v{form.activeVersionNumber || 1.5}
                             </span>
 
                             <div
@@ -871,10 +866,10 @@ export default function DistributionsDashboardPage() {
 
                           <div>
                             <h4 className={`font-bold text-xs line-clamp-2 transition-colors ${isSelected ? 'text-cyan-200' : 'text-slate-200'}`}>
-                              {f.metadata?.title || (f as any).title || f.formId}
+                              {form.metadata?.title || form.formId}
                             </h4>
                             <p className="text-[10px] text-slate-400 mt-0.5 line-clamp-1">
-                              {f.metadata?.category || 'Kuesioner Evaluasi'}
+                              {form.metadata?.category || 'Kuesioner Evaluasi'}
                             </p>
                           </div>
 
@@ -916,7 +911,7 @@ export default function DistributionsDashboardPage() {
                 <label className="block font-semibold text-slate-300 mb-1">Mode Versi Kuesioner</label>
                 <select
                   value={versionMode}
-                  onChange={(e) => setVersionMode(e.target.value as any)}
+                  onChange={(e) => setVersionMode(e.target.value as 'active' | 'pinned')}
                   className="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-3.5 py-2.5 font-semibold focus:outline-none focus:border-cyan-500"
                 >
                   <option value="active">Auto-Active (Selalu Ikut Versi Terbaru)</option>
@@ -1143,7 +1138,7 @@ export default function DistributionsDashboardPage() {
                   <label className="block font-semibold text-slate-300 mb-1">Mode Versi</label>
                   <select
                     value={editVersionMode}
-                    onChange={(e) => setEditVersionMode(e.target.value as any)}
+                    onChange={(e) => setEditVersionMode(e.target.value as 'active' | 'pinned')}
                     className="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-3.5 py-2.5 font-semibold focus:outline-none focus:border-cyan-500"
                   >
                     <option value="active">Auto-Active (Terbaru)</option>
@@ -1321,9 +1316,9 @@ export default function DistributionsDashboardPage() {
                 }}
                 className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-emerald-500 cursor-pointer font-medium"
               >
-                {publishedForms.map((f) => (
-                  <option key={f.formId} value={f.formId}>
-                    {f.metadata?.title || f.formId} (V{f.activeVersionNumber || 1}.0)
+                {publishedForms.map((form) => (
+                  <option key={form.formId} value={form.formId}>
+                    {form.metadata?.title || form.formId} (V{form.activeVersionNumber || 1}.0)
                   </option>
                 ))}
               </select>
@@ -1448,9 +1443,9 @@ export default function DistributionsDashboardPage() {
       )}
 
       {/* Toast Notification */}
-      {toastMessage && (
+      {toast.visible && (
         <div className="fixed bottom-6 right-6 z-50 p-4 rounded-xl bg-slate-900 border border-slate-700 text-slate-100 text-xs font-semibold shadow-2xl animate-in slide-in-from-bottom-3">
-          {toastMessage}
+          {toast.message}
         </div>
       )}
     </div>
