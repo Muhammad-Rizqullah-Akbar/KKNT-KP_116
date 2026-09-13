@@ -6,12 +6,12 @@ import {
   getResponseDoc,
   submitResponseDoc,
   listResponsesDoc,
-} from '@/lib/repositories/v1_5-responses.repo'
+} from '@/lib/repositories/responses.repo'
 import { getDistributionByCodeDoc, listDistributionsDoc } from '@/lib/repositories/distributions.repo'
 import {
   getFormAggregateFromDb,
   getFormVersionSnapshotsFromDb,
-} from '@/lib/repositories/v1_5-forms.repo'
+} from '@/lib/repositories/form-versions.repo'
 import { validateResponseAnswers } from '@/lib/forms/v1_5/response.validation'
 import { calculateResponseScore } from '@/lib/domain/scoring/scoring-engine'
 import { toPublicFormProjection } from '@/lib/forms/v1_5/legacyAdapter'

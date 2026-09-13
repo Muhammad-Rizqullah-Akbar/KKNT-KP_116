@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
-import type { FormVersionSnapshotDoc } from '@/lib/repositories/v1_5-forms.repo'
+import type { FormVersionSnapshotDoc } from '@/lib/repositories/form-versions.repo'
 import { Icon } from '@/components/ui/Icons'
 
 interface FormVersionHistoryModalProps {

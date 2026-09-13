@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthorizationContext, requireRole } from '@/lib/auth/server'
-import { getFormAggregateFromDb } from '@/lib/repositories/v1_5-forms.repo'
+import { getFormAggregateFromDb } from '@/lib/repositories/form-versions.repo'
 import { saveDraftWorkflow, updateFormMetadataWorkflow } from '@/lib/forms/v1_5/formManagement.service'
 import { deleteForm } from '@/lib/repositories/forms.repo'
 

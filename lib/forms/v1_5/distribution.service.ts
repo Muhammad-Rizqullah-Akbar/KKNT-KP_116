@@ -15,7 +15,7 @@ import { checkFormAccessDoc } from '@/lib/repositories/form-access.repo'
 import {
   getFormAggregateFromDb,
   getFormVersionSnapshotsFromDb,
-} from '@/lib/repositories/v1_5-forms.repo'
+} from '@/lib/repositories/form-versions.repo'
 import { toPublicFormProjection } from '@/lib/forms/v1_5/legacyAdapter'
 import type { AuthorizationContext } from '@/lib/auth/server'
 import type {

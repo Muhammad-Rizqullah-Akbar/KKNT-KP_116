@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { getAuthorizationContext, requireRole, AuthorizationError } from '@/lib/auth/server'
 import {
   listFormAggregatesFromDb,
-} from '@/lib/repositories/v1_5-forms.repo'
+} from '@/lib/repositories/form-versions.repo'
 import { createFormWorkflow } from '@/lib/forms/v1_5/formManagement.service'
 import { toPublicFormProjection } from '@/lib/forms/v1_5/legacyAdapter'
 

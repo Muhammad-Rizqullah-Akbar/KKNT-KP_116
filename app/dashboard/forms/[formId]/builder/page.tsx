@@ -3,7 +3,7 @@
 import React, { useEffect, useState, use } from 'react'
 import { useRouter } from 'next/navigation'
 import { FormBuilderV2 } from '@/components/forms/v1_5/FormBuilderV2'
-import type { FormAggregateDoc } from '@/lib/repositories/v1_5-forms.repo'
+import type { FormAggregateDoc } from '@/lib/repositories/form-versions.repo'
 import { formAggregateToBuilderState } from '@/lib/forms/v1_5/formConverters'
 import type { BuilderState } from '@/lib/forms/v1_5/builderState'
 import { Icon } from '@/components/ui/Icons'

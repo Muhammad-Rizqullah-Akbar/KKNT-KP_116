@@ -9,7 +9,7 @@ import {
   getFormVersionSnapshotsFromDb,
   type FormAggregateDoc,
   type FormVersionSnapshotDoc,
-} from '@/lib/repositories/v1_5-forms.repo'
+} from '@/lib/repositories/form-versions.repo'
 import { validateCanonicalForm } from '@/lib/forms/v1_5/validation'
 import type { FormMetadata } from '@/lib/forms/v1_5/types'
 import type { BuilderState } from '@/lib/forms/v1_5/builderState'
@@ -179,7 +179,7 @@ export async function restoreFormWorkflow(
   formId: string,
   sessionUid: string
 ): Promise<FormAggregateDoc> {
-  const { restoreFormInDb } = await import('@/lib/repositories/v1_5-forms.repo')
+  const { restoreFormInDb } = await import('@/lib/repositories/form-versions.repo')
   return await restoreFormInDb(formId, sessionUid)
 }
 
