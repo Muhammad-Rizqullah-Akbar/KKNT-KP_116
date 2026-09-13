@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthorizationContext } from '@/lib/auth/server'
-import { duplicateFormWorkflow } from '@/lib/forms/v1_5/formManagement.service'
+import { duplicateFormWorkflow } from '@/lib/domain/forms/form-management.service'
 
 /**
  * POST /api/v1_5/forms/[formId]/duplicate

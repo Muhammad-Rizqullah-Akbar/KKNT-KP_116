@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
-import type { BuilderState } from '@/lib/forms/v1_5/builderState'
-import { computeBalancedAspectWeights, updateScoring } from '@/lib/forms/v1_5/builderState'
+import type { BuilderState } from '@/lib/domain/forms/builder-state'
+import { computeBalancedAspectWeights, updateScoring } from '@/lib/domain/forms/builder-state'
 import { Icon } from '@/components/ui/Icons'
 import { calculateQuestionScore } from '@/lib/domain/scoring/scoring-engine'
 

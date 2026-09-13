@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthorizationContext } from '@/lib/auth/server'
-import { listResponsesWorkflow } from '@/lib/forms/v1_5/response.service'
+import { listResponsesWorkflow } from '@/lib/domain/responses/response.service'
 import { getFormAndDistributionOptions } from '@/lib/repositories/responses.repo'
 
 /**

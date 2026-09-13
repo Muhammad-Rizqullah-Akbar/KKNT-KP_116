@@ -1,4 +1,4 @@
-import type { BuilderQuestion, FormAspect, ScoringConfig, GradeThreshold, RecommendationConfig } from '@/lib/forms/v1_5/builderState'
+import type { BuilderQuestion, FormAspect, ScoringConfig, GradeThreshold, RecommendationConfig } from '@/lib/domain/forms/builder-state'
 import type { QuestionScoreResult, AspectScoreResult, ResponseResultDoc, IndicatorScoreItem } from './scoring-types'
 import { resolveGradeThreshold } from './threshold-engine'
 import { resolveRecommendationArticleIds } from './recommendation-engine'

@@ -1,8 +1,8 @@
 'use client'
 
 import React, { useState, useMemo } from 'react'
-import type { CanonicalForm } from '@/lib/forms/v1_5/types'
-import { toPublicFormProjection } from '@/lib/forms/v1_5/legacyAdapter'
+import type { CanonicalForm } from '@/lib/domain/forms/types'
+import { toPublicFormProjection } from '@/lib/domain/forms/legacy-adapter'
 import { FormPublicRenderer } from './FormPublicRenderer'
 import { Icon } from '@/components/ui/Icons'
 

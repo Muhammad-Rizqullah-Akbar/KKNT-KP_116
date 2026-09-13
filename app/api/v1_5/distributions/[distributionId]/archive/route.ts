@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthorizationContext } from '@/lib/auth/server'
-import { archiveDistributionWorkflow } from '@/lib/forms/v1_5/distribution.service'
+import { archiveDistributionWorkflow } from '@/lib/domain/distributions/distribution.service'
 
 interface RouteParams {
   params: Promise<{ distributionId: string }>

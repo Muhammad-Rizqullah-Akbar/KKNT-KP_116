@@ -3,7 +3,7 @@
 import React, { useState } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import type { FormAspect, BuilderQuestion } from '@/lib/forms/v1_5/builderState'
+import type { FormAspect, BuilderQuestion } from '@/lib/domain/forms/builder-state'
 import { QuestionCard } from './QuestionCard'
 import { QuestionEditor } from './QuestionEditor'
 import { Icon } from '@/components/ui/Icons'

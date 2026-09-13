@@ -6,7 +6,7 @@ import { Topbar } from '@/components/dashboard/Topbar'
 import { Icon, type IconName } from '@/components/ui/Icons'
 import { Button } from '@/components/shared/Button'
 import { getAllResponses, getForms, getFormGroups, type FormResponse, type FormData as LegacyFormData, type FormGroup } from '@/lib/repositories/forms.repo'
-import { extractRespondentName, extractRespondentEmail } from '@/lib/forms/v1_5/respondentUtils'
+import { extractRespondentName, extractRespondentEmail } from '@/lib/domain/responses/respondent-utils'
 import { useAuth } from '@/context/AuthContext'
 import { safeFetchJson } from '@/lib/shared/safeFetch'
 

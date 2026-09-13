@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test, describe } from 'node:test'
-import { toPublicFormProjection } from '../lib/forms/v1_5/legacyAdapter'
+import { toPublicFormProjection } from '../lib/domain/forms/legacy-adapter'
 
 describe('Security & Public Projection Boundaries', () => {
 

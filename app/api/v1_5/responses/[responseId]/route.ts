@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { requireRole } from '@/lib/auth/server'
-import { getResponseDetailWorkflow } from '@/lib/forms/v1_5/response.service'
+import { getResponseDetailWorkflow } from '@/lib/domain/responses/response.service'
 
 interface RouteParams {
   params: Promise<{ responseId: string }>

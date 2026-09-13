@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { startResponseWorkflow } from '@/lib/forms/v1_5/response.service'
+import { startResponseWorkflow } from '@/lib/domain/responses/response.service'
 
 /**
  * POST /api/v1_5/responses/start

@@ -1,4 +1,4 @@
-import type { BuilderQuestion, ValidationConfig } from '@/lib/forms/v1_5/builderState'
+import type { BuilderQuestion, ValidationConfig } from '@/lib/domain/forms/builder-state'
 
 export interface ValidationErrorItem {
   questionId: string

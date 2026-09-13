@@ -16,14 +16,14 @@ import {
   getFormAggregateFromDb,
   getFormVersionSnapshotsFromDb,
 } from '@/lib/repositories/form-versions.repo'
-import { toPublicFormProjection } from '@/lib/forms/v1_5/legacyAdapter'
+import { toPublicFormProjection } from '@/lib/domain/forms/legacy-adapter'
 import type { AuthorizationContext } from '@/lib/auth/server'
 import type {
   DistributionDoc,
   PublicDistributionDTO,
   CreateDistributionParams,
   UpdateDistributionParams,
-} from '@/lib/forms/v1_5/distributionTypes'
+} from '@/lib/domain/distributions/distribution-types'
 
 import { randomInt, randomBytes } from 'crypto'
 

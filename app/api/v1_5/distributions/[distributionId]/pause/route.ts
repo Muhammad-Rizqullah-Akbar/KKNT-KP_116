@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthorizationContext } from '@/lib/auth/server'
-import { pauseDistributionWorkflow } from '@/lib/forms/v1_5/distribution.service'
+import { pauseDistributionWorkflow } from '@/lib/domain/distributions/distribution.service'
 
 interface RouteParams {
   params: Promise<{ distributionId: string }>

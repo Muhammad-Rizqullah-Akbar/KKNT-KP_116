@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import type { FormValidationIssue } from '@/lib/forms/v1_5/validation'
+import type { FormValidationIssue } from '@/lib/domain/forms/validation'
 import { Icon } from '@/components/ui/Icons'
 
 interface ValidationErrorsBannerProps {

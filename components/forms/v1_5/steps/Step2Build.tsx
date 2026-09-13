@@ -11,7 +11,7 @@ import {
   DragEndEvent,
 } from '@dnd-kit/core'
 
-import type { BuilderState, BuilderQuestion } from '@/lib/forms/v1_5/builderState'
+import type { BuilderState, BuilderQuestion } from '@/lib/domain/forms/builder-state'
 import {
   addQuestion,
   updateQuestion,
@@ -21,8 +21,8 @@ import {
   moveQuestionToAspect,
   addAspect,
   updateAspect,
-} from '@/lib/forms/v1_5/builderState'
-import type { QuestionType } from '@/lib/forms/v1_5/types'
+} from '@/lib/domain/forms/builder-state'
+import type { QuestionType } from '@/lib/domain/forms/types'
 import { QuestionEditor } from '../QuestionEditor'
 import { Icon } from '@/components/ui/Icons'
 import { AddAspectModal, ConfirmDeleteModal } from '../modals/FormBuilderModals'

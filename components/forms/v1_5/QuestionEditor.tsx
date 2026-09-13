@@ -1,9 +1,9 @@
 'use client'
 
 import React, { useState } from 'react'
-import type { QuestionType, BiodataKey } from '@/lib/forms/v1_5/types'
-import type { FormAspect, BuilderQuestion } from '@/lib/forms/v1_5/builderState'
-import { QUESTION_TYPES } from '@/lib/forms/v1_5/types'
+import type { QuestionType, BiodataKey } from '@/lib/domain/forms/types'
+import type { FormAspect, BuilderQuestion } from '@/lib/domain/forms/builder-state'
+import { QUESTION_TYPES } from '@/lib/domain/forms/types'
 import { LikertScaleEditor } from './LikertScaleEditor'
 import { Icon } from '@/components/ui/Icons'
 

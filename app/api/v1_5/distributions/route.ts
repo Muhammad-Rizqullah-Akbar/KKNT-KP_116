@@ -3,7 +3,7 @@ import { getAuthorizationContext } from '@/lib/auth/server'
 import {
   listDistributionsWorkflow,
   createDistributionWorkflow,
-} from '@/lib/forms/v1_5/distribution.service'
+} from '@/lib/domain/distributions/distribution.service'
 
 /**
  * Detect Firestore "database not found" errors and return a clear message.

@@ -1,4 +1,4 @@
-import type { GradeThreshold } from '@/lib/forms/v1_5/builderState'
+import type { GradeThreshold } from '@/lib/domain/forms/builder-state'
 import type { GradeResult } from './scoring-types'
 
 /**

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getPublicResponseResultWorkflow } from '@/lib/forms/v1_5/response.service'
+import { getPublicResponseResultWorkflow } from '@/lib/domain/responses/response.service'
 
 interface RouteParams {
   params: Promise<{ responseId: string }>

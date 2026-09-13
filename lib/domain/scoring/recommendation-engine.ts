@@ -1,4 +1,4 @@
-import type { RecommendationConfig } from '@/lib/forms/v1_5/builderState'
+import type { RecommendationConfig } from '@/lib/domain/forms/builder-state'
 
 /**
  * Pure recommendation resolver.

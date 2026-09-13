@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
 import { test, describe, after } from 'node:test'
 import { adminFirestore, adminAuth } from '../lib/firebaseAdmin'
-import { createFormWorkflow, createNewVersionWorkflow, publishFormWorkflow } from '../lib/forms/v1_5/formManagement.service'
-import { createDistributionWorkflow, resolveDistributionWorkflow } from '../lib/forms/v1_5/distribution.service'
-import { startResponseWorkflow, submitResponseWorkflow } from '../lib/forms/v1_5/response.service'
+import { createFormWorkflow, createNewVersionWorkflow, publishFormWorkflow } from '../lib/domain/forms/form-management.service'
+import { createDistributionWorkflow, resolveDistributionWorkflow } from '../lib/domain/distributions/distribution.service'
+import { startResponseWorkflow, submitResponseWorkflow } from '../lib/domain/responses/response.service'
 
 describe('Golden Flow E2E Live Verification Matrix', () => {
   const timestamp = Date.now()

@@ -1,11 +1,11 @@
 'use client'
 
 import React, { useState } from 'react'
-import type { BuilderState, FormAspect } from '@/lib/forms/v1_5/builderState'
-import { addAspect, updateAspect, deleteAspect, reorderAspect, updateMetadata, updateScoring } from '@/lib/forms/v1_5/builderState'
-import { builderStateToCanonicalForm } from '@/lib/forms/v1_5/formConverters'
-import type { AssessmentOutputMode, CanonicalForm } from '@/lib/forms/v1_5/types'
-import { validateCanonicalForm } from '@/lib/forms/v1_5/validation'
+import type { BuilderState, FormAspect } from '@/lib/domain/forms/builder-state'
+import { addAspect, updateAspect, deleteAspect, reorderAspect, updateMetadata, updateScoring } from '@/lib/domain/forms/builder-state'
+import { builderStateToCanonicalForm } from '@/lib/domain/forms/form-converters'
+import type { AssessmentOutputMode, CanonicalForm } from '@/lib/domain/forms/types'
+import { validateCanonicalForm } from '@/lib/domain/forms/validation'
 import { Icon } from '@/components/ui/Icons'
 import { AddAspectModal, ConfirmDeleteModal } from '../modals/FormBuilderModals'
 

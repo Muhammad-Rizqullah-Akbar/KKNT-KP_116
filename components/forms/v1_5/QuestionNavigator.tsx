@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import type { BuilderQuestion, FormAspect } from '@/lib/forms/v1_5/builderState'
+import type { BuilderQuestion, FormAspect } from '@/lib/domain/forms/builder-state'
 import { Icon } from '@/components/ui/Icons'
 
 export type QuestionStatus = 'valid' | 'warning' | 'error'

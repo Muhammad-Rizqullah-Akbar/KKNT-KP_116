@@ -7,7 +7,7 @@ import { safeFetchJson } from '@/lib/shared/safeFetch'
 import { getArticles, type ArticleData } from '@/lib/repositories/articles.repo'
 import { Topbar } from '@/components/dashboard/Topbar'
 import { Icon } from '@/components/ui/Icons'
-import type { DistributionDoc } from '@/lib/forms/v1_5/distributionTypes'
+import type { DistributionDoc } from '@/lib/domain/distributions/distribution-types'
 
 export default function UserProfileProgressPage() {
   const { user, userData, refreshUserData } = useAuth()

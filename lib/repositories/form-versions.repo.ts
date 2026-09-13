@@ -1,13 +1,13 @@
 import { adminFirestore } from '@/lib/firebaseAdmin'
 import { recursivelyOffloadBase64Media } from '@/lib/infra/media-offloader'
-import type { FormMetadata, ScoringConfig, ValidationConfig, CanonicalForm } from '@/lib/forms/v1_5/types'
+import type { FormMetadata, ScoringConfig, ValidationConfig, CanonicalForm } from '@/lib/domain/forms/types'
 import type {
   FormAspect,
   BuilderQuestion,
   GradeThreshold,
   RecommendationConfig,
   FormDistributionConfig,
-} from '@/lib/forms/v1_5/builderState'
+} from '@/lib/domain/forms/builder-state'
 
 export interface FormAggregateDoc {
   formId: string

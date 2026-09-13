@@ -1,8 +1,8 @@
 import { safeGetDoc, safeGetCollectionDocs, safeSetDoc, safeDeleteDoc } from './safe-firestore'
-import type { ResponseDoc, ResponseFilterOptions } from '@/lib/forms/v1_5/responseTypes'
+import type { ResponseDoc, ResponseFilterOptions } from '@/lib/domain/responses/response-types'
 import { ScoringEngine } from '@/lib/domain/scoring/preview-engine'
 import { calculateResponseScore } from '@/lib/domain/scoring/scoring-engine'
-import { adaptLegacyForm } from '@/lib/forms/v1_5/legacyAdapter'
+import { adaptLegacyForm } from '@/lib/domain/forms/legacy-adapter'
 
 const RESPONSES_COLLECTION = 'responses'
 

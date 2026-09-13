@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import type { BuilderState } from '@/lib/forms/v1_5/builderState'
+import type { BuilderState } from '@/lib/domain/forms/builder-state'
 import {
   DEFAULT_ASPECTS,
   DEFAULT_SCORING_CONFIG,
@@ -10,9 +10,9 @@ import {
   DEFAULT_THRESHOLDS,
   DEFAULT_RECOMMENDATIONS,
   DEFAULT_DISTRIBUTION,
-} from '@/lib/forms/v1_5/builderState'
-import type { CanonicalForm } from '@/lib/forms/v1_5/types'
-import { validateCanonicalForm } from '@/lib/forms/v1_5/validation'
+} from '@/lib/domain/forms/builder-state'
+import type { CanonicalForm } from '@/lib/domain/forms/types'
+import { validateCanonicalForm } from '@/lib/domain/forms/validation'
 
 import { FormBuilderStepper, type BuilderStepId } from './FormBuilderStepper'
 import { Step1Setup } from './steps/Step1Setup'

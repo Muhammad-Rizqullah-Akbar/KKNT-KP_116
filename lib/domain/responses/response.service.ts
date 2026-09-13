@@ -12,9 +12,9 @@ import {
   getFormAggregateFromDb,
   getFormVersionSnapshotsFromDb,
 } from '@/lib/repositories/form-versions.repo'
-import { validateResponseAnswers } from '@/lib/forms/v1_5/response.validation'
+import { validateResponseAnswers } from '@/lib/domain/responses/response.validation'
 import { calculateResponseScore } from '@/lib/domain/scoring/scoring-engine'
-import { toPublicFormProjection } from '@/lib/forms/v1_5/legacyAdapter'
+import { toPublicFormProjection } from '@/lib/domain/forms/legacy-adapter'
 import type { AuthorizationContext } from '@/lib/auth/server'
 import type {
   ResponseDoc,
@@ -23,12 +23,12 @@ import type {
   StartResponseParams,
   SubmitResponseParams,
   ResponseFilterOptions,
-} from '@/lib/forms/v1_5/responseTypes'
+} from '@/lib/domain/responses/response-types'
 import type { ResponseResultDoc, RecommendationItem } from '@/lib/domain/scoring/scoring-types'
 
 import { randomBytes, randomUUID } from 'crypto'
 
-import { extractRespondentName, extractRespondentEmail } from '@/lib/forms/v1_5/respondentUtils'
+import { extractRespondentName, extractRespondentEmail } from '@/lib/domain/responses/respondent-utils'
 export { extractRespondentName, extractRespondentEmail }
 
 /**

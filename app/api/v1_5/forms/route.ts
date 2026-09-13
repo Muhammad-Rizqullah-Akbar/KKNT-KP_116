@@ -3,8 +3,8 @@ import { getAuthorizationContext, requireRole, AuthorizationError } from '@/lib/
 import {
   listFormAggregatesFromDb,
 } from '@/lib/repositories/form-versions.repo'
-import { createFormWorkflow } from '@/lib/forms/v1_5/formManagement.service'
-import { toPublicFormProjection } from '@/lib/forms/v1_5/legacyAdapter'
+import { createFormWorkflow } from '@/lib/domain/forms/form-management.service'
+import { toPublicFormProjection } from '@/lib/domain/forms/legacy-adapter'
 
 /**
  * Detect Firestore "database not found" errors and return a clear message

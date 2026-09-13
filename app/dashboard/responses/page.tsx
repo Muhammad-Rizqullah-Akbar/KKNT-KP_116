@@ -4,11 +4,11 @@ import React, { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import { Topbar } from '@/components/dashboard/Topbar'
 import { Icon } from '@/components/ui/Icons'
-import type { ResponseDoc } from '@/lib/forms/v1_5/responseTypes'
+import type { ResponseDoc } from '@/lib/domain/responses/response-types'
 import { useAuth } from '@/context/AuthContext'
 import { safeFetchJson } from '@/lib/shared/safeFetch'
 import { SkeletonCard, SkeletonTable } from '@/components/ui/Skeleton'
-import { extractRespondentName, extractRespondentEmail } from '@/lib/forms/v1_5/respondentUtils'
+import { extractRespondentName, extractRespondentEmail } from '@/lib/domain/responses/respondent-utils'
 import * as XLSX from 'xlsx'
 
 interface FormMetaItem {

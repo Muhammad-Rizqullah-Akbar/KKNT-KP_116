@@ -1,8 +1,8 @@
 'use client'
 
 import React from 'react'
-import type { BuilderState } from '@/lib/forms/v1_5/builderState'
-import type { CanonicalForm } from '@/lib/forms/v1_5/types'
+import type { BuilderState } from '@/lib/domain/forms/builder-state'
+import type { CanonicalForm } from '@/lib/domain/forms/types'
 import { FormBuilderWorkflow } from './FormBuilderWorkflow'
 
 export interface FormBuilderV2Props {

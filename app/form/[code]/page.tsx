@@ -7,7 +7,7 @@ import { PublicProgressHeader } from '@/components/forms/v1_5/PublicProgressHead
 import { PublicQuestionNavigator } from '@/components/forms/v1_5/PublicQuestionNavigator'
 import { PublicReviewScreen } from '@/components/forms/v1_5/PublicReviewScreen'
 import { PublicCompletionReceipt } from '@/components/forms/v1_5/PublicCompletionReceipt'
-import type { PublicDistributionDTO, PublicResponseSessionDTO } from '@/lib/forms/v1_5/distributionTypes'
+import type { PublicDistributionDTO, PublicResponseSessionDTO } from '@/lib/domain/distributions/distribution-types'
 import { Icon } from '@/components/ui/Icons'
 import { safeFetchJson } from '@/lib/shared/safeFetch'
 

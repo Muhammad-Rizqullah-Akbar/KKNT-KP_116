@@ -3,7 +3,7 @@
 import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { FormBuilderV2 } from '@/components/forms/v1_5/FormBuilderV2'
-import type { BuilderState } from '@/lib/forms/v1_5/builderState'
+import type { BuilderState } from '@/lib/domain/forms/builder-state'
 
 export default function FormBuilderV15TestPage() {
   const router = useRouter()

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { resolveDistributionWorkflow } from '@/lib/forms/v1_5/distribution.service'
+import { resolveDistributionWorkflow } from '@/lib/domain/distributions/distribution.service'
 
 interface RouteParams {
   params: Promise<{ distributionCode: string }>

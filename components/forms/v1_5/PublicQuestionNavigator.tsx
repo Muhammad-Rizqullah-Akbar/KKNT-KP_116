@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import type { PublicAspect, PublicQuestion } from '@/lib/forms/v1_5/types'
+import type { PublicAspect, PublicQuestion } from '@/lib/domain/forms/types'
 import { Icon } from '@/components/ui/Icons'
 
 interface PublicQuestionNavigatorProps {

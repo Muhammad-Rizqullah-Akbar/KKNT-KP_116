@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthorizationContext } from '@/lib/auth/server'
-import { restoreFormWorkflow } from '@/lib/forms/v1_5/formManagement.service'
+import { restoreFormWorkflow } from '@/lib/domain/forms/form-management.service'
 
 interface RouteParams {
   params: Promise<{ formId: string }>

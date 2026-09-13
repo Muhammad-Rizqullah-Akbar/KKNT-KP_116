@@ -10,19 +10,19 @@ import {
   type FormAggregateDoc,
   type FormVersionSnapshotDoc,
 } from '@/lib/repositories/form-versions.repo'
-import { validateCanonicalForm } from '@/lib/forms/v1_5/validation'
-import type { FormMetadata } from '@/lib/forms/v1_5/types'
-import type { BuilderState } from '@/lib/forms/v1_5/builderState'
+import { validateCanonicalForm } from '@/lib/domain/forms/validation'
+import type { FormMetadata } from '@/lib/domain/forms/types'
+import type { BuilderState } from '@/lib/domain/forms/builder-state'
 import {
   builderStateToFormAggregate,
   formAggregateToCanonicalForm,
-} from '@/lib/forms/v1_5/formConverters'
+} from '@/lib/domain/forms/form-converters'
 
 export {
   builderStateToFormAggregate,
   formAggregateToBuilderState,
   formAggregateToCanonicalForm,
-} from '@/lib/forms/v1_5/formConverters'
+} from '@/lib/domain/forms/form-converters'
 
 import { registerNewMetadataEntry } from '@/lib/repositories/form-registry.repo'
 

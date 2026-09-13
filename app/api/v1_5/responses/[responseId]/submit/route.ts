@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { submitResponseWorkflow } from '@/lib/forms/v1_5/response.service'
+import { submitResponseWorkflow } from '@/lib/domain/responses/response.service'
 
 interface RouteParams {
   params: Promise<{ responseId: string }>

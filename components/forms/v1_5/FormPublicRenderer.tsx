@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import type { PublicQuestion } from '@/lib/forms/v1_5/types'
+import type { PublicQuestion } from '@/lib/domain/forms/types'
 import { Icon } from '@/components/ui/Icons'
 
 interface FormPublicRendererProps {

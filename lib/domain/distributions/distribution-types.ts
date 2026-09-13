@@ -1,4 +1,4 @@
-import type { PublicFormProjection } from '@/lib/forms/v1_5/types'
+import type { PublicFormProjection } from '@/lib/domain/forms/types'
 
 export type DistributionOwnerType = 'admin' | 'cadre' | 'partnership'
 export type DistributionVersionMode = 'active' | 'pinned'

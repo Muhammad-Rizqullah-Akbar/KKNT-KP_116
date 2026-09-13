@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { requireRole } from '@/lib/auth/server'
-import { createNewVersionWorkflow } from '@/lib/forms/v1_5/formManagement.service'
+import { createNewVersionWorkflow } from '@/lib/domain/forms/form-management.service'
 
 interface RouteParams {
   params: Promise<{ formId: string }>

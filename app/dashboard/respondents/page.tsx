@@ -18,7 +18,7 @@ import {
 } from '@/lib/repositories/forms.repo'
 import { ScoringEngine } from '@/lib/domain/scoring/preview-engine'
 import { isBiodataAspect } from '@/lib/domain/scoring/scoring-engine'
-import { extractRespondentName, extractRespondentEmail } from '@/lib/forms/v1_5/respondentUtils'
+import { extractRespondentName, extractRespondentEmail } from '@/lib/domain/responses/respondent-utils'
 import * as XLSX from 'xlsx'
 
 // ---------- TYPES ----------
