@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getAuthorizationContext } from '@/lib/auth/server'
+import { getAuthorizationContext } from '@/lib/domain/auth/authorization'
 import { safeGetDoc, safeSetDoc } from '@/lib/repositories/safe-firestore'
 
 interface RouteParams {

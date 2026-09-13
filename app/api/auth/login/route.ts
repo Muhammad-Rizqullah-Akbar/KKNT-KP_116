@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { adminAuth, adminFirestore } from '@/lib/firebaseAdmin'
-import { SESSION_COOKIE_NAME } from '@/lib/auth/server'
+import { SESSION_COOKIE_NAME } from '@/lib/domain/auth/authorization'
 import { safeGetCollectionDocs } from '@/lib/repositories/safe-firestore'
 
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24

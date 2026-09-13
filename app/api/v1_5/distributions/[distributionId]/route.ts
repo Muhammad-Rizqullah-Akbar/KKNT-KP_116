@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getAuthorizationContext } from '@/lib/auth/server'
+import { getAuthorizationContext } from '@/lib/domain/auth/authorization'
 import { getDistributionDoc } from '@/lib/repositories/distributions.repo'
 import { getFormAggregateFromDb } from '@/lib/repositories/form-versions.repo'
 import { updateDistributionWorkflow, deleteDistributionWorkflow } from '@/lib/domain/distributions/distribution.service'

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getAuthorizationContext } from '@/lib/auth/server'
+import { getAuthorizationContext } from '@/lib/domain/auth/authorization'
 import { saveBase64MediaToFileOrStorage } from '@/lib/infra/media-offloader'
 
 /**

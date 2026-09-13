@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { adminAuth } from '@/lib/firebaseAdmin'
-import { getAuthorizationContext } from '@/lib/auth/server'
+import { getAuthorizationContext } from '@/lib/domain/auth/authorization'
 import { safeGetCollectionDocs } from '@/lib/repositories/safe-firestore'
 
 let cachedUserDocs: any[] | null = null

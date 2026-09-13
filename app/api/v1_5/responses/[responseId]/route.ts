@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { requireRole } from '@/lib/auth/server'
+import { requireRole } from '@/lib/domain/auth/authorization'
 import { getResponseDetailWorkflow } from '@/lib/domain/responses/response.service'
 
 interface RouteParams {

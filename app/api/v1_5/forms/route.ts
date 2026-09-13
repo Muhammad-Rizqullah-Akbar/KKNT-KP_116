@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getAuthorizationContext, requireRole, AuthorizationError } from '@/lib/auth/server'
+import { getAuthorizationContext, requireRole, AuthorizationError } from '@/lib/domain/auth/authorization'
 import {
   listFormAggregatesFromDb,
 } from '@/lib/repositories/form-versions.repo'

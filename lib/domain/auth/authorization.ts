@@ -2,7 +2,7 @@ import 'server-only'
 
 import { cookies } from 'next/headers'
 import type { DecodedIdToken } from 'firebase-admin/auth'
-import { adminAuth, adminFirestore } from '@/lib/firebaseAdmin'
+import { adminAuth, adminFirestore } from '@/lib/infra/firebase-admin'
 
 export const SESSION_COOKIE_NAME = '__session'
 export const APP_ROLES = ['super_admin', 'admin', 'internal_bpom', 'partnership', 'cadre', 'public'] as const

@@ -15,7 +15,7 @@ import {
 import { validateResponseAnswers } from '@/lib/domain/responses/response.validation'
 import { calculateResponseScore } from '@/lib/domain/scoring/scoring-engine'
 import { toPublicFormProjection } from '@/lib/domain/forms/legacy-adapter'
-import type { AuthorizationContext } from '@/lib/auth/server'
+import type { AuthorizationContext } from '@/lib/domain/auth/authorization'
 import type {
   ResponseDoc,
   PublicResponseSessionDTO,

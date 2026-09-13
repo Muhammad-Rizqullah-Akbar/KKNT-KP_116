@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getAuthorizationContext } from '@/lib/auth/server'
+import { getAuthorizationContext } from '@/lib/domain/auth/authorization'
 import { pauseDistributionWorkflow } from '@/lib/domain/distributions/distribution.service'
 
 interface RouteParams {

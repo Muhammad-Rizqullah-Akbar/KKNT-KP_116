@@ -17,7 +17,7 @@ import {
   getFormVersionSnapshotsFromDb,
 } from '@/lib/repositories/form-versions.repo'
 import { toPublicFormProjection } from '@/lib/domain/forms/legacy-adapter'
-import type { AuthorizationContext } from '@/lib/auth/server'
+import type { AuthorizationContext } from '@/lib/domain/auth/authorization'
 import type {
   DistributionDoc,
   PublicDistributionDTO,
