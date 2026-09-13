@@ -13,7 +13,7 @@ import {
 } from '@/lib/repositories/settings.repo'
 import { uploadSettingsImage, uploadGalleryImage, uploadOptimizedArticleImage } from '@/lib/infra/storage'
 import { queryKeys } from '@/lib/query-keys'
-import { TOAST_DURATION_MS, TOAST_DURATION_LONG_MS } from '@/lib/constants'
+import { useToast } from '@/lib/hooks'
 
 // ============ DATA DEFAULT / FALLBACK ============
 const defaultHeroData = {
@@ -94,8 +94,7 @@ export default function SettingsPage() {
   // ============ STATE UTAMA ============
   const [activeTab, setActiveTab] = useState<'hero' | 'partnership' | 'gallery'>('hero')
   const [saving, setSaving] = useState(false)
-  const [showSuccess, setShowSuccess] = useState(false)
-  const [successMessage, setSuccessMessage] = useState('')
+  const { visible, message, show, hide } = useToast()
 
   // 1. Hero State
   const [heroForm, setHeroForm] = useState(defaultHeroData)
@@ -143,9 +142,7 @@ export default function SettingsPage() {
     setSaving(true)
     try {
       await updateLandingPageSettings({ hero: heroForm })
-      setSuccessMessage('Hero Section berhasil diperbarui!')
-      setShowSuccess(true)
-      setTimeout(() => setShowSuccess(false), TOAST_DURATION_MS)
+      show('Hero Section berhasil diperbarui!')
     } catch (error: any) {
       alert('Gagal menyimpan Hero Section: ' + error.message)
     } finally {
@@ -158,9 +155,7 @@ export default function SettingsPage() {
     try {
       const res = await uploadOptimizedArticleImage(file, 'settings')
       setHeroForm(prev => ({ ...prev, bgImageUrl: res.url }))
-      setSuccessMessage(`Foto background Hero terkompresi (${res.savedPercent}% hemat storage)!`)
-      setShowSuccess(true)
-      setTimeout(() => setShowSuccess(false), TOAST_DURATION_MS)
+      show(`Foto background Hero terkompresi (${res.savedPercent}% hemat storage)!`)
     } catch (error: any) {
       alert('Gagal mengunggah foto background: ' + error.message)
     } finally {
@@ -173,9 +168,7 @@ export default function SettingsPage() {
     setSaving(true)
     try {
       await updateLandingPageSettings({ partnership: partnershipForm })
-      setSuccessMessage('Data Partnership & KKN berhasil diperbarui di database!')
-      setShowSuccess(true)
-      setTimeout(() => setShowSuccess(false), TOAST_DURATION_MS)
+      show('Data Partnership & KKN berhasil diperbarui di database!')
     } catch (error: any) {
       alert('Gagal menyimpan Partnership: ' + error.message)
     } finally {
@@ -207,9 +200,7 @@ export default function SettingsPage() {
     try {
       const res = await uploadOptimizedArticleImage(file, 'gallery')
       setGalleryForm(prev => ({ ...prev, imageUrl: res.url }))
-      setSuccessMessage(`Foto galeri terkompresi (${res.savedPercent}% hemat storage)!`)
-      setShowSuccess(true)
-      setTimeout(() => setShowSuccess(false), TOAST_DURATION_MS)
+      show(`Foto galeri terkompresi (${res.savedPercent}% hemat storage)!`)
     } catch (error: any) {
       alert('Gagal mengunggah foto galeri: ' + error.message)
     } finally {
@@ -232,7 +223,7 @@ export default function SettingsPage() {
       )
     } else {
       const newItem: GalleryItem = {
-        id: Math.max(0, ...gallery.map(g => g.id)) + 1,
+        id: Math.max(0, ...gallery.map((galleryItem) => galleryItem.id)) + 1,
         title: galleryForm.title || '',
         location: galleryForm.location || '',
         category: galleryForm.category || '',
@@ -247,9 +238,7 @@ export default function SettingsPage() {
       await updateLandingPageSettings({ gallery: updatedGallery })
       setGallery(updatedGallery)
       setIsGalleryModalOpen(false)
-      setSuccessMessage('Galeri berhasil diperbarui di database!')
-      setShowSuccess(true)
-      setTimeout(() => setShowSuccess(false), TOAST_DURATION_MS)
+      show('Galeri berhasil diperbarui di database!')
     } catch (error: any) {
       alert('Gagal menyimpan Galeri: ' + error.message)
     } finally {
@@ -270,9 +259,7 @@ export default function SettingsPage() {
     try {
       await updateLandingPageSettings({ gallery: updatedGallery })
       setGallery(updatedGallery)
-      setSuccessMessage('Item galeri berhasil dihapus!')
-      setShowSuccess(true)
-      setTimeout(() => setShowSuccess(false), TOAST_DURATION_MS)
+      show('Item galeri berhasil dihapus!')
     } catch (error: any) {
       alert('Gagal menghapus Galeri: ' + error.message)
     } finally {
@@ -292,12 +279,12 @@ export default function SettingsPage() {
 
       <div className="flex-1 p-6 space-y-6">
         {/* Toast Notifikasi */}
-        {showSuccess && (
+        {visible && (
           <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-3 animate-slideUp">
             <Icon name="checkCircle" className="w-5 h-5 text-emerald-400" />
-            <p className="text-sm text-white">{successMessage}</p>
+            <p className="text-sm text-white">{message}</p>
             <button
-              onClick={() => setShowSuccess(false)}
+              onClick={hide}
               className="ml-auto p-1 rounded-lg hover:bg-white/[0.05] transition-colors"
             >
               <Icon name="x" className="w-4 h-4 text-white/50" />
