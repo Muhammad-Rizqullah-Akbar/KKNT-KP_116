@@ -7,7 +7,6 @@ import { useAuth } from '@/context/AuthContext'
 import { safeFetchJson } from '@/lib/infra/safe-fetch'
 import { queryKeys } from '@/lib/query-keys'
 import {
-  cleanString,
   mapAnswersToQuestionIds,
   findMatchingForm,
   matchSelectedForm,
