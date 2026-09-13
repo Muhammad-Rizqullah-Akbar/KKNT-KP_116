@@ -241,7 +241,7 @@ export default function ResponsesDashboardPage() {
 
   const handleSelectResponseToggle = (id: string) => {
     setSelectedResponseIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((respId) => respId !== id) : [...prev, id]
     )
   }
 
@@ -313,13 +313,13 @@ export default function ResponsesDashboardPage() {
   // 1. KIRI: Dynamic Form options list from Firestore
   const mergedFormOptions = useMemo(() => {
     const map = new Map<string, FormMetaItem>()
-    dbForms.forEach((f) => map.set(f.formId, f))
+    dbForms.forEach((form) => map.set(form.formId, form))
 
     responses.forEach((r) => {
       if (r.formId && !map.has(r.formId)) {
         map.set(r.formId, {
           formId: r.formId,
-          title: (r as any).formTitle || 'Formulir Evaluasi Pangan',
+          title: r.formTitle || 'Formulir Evaluasi Pangan',
           versionNumber: r.versionNumber || 1.5,
           versionLabel: r.versionNumber >= 1.5 ? `V1.5 (v${r.versionNumber})` : 'V1.0 Legacy',
         })
@@ -333,21 +333,21 @@ export default function ResponsesDashboardPage() {
     let dists = dbDistributions
 
     if (selectedFormId !== 'all') {
-      dists = dists.filter((d) => d.formId === selectedFormId || !d.formId)
+      dists = dists.filter((dist) => dist.formId === selectedFormId || !dist.formId)
     }
 
     const map = new Map<string, PersonAuthorOption>()
 
-    dists.forEach((d) => {
-      const ownerName = d.ownerName || 'Kader Lapangan'
+    dists.forEach((dist) => {
+      const ownerName = dist.ownerName || 'Kader Lapangan'
       const ownerKey = ownerName.trim().toLowerCase()
-      const code = d.code || d.distributionId
+      const code = dist.code || dist.distributionId
 
       if (!map.has(ownerKey)) {
         map.set(ownerKey, {
           ownerKey,
           ownerName,
-          ownerType: d.ownerType || 'cadre',
+          ownerType: dist.ownerType || 'cadre',
           codes: code ? [code] : [],
           count: 1,
         })
@@ -361,16 +361,16 @@ export default function ResponsesDashboardPage() {
     })
 
     responses.forEach((r) => {
-      if (selectedFormId === 'all' || r.formId === selectedFormId || (r as any).formTitle === selectedFormId) {
-        const ownerName = (r as any).ownerName || 'Kader Lapangan'
+      if (selectedFormId === 'all' || r.formId === selectedFormId || r.formTitle === selectedFormId) {
+        const ownerName = r.ownerName || 'Kader Lapangan'
         const ownerKey = ownerName.trim().toLowerCase()
-        const code = r.distributionCode || (r as any).groupName || 'V1-DIST'
+        const code = r.distributionCode || r.groupName || 'V1-DIST'
 
         if (!map.has(ownerKey)) {
           map.set(ownerKey, {
             ownerKey,
             ownerName,
-            ownerType: (r as any).ownerType || 'cadre',
+            ownerType: r.ownerType || 'cadre',
             codes: code ? [code] : [],
             count: 1,
           })
@@ -389,7 +389,7 @@ export default function ResponsesDashboardPage() {
   // Reset Author Selection if selected author is no longer in available list
   useEffect(() => {
     if (selectedAuthorCode !== 'all') {
-      const exists = availableAuthors.some((a) => a.ownerKey === selectedAuthorCode || a.ownerName === selectedAuthorCode)
+      const exists = availableAuthors.some((author) => author.ownerKey === selectedAuthorCode || author.ownerName === selectedAuthorCode)
       if (!exists) setSelectedAuthorCode('all')
     }
   }, [selectedFormId, availableAuthors, selectedAuthorCode])
@@ -398,10 +398,10 @@ export default function ResponsesDashboardPage() {
   const filteredResponses = useMemo(() => {
     return responses.filter((r) => {
       const term = searchTerm.toLowerCase()
-      const formTitle = (r as any).formTitle || 'Formulir Evaluasi Keamanan Pangan'
+      const formTitle = r.formTitle || 'Formulir Evaluasi Keamanan Pangan'
       const distCode = r.distributionCode || 'V1-DIST'
-      const distTitle = (r as any).distributionTitle || (r as any).groupName || 'Kader Lapangan'
-      const ownerName = (r as any).ownerName || 'Kader Lapangan'
+      const distTitle = r.distributionTitle || r.groupName || 'Kader Lapangan'
+      const ownerName = r.ownerName || 'Kader Lapangan'
       const ownerKey = ownerName.trim().toLowerCase()
 
       const matchesSearch =
@@ -417,7 +417,7 @@ export default function ResponsesDashboardPage() {
 
       let matchesAuthor = true
       if (selectedAuthorCode !== 'all') {
-        const selectedPerson = availableAuthors.find((a) => a.ownerKey === selectedAuthorCode || a.ownerName === selectedAuthorCode)
+        const selectedPerson = availableAuthors.find((author) => author.ownerKey === selectedAuthorCode || author.ownerName === selectedAuthorCode)
         if (selectedPerson) {
           matchesAuthor =
             ownerKey === selectedPerson.ownerKey ||
@@ -462,12 +462,12 @@ export default function ResponsesDashboardPage() {
       return null
     }
 
-    const scoresList = filteredResponses.map(extractScore).filter((s): s is number => s !== null)
+    const scoresList = filteredResponses.map(extractScore).filter((scoreVal): scoreVal is number => scoreVal !== null)
     const avgScore = scoresList.length > 0
-      ? Math.round(scoresList.reduce((a, b) => a + b, 0) / scoresList.length)
+      ? Math.round(scoresList.reduce((acc, scoreVal) => acc + scoreVal, 0) / scoresList.length)
       : (filteredResponses.length > 0 ? 75 : 0)
 
-    const passCount = scoresList.filter((s) => s >= 75).length
+    const passCount = scoresList.filter((scoreVal) => scoreVal >= 75).length
 
     return { total, avgScore, passCount }
   }, [filteredResponses])
@@ -546,7 +546,7 @@ export default function ResponsesDashboardPage() {
     // Sheet 1: Summary
     const total = dataToExport.length
     const scores = dataToExport.map(r => r.result?.percentage ?? 0)
-    const avgScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / total) : 0
+    const avgScore = scores.length > 0 ? Math.round(scores.reduce((acc, scoreVal) => acc + scoreVal, 0) / total) : 0
 
     const summaryData: any[][] = [
       ['LAPORAN HASIL EVALUASI & PENILAIAN RESPONDEN'],
@@ -576,13 +576,13 @@ export default function ResponsesDashboardPage() {
     XLSX.utils.book_append_sheet(wb, ws1, 'Summary')
 
     // Sheet 2: Responden (With Per-Aspect Columns)
-    const aspectTitles = Array.from(aspectMap.values()).map(a => a.title)
+    const aspectTitles = Array.from(aspectMap.values()).map(aspect => aspect.title)
 
     const respData = dataToExport.map((r, i) => {
       const respAspects = getRespondentAspects(r)
       const aspScoreObj: Record<string, string> = {}
       aspectTitles.forEach(t => {
-        const found = respAspects.find(a => a.title === t)
+        const found = respAspects.find(aspect => aspect.title === t)
         aspScoreObj[`[Aspek] ${t} (%)`] = found ? `${found.percentage}%` : '-'
       })
 
@@ -593,7 +593,7 @@ export default function ResponsesDashboardPage() {
         'Email': r.respondent?.email || '-',
         'No HP': r.respondent?.phone || '-',
         'Instansi / Sekolah': r.respondent?.institution || '-',
-        'Formulir': (r as any).formTitle || r.formId,
+        'Formulir': r.formTitle || r.formId,
         'Kode Akses': r.distributionCode || '-',
         'Waktu Selesai': new Date(r.submittedAt || r.updatedAt || Date.now()).toLocaleString('id-ID'),
         'Skor Overall (%)': `${r.result?.percentage ?? 0}%`,
@@ -625,7 +625,7 @@ export default function ResponsesDashboardPage() {
             'ID Respon': r.responseId,
             'Nama Responden': r.respondent?.name || 'Anonim',
             'Instansi / Sekolah': r.respondent?.institution || '-',
-            'Formulir': (r as any).formTitle || r.formId,
+            'Formulir': r.formTitle || r.formId,
             'Skor Overall (%)': `${r.result?.percentage ?? 0}%`,
             'Nama Aspek Penilaian': asp.title,
             'Skor Aspek (%)': `${asp.percentage}%`,
@@ -764,9 +764,9 @@ export default function ResponsesDashboardPage() {
                 className="px-3.5 py-2 rounded-2xl bg-slate-950 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 font-semibold w-full sm:w-56"
               >
                 <option value="all">Semua Formulir ({mergedFormOptions.length})</option>
-                {mergedFormOptions.map((f) => (
-                  <option key={f.formId} value={f.formId}>
-                    {f.title}
+                {mergedFormOptions.map((form) => (
+                  <option key={form.formId} value={form.formId}>
+                    {form.title}
                   </option>
                 ))}
               </select>
@@ -781,9 +781,9 @@ export default function ResponsesDashboardPage() {
                 className="px-3.5 py-2 rounded-2xl bg-slate-950 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:border-purple-500 font-semibold w-full sm:w-72"
               >
                 <option value="all">Semua Author / Orang ({availableAuthors.length})</option>
-                {availableAuthors.map((a) => (
-                  <option key={a.ownerKey} value={a.ownerKey}>
-                    {a.ownerName} ({a.ownerType === 'super_admin' ? 'Super Admin' : a.ownerType === 'cadre' ? 'Kader' : 'Mitra'})
+                {availableAuthors.map((author) => (
+                  <option key={author.ownerKey} value={author.ownerKey}>
+                    {author.ownerName} ({author.ownerType === 'super_admin' ? 'Super Admin' : author.ownerType === 'cadre' ? 'Kader' : 'Mitra'})
                   </option>
                 ))}
               </select>
@@ -903,9 +903,9 @@ export default function ResponsesDashboardPage() {
               const grade = res?.grade || (score >= 80 ? 'Grade A' : score >= 60 ? 'Grade B' : 'Grade C')
               const thresholdTitle = res?.thresholdTitle || (score >= 80 ? 'Memenuhi Syarat (MS)' : score >= 60 ? 'Binaan Lanjutan' : 'Perlu Perbaikan')
 
-              const formTitle = ((r as any).formTitle || 'Formulir Evaluasi Keamanan Pangan').replace(/^form_[\w\-]+/g, 'Formulir Evaluasi Pangan')
+              const formTitle = (r.formTitle || 'Formulir Evaluasi Keamanan Pangan').replace(/^form_[\w\-]+/g, 'Formulir Evaluasi Pangan')
               const distCode = r.distributionCode || 'V1-DIST'
-              const ownerName = (r as any).ownerName || 'Penerbit Kode'
+              const ownerName = r.ownerName || 'Penerbit Kode'
 
               return (
                 <div
@@ -1046,8 +1046,8 @@ export default function ResponsesDashboardPage() {
                 const score = Math.min(100, Math.max(0, Math.round(Number(rawScoreVal) || 0)))
                 const grade = res?.grade || (score >= 80 ? 'A' : score >= 60 ? 'B' : 'C')
                 const thresholdTitle = res?.thresholdTitle || (score >= 80 ? 'Memenuhi Syarat (MS)' : score >= 60 ? 'Binaan Lanjutan' : 'Perlu Perbaikan')
-                const formTitle = ((r as any).formTitle || 'Formulir Evaluasi Keamanan Pangan').replace(/^form_[\w\-]+/g, 'Formulir Evaluasi Pangan')
-                const ownerName = (r as any).ownerName || 'Penerbit Kode'
+                const formTitle = (r.formTitle || 'Formulir Evaluasi Keamanan Pangan').replace(/^form_[\w\-]+/g, 'Formulir Evaluasi Pangan')
+                const ownerName = r.ownerName || 'Penerbit Kode'
 
                 return (
                   <div
@@ -1186,7 +1186,7 @@ export default function ResponsesDashboardPage() {
                   {selectedRespondent.respondent?.name || 'Responden Publik'}
                 </h3>
                 <p className="text-xs text-slate-400 font-sans font-semibold">
-                  Formulir: {(selectedRespondent as any).formTitle || selectedRespondent.formId}
+                  Formulir: {selectedRespondent.formTitle || selectedRespondent.formId}
                 </p>
               </div>
 
@@ -1236,7 +1236,7 @@ export default function ResponsesDashboardPage() {
                       Analisis Kode & Author
                     </span>
                     <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-purple-500/10 text-purple-300 border border-purple-500/30 font-bold uppercase">
-                      {(selectedRespondent as any).ownerType || 'cadre'}
+                      {selectedRespondent.ownerType || 'cadre'}
                     </span>
                   </div>
                   <p className="text-2xl font-black font-mono text-purple-200 tracking-wider">
@@ -1244,10 +1244,10 @@ export default function ResponsesDashboardPage() {
                   </p>
                   <div className="text-xs space-y-0.5">
                     <p className="text-slate-300 font-bold">
-                      Author: <span className="text-purple-300">{(selectedRespondent as any).ownerName || 'Administrator BPOM'}</span>
+                      Author: <span className="text-purple-300">{selectedRespondent.ownerName || 'Administrator BPOM'}</span>
                     </p>
                     <p className="text-slate-400 font-mono text-[11px]">
-                      Form: {(selectedRespondent as any).formTitle || 'Formulir Evaluasi Pangan'} (v{selectedRespondent.versionNumber || 1.5})
+                      Form: {selectedRespondent.formTitle || 'Formulir Evaluasi Pangan'} (v{selectedRespondent.versionNumber || 1.5})
                     </p>
                   </div>
                 </div>
@@ -1411,14 +1411,14 @@ export default function ResponsesDashboardPage() {
                         {/* SIGNATURE */}
                         {type === 'signature' && (
                           <div className="rounded-xl overflow-hidden border border-slate-800 bg-white p-2 max-w-xs">
-                            <img src={q.selectedValue || (selectedRespondent.answers as any)?.[q.questionId]} alt="Tanda Tangan" className="max-h-32 mx-auto" />
+                            <img src={q.selectedValue || selectedRespondent.answers?.[q.questionId]} alt="Tanda Tangan" className="max-h-32 mx-auto" />
                           </div>
                         )}
 
                         {/* TEXT / OTHER */}
                         {!['indicator-table', 'likert', 'single-choice', 'dropdown', 'binary', 'multiple-choice', 'signature'].includes(type) && (
                           <div className="p-3 rounded-xl bg-slate-950 border border-slate-800/80 text-xs font-mono text-slate-200">
-                            {String(q.selectedValue || (selectedRespondent.answers as any)?.[q.questionId] || '-')}
+                            {String(q.selectedValue || selectedRespondent.answers?.[q.questionId] || '-')}
                           </div>
                         )}
                       </div>
@@ -1548,7 +1548,7 @@ export default function ResponsesDashboardPage() {
             </div>
 
             <p className="text-xs text-slate-300 leading-relaxed">
-              Apakah Anda yakin ingin menghapus data tanggapan kuesioner dari <strong>{(selectedResponse as any).respondentName || (selectedResponse as any).answers?.name || 'Responden'}</strong>? Tindakan ini permanen dan tidak dapat dibatalkan.
+              Apakah Anda yakin ingin menghapus data tanggapan kuesioner dari <strong>{(selectedResponse as any).respondentName || selectedResponse.answers?.name || 'Responden'}</strong>? Tindakan ini permanen dan tidak dapat dibatalkan.
             </p>
 
             <div className="flex items-center justify-end gap-3 pt-2">
