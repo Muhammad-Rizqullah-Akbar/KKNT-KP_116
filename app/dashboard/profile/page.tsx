@@ -9,6 +9,7 @@ import { getArticles, type ArticleData } from '@/lib/repositories/articles.repo'
 import { Topbar } from '@/features/dashboard/components/layout/Topbar'
 import { Icon } from '@/components/ui/Icons'
 import type { DistributionDoc } from '@/lib/domain/distributions/distribution-types'
+import { queryKeys } from '@/lib/query-keys'
 
 export default function UserProfileProgressPage() {
   const { user, userData, refreshUserData } = useAuth()
@@ -45,7 +46,7 @@ export default function UserProfileProgressPage() {
     cadresCount: number
     teamResponsesCount: number
   }>({
-    queryKey: ['user-progress', user?.uid, userData],
+    queryKey: queryKeys.profile.progress(user?.uid, userData),
     queryFn: async () => {
       const currentUser = user
       const currentUserData = userData

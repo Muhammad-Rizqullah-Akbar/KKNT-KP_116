@@ -11,6 +11,7 @@ import { safeFetchJson } from '@/lib/infra/safe-fetch'
 import { SkeletonCard, SkeletonTable } from '@/components/ui/Skeleton'
 import { extractRespondentName, extractRespondentEmail } from '@/lib/domain/responses/respondent-utils'
 import * as XLSX from 'xlsx'
+import { queryKeys } from '@/lib/query-keys'
 
 interface FormMetaItem {
   formId: string
@@ -262,7 +263,7 @@ export default function ResponsesDashboardPage() {
     error: queryError,
     refetch,
   } = useQuery({
-    queryKey: ['dashboard', 'responses'],
+    queryKey: queryKeys.dashboard.responses,
     queryFn: async () => {
       const [respRes, userRes] = await Promise.all([
         safeFetchJson('/api/responses?status=submitted'),

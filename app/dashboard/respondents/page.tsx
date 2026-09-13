@@ -21,6 +21,7 @@ import { ScoringEngine } from '@/lib/domain/scoring/preview-engine'
 import { isBiodataAspect } from '@/lib/domain/scoring/scoring-engine'
 import { extractRespondentName, extractRespondentEmail } from '@/lib/domain/responses/respondent-utils'
 import * as XLSX from 'xlsx'
+import { queryKeys } from '@/lib/query-keys'
 
 // ---------- TYPES ----------
 type Respondent = {
@@ -180,7 +181,7 @@ export default function RespondentsPage() {
 
   // ============ LOAD DATA (TanStack Query) ============
   const { data: respondentsData, isLoading: loading } = useQuery({
-    queryKey: ['dashboard', 'respondents'],
+    queryKey: queryKeys.dashboard.respondents,
     queryFn: async () => {
       const [responsesData, formsData, groupsData] = await Promise.all([
         getAllResponses(),

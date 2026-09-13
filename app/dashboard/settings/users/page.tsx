@@ -7,6 +7,7 @@ import { useAuth } from '@/context/AuthContext'
 import { safeFetchJson } from '@/lib/infra/safe-fetch'
 import { Icon, type IconName } from '@/components/ui/Icons'
 import { Topbar } from '@/features/dashboard/components/layout/Topbar'
+import { queryKeys } from '@/lib/query-keys'
 
 type UserRole = 'super_admin' | 'cadre' | 'partnership' | null
 
@@ -90,7 +91,7 @@ export default function UserManagementPage() {
     error: usersError,
     refetch,
   } = useQuery<User[]>({
-    queryKey: ['users'],
+    queryKey: queryKeys.users.list,
     queryFn: async () => {
       const { ok, data, error: fetchErr } = await safeFetchJson<{ users?: User[] }>('/api/auth/users')
       if (!ok || !data) {
@@ -342,7 +343,7 @@ export default function UserManagementPage() {
       setRegisterPartnershipId('')
       setRegisterRole('super_admin')
 
-      queryClient.invalidateQueries({ queryKey: ['users'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.users.list })
     } catch (err: any) {
       setError(err.message)
     } finally {

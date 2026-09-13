@@ -20,6 +20,7 @@ import { uploadOptimizedArticleImage } from '@/lib/infra/storage'
 import { ref, uploadBytes, getDownloadURL, listAll } from 'firebase/storage'
 import { SmartUploadArticleModal } from '@/features/dashboard/components/modals/SmartUploadArticleModal'
 import { exportArticleToJson } from '@/lib/domain/articles/smart-article-parser'
+import { queryKeys } from '@/lib/query-keys'
 
 // ============ TIPE DATA & KONSTANTA ============
 type GalleryImage = { id: string; url?: string; caption: string; gradient: string }
@@ -88,7 +89,7 @@ export default function ArticlesAdminPage() {
 
   // ============ SERVER-STATE (TanStack Query) ============
   const articlesQuery = useQuery({
-    queryKey: ['dashboard', 'articles', user?.uid, userData?.role, userData?.displayName],
+    queryKey: queryKeys.dashboard.articles(user?.uid, userData?.role),
     queryFn: async () => {
       const [data, catData, formsList] = await Promise.all([
         getArticles(),
@@ -261,7 +262,7 @@ export default function ArticlesAdminPage() {
       setShowSuccess(true)
       setSelectedArticleIds([])
       setIsBulkDeleteModalOpen(false)
-      queryClient.invalidateQueries({ queryKey: ['dashboard', 'articles'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.articles(user?.uid, userData?.role) })
       setTimeout(() => setShowSuccess(false), 3000)
     } catch (err: any) {
       console.error('Gagal menghapus secara massal:', err)
@@ -903,7 +904,7 @@ export default function ArticlesAdminPage() {
       setIsModalOpen(false)
       setIsPreviewOpen(false)
       setShowSuccess(true)
-      queryClient.invalidateQueries({ queryKey: ['dashboard', 'articles'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.articles(user?.uid, userData?.role) })
       setTimeout(() => setShowSuccess(false), 3000)
     } catch (error) {
       console.error('Gagal menyimpan:', error)
@@ -925,7 +926,7 @@ export default function ArticlesAdminPage() {
         await deleteArticle(articleToDeleteId)
         setSuccessMessage('Artikel berhasil dihapus!')
         setShowSuccess(true)
-        queryClient.invalidateQueries({ queryKey: ['dashboard', 'articles'] })
+        queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.articles(user?.uid, userData?.role) })
         setTimeout(() => setShowSuccess(false), 3000)
       } catch (error) {
         console.error('Gagal menghapus:', error)

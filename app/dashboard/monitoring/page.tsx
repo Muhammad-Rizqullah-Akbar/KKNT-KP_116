@@ -9,6 +9,7 @@ import { Topbar } from '@/features/dashboard/components/layout/Topbar'
 import { Icon } from '@/components/ui/Icons'
 import { ProfileProgressModal } from '@/features/dashboard/components/modals/ProfileProgressModal'
 import { SkeletonOverview, SkeletonTable } from '@/components/ui/Skeleton'
+import { queryKeys } from '@/lib/query-keys'
 
 type UserProfile = {
   uid: string
@@ -87,7 +88,7 @@ export default function MonitoringDomainPage() {
 
   // Fetch all Monitoring Data via TanStack Query
   const { data: monitoringData, isLoading } = useQuery({
-    queryKey: ['dashboard', 'monitoring'],
+    queryKey: queryKeys.dashboard.monitoring,
     queryFn: async () => {
       const [usersRes, distRes, respRes] = await Promise.all([
         safeFetchJson('/api/auth/users'),

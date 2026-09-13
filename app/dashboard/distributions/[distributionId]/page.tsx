@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import { Topbar } from '@/features/dashboard/components/layout/Topbar'
 import { Icon } from '@/components/ui/Icons'
 import type { DistributionDoc } from '@/lib/domain/distributions/distribution-types'
+import { queryKeys } from '@/lib/query-keys'
 
 interface PageProps {
   params: Promise<{ distributionId: string }>
@@ -28,7 +29,7 @@ export default function DistributionDetailPage({ params }: PageProps) {
     isLoading,
     error: distributionError,
   } = useQuery<DistributionDoc | null>({
-    queryKey: ['distribution', distributionId],
+    queryKey: queryKeys.distributions.detail(distributionId),
     queryFn: async () => {
       const res = await fetch(`/api/distributions/${distributionId}`)
       const data = await res.json()
@@ -42,7 +43,7 @@ export default function DistributionDetailPage({ params }: PageProps) {
   const error = distributionError ? (distributionError as Error).message : null
 
   const invalidateDistribution = () =>
-    queryClient.invalidateQueries({ queryKey: ['distribution', distributionId] })
+    queryClient.invalidateQueries({ queryKey: queryKeys.distributions.detail(distributionId) })
 
   const handleTogglePause = async () => {
     if (!distribution) return

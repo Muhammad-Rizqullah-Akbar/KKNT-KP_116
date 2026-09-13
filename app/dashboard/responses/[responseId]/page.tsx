@@ -9,6 +9,7 @@ import { Icon } from '@/components/ui/Icons'
 import type { ResponseDoc } from '@/lib/domain/responses/response-types'
 import { isBiodataAspect } from '@/lib/domain/scoring/scoring-engine'
 import { extractRespondentName, extractRespondentEmail } from '@/lib/domain/responses/respondent-utils'
+import { queryKeys } from '@/lib/query-keys'
 
 interface PageProps {
   params: Promise<{ responseId: string }>
@@ -24,7 +25,7 @@ export default function ResponseDetailPage({ params }: PageProps) {
     isLoading,
     error: responseError,
   } = useQuery<ResponseDoc | null>({
-    queryKey: ['response', responseId],
+    queryKey: queryKeys.responses.detail(responseId),
     queryFn: async () => {
       const res = await fetch(`/api/responses/${responseId}`)
       const data = await res.json()
@@ -39,7 +40,7 @@ export default function ResponseDetailPage({ params }: PageProps) {
   const error = responseError ? (responseError as Error).message : null
 
   const { data: formDoc } = useQuery<any>({
-    queryKey: ['form', responseDoc?.formId],
+    queryKey: queryKeys.forms.detail(responseDoc?.formId),
     enabled: !!responseDoc?.formId,
     queryFn: async () => {
       try {

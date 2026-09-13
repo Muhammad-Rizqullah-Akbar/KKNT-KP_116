@@ -11,6 +11,7 @@ import type { FormAggregateDoc } from '@/lib/repositories/form-versions.repo'
 import { useAuth } from '@/context/AuthContext'
 import { safeFetchJson } from '@/lib/infra/safe-fetch'
 import { SkeletonTable } from '@/components/ui/Skeleton'
+import { queryKeys } from '@/lib/query-keys'
 
 export default function DistributionsDashboardPage() {
   const router = useRouter()
@@ -21,7 +22,7 @@ export default function DistributionsDashboardPage() {
 
   // ============ SERVER-STATE (TanStack Query) ============
   const distributionsQuery = useQuery<{ distributions: DistributionDoc[]; publishedForms: FormAggregateDoc[] }>({
-    queryKey: ['distributions', 'list', userRole],
+    queryKey: queryKeys.distributions.list(userRole),
     queryFn: async () => {
       const [distRes, formRes] = await Promise.all([
         safeFetchJson('/api/distributions'),

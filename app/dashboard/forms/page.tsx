@@ -17,6 +17,7 @@ import {
   type FormGroup,
 } from '@/lib/repositories/forms.repo'
 import { useAuth } from '@/context/AuthContext'
+import { queryKeys } from '@/lib/query-keys'
 
 export default function LegacyFormsPage() {
   const { user, userData, userRole, loading } = useAuth()
@@ -35,7 +36,7 @@ export default function LegacyFormsPage() {
 
   // ============ SERVER-STATE (TanStack Query) ============
   const legacyQuery = useQuery<{ forms: LegacyFormData[]; groups: FormGroup[] }>({
-    queryKey: ['forms', 'legacy'],
+    queryKey: queryKeys.forms.legacy,
     queryFn: async () => {
       const [formsData, groupsData] = await Promise.all([getForms(), getFormGroups()])
       return { forms: formsData, groups: groupsData }

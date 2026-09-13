@@ -10,6 +10,7 @@ import { Topbar } from '@/features/dashboard/components/layout/Topbar'
 import { Icon } from '@/components/ui/Icons'
 import { ProfileProgressModal } from '@/features/dashboard/components/modals/ProfileProgressModal'
 import { SkeletonCard, SkeletonTable } from '@/components/ui/Skeleton'
+import { queryKeys } from '@/lib/query-keys'
 
 type UserProfile = {
   uid: string
@@ -62,7 +63,7 @@ export default function PartnershipDomainPage() {
     responses: any[]
     articles: ArticleData[]
   }>({
-    queryKey: ['partnership-data'],
+    queryKey: queryKeys.partnership.data,
     queryFn: async () => {
       const [usersRes, distRes, respRes, articlesData] = await Promise.all([
         safeFetchJson('/api/auth/users'),
@@ -81,7 +82,7 @@ export default function PartnershipDomainPage() {
   })
 
   const invalidatePartnershipData = () =>
-    queryClient.invalidateQueries({ queryKey: ['partnership-data'] })
+    queryClient.invalidateQueries({ queryKey: queryKeys.partnership.data })
 
   const [toastMessage, setToastMessage] = useState<string | null>(null)
 

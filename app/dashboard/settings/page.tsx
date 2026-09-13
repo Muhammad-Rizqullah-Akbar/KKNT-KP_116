@@ -12,6 +12,7 @@ import {
   type LandingPageSettings 
 } from '@/lib/repositories/settings.repo'
 import { uploadSettingsImage, uploadGalleryImage, uploadOptimizedArticleImage } from '@/lib/infra/storage'
+import { queryKeys } from '@/lib/query-keys'
 
 // ============ DATA DEFAULT / FALLBACK ============
 const defaultHeroData = {
@@ -115,7 +116,7 @@ export default function SettingsPage() {
 
   // ============ FETCH DATA DARI FIRESTORE ============
   const { isLoading: loading } = useQuery({
-    queryKey: ['landing-page-settings'],
+    queryKey: queryKeys.settings.landing,
     queryFn: async () => {
       const settings = await getLandingPageSettings()
       if (settings) {

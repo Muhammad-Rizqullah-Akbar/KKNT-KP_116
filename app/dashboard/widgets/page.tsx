@@ -10,6 +10,7 @@ import { getAllResponses, getForms, getFormGroups, type FormResponse, type FormD
 import { extractRespondentName, extractRespondentEmail } from '@/lib/domain/responses/respondent-utils'
 import { useAuth } from '@/context/AuthContext'
 import { safeFetchJson } from '@/lib/infra/safe-fetch'
+import { queryKeys } from '@/lib/query-keys'
 
 // ============================================================================
 // CONSTANTS & COLOR PALETTES
@@ -448,7 +449,7 @@ export default function WidgetsPage() {
       dynamicWidgets = [],
     } = {},
   } = useQuery<WidgetCmsData>({
-    queryKey: ['widget-cms-data'],
+    queryKey: queryKeys.widgets.cmsData,
     queryFn: fetchWidgetData,
   })
 

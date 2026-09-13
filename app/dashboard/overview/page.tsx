@@ -9,6 +9,7 @@ import { useAuth } from '@/context/AuthContext'
 import { safeFetchJson } from '@/lib/infra/safe-fetch'
 import { getArticles } from '@/lib/repositories/articles.repo'
 import { SkeletonCard } from '@/components/ui/Skeleton'
+import { queryKeys } from '@/lib/query-keys'
 
 const colorSchemes: Record<string, string[]> = {
   cyan: ['#06b6d4', '#22d3ee', '#67e8f9', '#a5f3fc', '#cffafe'],
@@ -24,7 +25,7 @@ function CadreOverviewDashboard() {
   const { user, userData } = useAuth()
 
   const { data: cadreData } = useQuery({
-    queryKey: ['dashboard', 'overview', 'cadre', user?.uid, userData?.displayName],
+    queryKey: queryKeys.dashboard.overview.cadre(user?.uid, userData?.displayName),
     enabled: !!user,
     queryFn: async () => {
       const [distRes, respRes, artData] = await Promise.all([
@@ -186,7 +187,7 @@ function AdminOverviewDashboard() {
 
   // Fetch Database Responses & Forms
   const { data: overviewData, isLoading: loading } = useQuery({
-    queryKey: ['dashboard', 'overview', 'admin'],
+    queryKey: queryKeys.dashboard.overview.admin,
     queryFn: async () => {
       const { getForms, getAllResponses } = await import('@/lib/repositories/forms.repo')
       const { safeFetchJson } = await import('@/lib/infra/safe-fetch')

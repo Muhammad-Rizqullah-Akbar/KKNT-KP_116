@@ -13,6 +13,7 @@ import { formAggregateToCanonicalForm } from '@/lib/domain/forms/form-converters
 import { useAuth } from '@/context/AuthContext'
 import { safeFetchJson } from '@/lib/infra/safe-fetch'
 import { SkeletonCard, SkeletonTable } from '@/components/ui/Skeleton'
+import { queryKeys } from '@/lib/query-keys'
 
 export type DerivedLifecycleStatus = 'draft' | 'ready' | 'published' | 'active' | 'archived'
 
@@ -72,7 +73,7 @@ export default function V15FormsDashboardPage() {
 
   // ============ SERVER-STATE (TanStack Query) ============
   const formsQuery = useQuery<FormAggregateDoc[]>({
-    queryKey: ['forms', 'list'],
+    queryKey: queryKeys.forms.list,
     queryFn: async () => {
       const [formsRes, distRes, respRes] = await Promise.all([
         safeFetchJson('/api/forms'),
