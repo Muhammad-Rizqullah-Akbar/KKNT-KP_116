@@ -12,58 +12,20 @@ import type { FormAggregateDoc } from '@/lib/repositories/form-versions.repo'
 import { formAggregateToCanonicalForm } from '@/lib/domain/forms/form-converters'
 import { useAuth } from '@/context/AuthContext'
 import { safeFetchJson } from '@/lib/infra/safe-fetch'
-import { SkeletonCard, SkeletonTable } from '@/components/ui/Skeleton'
+import { SkeletonCard } from '@/components/ui/Skeleton'
 import { queryKeys } from '@/lib/query-keys'
 import { useToast } from '@/lib/hooks/use-toast'
-
-export type DerivedLifecycleStatus = 'draft' | 'ready' | 'published' | 'active' | 'archived'
-
-export function getDerivedLifecycle(form: FormAggregateDoc): {
-  status: DerivedLifecycleStatus
-  label: string
-  colorClass: string
-  isReady: boolean
-} {
-  if (form.status === 'archived') {
-    return { status: 'archived', label: 'Arsip', colorClass: 'bg-slate-800 text-slate-400 border-slate-700', isReady: false }
-  }
-
-  const aspectCount = form.aspects?.length || 0
-  const questionCount = form.questions?.length || 0
-  const hasZeroQuestionAspect = form.aspects?.some((asp) => {
-    const cnt = form.questions?.filter((question) => (question.aspectId || form.aspects[0]?.aspectId) === asp.aspectId).length || 0
-    return cnt === 0
-  })
-
-  const missingKeyQuestions = (form.questions || []).filter((question) => {
-    if (question.type === 'indicator-table' || question.type === 'likert') {
-      const indicators = (question as any).presentation?.indicators || (question as any).config?.indicators || []
-      return indicators.length === 0
-    }
-    const targetAspect = form.aspects?.find((aspect: any) => aspect.aspectId === (question.aspectId || form.aspects?.[0]?.aspectId))
-    const isNonScoring = targetAspect?.isScored === false || ['biodata-name', 'biodata-email', 'biodata-phone', 'biodata-address', 'biodata-institution', 'short-text', 'long-text', 'text', 'textarea', 'file-upload', 'image', 'signature', 'date'].includes(question.type)
-    if (isNonScoring) return false
-    return question.answerKey?.kind === 'none' || !(question.answerKey as any)?.correctOptionIds?.length
-  })
-
-  const hasTitle = Boolean(form.metadata?.title && form.metadata.title.trim().length > 0)
-  const isReady = aspectCount > 0 && questionCount > 0 && !hasZeroQuestionAspect && missingKeyQuestions.length === 0 && hasTitle
-
-  if (form.status === 'published') {
-    const activeDistributionCount = (form as any).activeDistributionCount || 0
-    if (activeDistributionCount > 0) {
-      return { status: 'active', label: 'Aktif', colorClass: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-sm shadow-emerald-500/10', isReady: true }
-    }
-    return { status: 'published', label: 'Terpublikasi', colorClass: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40', isReady: true }
-  }
-
-  // Status is draft
-  if (isReady) {
-    return { status: 'ready', label: 'Siap', colorClass: 'bg-amber-500/20 text-amber-300 border-amber-500/40', isReady: true }
-  }
-
-  return { status: 'draft', label: 'Draft', colorClass: 'bg-purple-500/20 text-purple-300 border-purple-500/40', isReady: false }
-}
+import {
+  deriveCategories,
+  computeTabCounts,
+  filterForms,
+  type LifecycleTab,
+  type ViewMode,
+  type SortBy,
+} from './forms-utils'
+import FormsLifecycleFilter from './forms-lifecycle-filter'
+import FormsCard from './forms-card'
+import FormsListRow from './forms-list-row'
 
 export default function V15FormsDashboardPage() {
   const router = useRouter()
@@ -138,12 +100,12 @@ export default function V15FormsDashboardPage() {
   const error = formsQuery.error ? (formsQuery.error as Error).message : null
 
   // Lifecycle Tab & Filter State
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
-  const [lifecycleTab, setLifecycleTab] = useState<'all' | 'draft' | 'ready' | 'active' | 'archived'>('all')
+  const [viewMode, setViewMode] = useState<ViewMode>('grid')
+  const [lifecycleTab, setLifecycleTab] = useState<LifecycleTab>('all')
   const [searchTerm, setSearchTerm] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('all')
-  const [sortBy, setSortBy] = useState<'updated' | 'title' | 'questions'>('updated')
+  const [sortBy, setSortBy] = useState<SortBy>('updated')
 
   // Pagination State (Strict 10 items limit for cost control)
   const [currentPage, setCurrentPage] = useState<number>(1)
@@ -296,76 +258,16 @@ export default function V15FormsDashboardPage() {
   const fetchForms = () => formsQuery.refetch()
 
   // Categories list derived from forms
-  const categories = useMemo(() => {
-    const set = new Set<string>()
-    forms.forEach((form) => {
-      const cat = form.metadata?.category
-      if (cat) set.add(cat)
-    })
-    return Array.from(set)
-  }, [forms])
+  const categories = useMemo(() => deriveCategories(forms), [forms])
 
   // Derived Counts for Tabs
-  const tabCounts = useMemo(() => {
-    let draft = 0
-    let ready = 0
-    let active = 0
-    let archived = 0
-
-    forms.forEach((form) => {
-      const { status } = getDerivedLifecycle(form)
-      if (status === 'archived') archived++
-      else if (status === 'published' || status === 'active') active++
-      else if (status === 'ready') ready++
-      else draft++
-    })
-
-    return { all: forms.length, draft, ready, active, archived }
-  }, [forms])
+  const tabCounts = useMemo(() => computeTabCounts(forms), [forms])
 
   // Filtered & Sorted Forms List
-  const filteredForms = useMemo(() => {
-    let list = forms.filter((form) => {
-      const derived = getDerivedLifecycle(form)
-
-      // 1. Tab Filter
-      if (lifecycleTab === 'draft' && derived.status !== 'draft') return false
-      if (lifecycleTab === 'ready' && derived.status !== 'ready') return false
-      if (lifecycleTab === 'active' && derived.status !== 'active' && derived.status !== 'published') return false
-      if (lifecycleTab === 'archived' && derived.status !== 'archived') return false
-
-      // 2. Category Filter
-      if (categoryFilter !== 'all' && (form.metadata?.category || '').toLowerCase() !== categoryFilter.toLowerCase()) {
-        return false
-      }
-
-      // 3. Debounced Search Match
-      if (debouncedSearch.trim()) {
-        const term = debouncedSearch.toLowerCase().trim()
-        const titleMatch = (form.metadata?.title || '').toLowerCase().includes(term)
-        const codeMatch = (form.formId || '').toLowerCase().includes(term)
-        const catMatch = (form.metadata?.category || '').toLowerCase().includes(term)
-        const descMatch = (form.metadata?.description || '').toLowerCase().includes(term)
-        if (!titleMatch && !codeMatch && !catMatch && !descMatch) return false
-      }
-
-      return true
-    })
-
-    // Sorting
-    return list.sort((a, b) => {
-      if (sortBy === 'title') {
-        return (a.metadata?.title || '').localeCompare(b.metadata?.title || '')
-      }
-      if (sortBy === 'questions') {
-        return (b.questions?.length || 0) - (a.questions?.length || 0)
-      }
-      // default: updated date desc
-      const dateA = new Date(a.updatedAt || a.createdAt || 0).getTime()
-      const dateB = new Date(b.updatedAt || b.createdAt || 0).getTime()
-      return dateB - dateA
-    })
-  }, [forms, lifecycleTab, categoryFilter, debouncedSearch, sortBy])
+  const filteredForms = useMemo(
+    () => filterForms(forms, { lifecycleTab, categoryFilter, debouncedSearch, sortBy }),
+    [forms, lifecycleTab, categoryFilter, debouncedSearch, sortBy]
+  )
 
   // Paginated Subset
   const paginatedForms = useMemo(() => {
@@ -520,6 +422,10 @@ export default function V15FormsDashboardPage() {
     }
   }
 
+  const handleResponses = (formId: string) => {
+    router.push(`/dashboard/responses?formId=${formId}`)
+  }
+
   return (
     <div className="flex flex-col min-h-screen bg-[#06060E] text-slate-100 font-sans" onClick={() => setActiveMenuFormId(null)}>
       <Topbar title="Form Lifecycle Control Center" />
@@ -571,164 +477,33 @@ export default function V15FormsDashboardPage() {
         </div>
 
         {/* LIFECYCLE NAVIGATION TABS & FILTERS */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar border-b border-slate-800/60">
-            {(
-              [
-                { id: 'all', label: 'Semua', count: tabCounts.all },
-                { id: 'draft', label: 'Draft', count: tabCounts.draft },
-                { id: 'ready', label: 'Siap', count: tabCounts.ready },
-                { id: 'active', label: 'Aktif', count: tabCounts.active },
-                { id: 'archived', label: 'Arsip', count: tabCounts.archived },
-              ] as const
-            ).map((tab) => {
-              const isActive = lifecycleTab === tab.id
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => {
-                    setLifecycleTab(tab.id)
-                    setCurrentPage(1)
-                  }}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
-                    isActive
-                      ? 'bg-slate-800 text-emerald-400 border border-slate-700 shadow-sm'
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
-                  }`}
-                >
-                  <span>{tab.label}</span>
-                  <span
-                    className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-bold ${
-                      isActive ? 'bg-emerald-500/20 text-emerald-300' : 'bg-slate-800 text-slate-400'
-                    }`}
-                  >
-                    {tab.count}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-
-          {/* SEARCH, CATEGORY & SORT BAR */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-900/40 p-3 rounded-2xl border border-slate-800/80">
-            {/* Search Input */}
-            <div className="relative w-full sm:w-80">
-              <Icon name="search" className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Cari formulir atau kode..."
-                value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value)
-                  setCurrentPage(1)
-                }}
-                className="w-full pl-9 pr-8 py-2 bg-slate-950/80 border border-slate-800 rounded-xl text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500/50"
-              />
-              {searchTerm && (
-                <button
-                  type="button"
-                  onClick={() => setSearchTerm('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
-                >
-                  ✕
-                </button>
-              )}
-            </div>
-
-            {/* Filters & Sorting */}
-            <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
-              {categories.length > 0 && (
-                <select
-                  value={categoryFilter}
-                  onChange={(e) => {
-                    setCategoryFilter(e.target.value)
-                    setCurrentPage(1)
-                  }}
-                  className="px-3 py-2 bg-slate-950/80 border border-slate-800 rounded-xl text-xs text-slate-300 focus:outline-none focus:border-emerald-500/50 cursor-pointer"
-                >
-                  <option value="all">Semua Kategori</option>
-                  {categories.map((category) => (
-                    <option key={category} value={category}>
-                      {category}
-                    </option>
-                  ))}
-                </select>
-              )}
-
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as 'updated' | 'title' | 'questions')}
-                className="px-3 py-2 bg-slate-950/80 border border-slate-800 rounded-xl text-xs text-slate-300 focus:outline-none focus:border-emerald-500/50 cursor-pointer"
-              >
-                <option value="updated">Terbaru Ditambahkan</option>
-                <option value="title">Judul A-Z</option>
-                <option value="questions">Jumlah Soal Terbanyak</option>
-              </select>
-
-              {/* Select All Checkbox Button */}
-              <button
-                type="button"
-                onClick={() => handleSelectAllToggle(filteredForms)}
-                className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all flex items-center gap-1.5 cursor-pointer ${
-                  selectedFormIds.length > 0 && selectedFormIds.length === filteredForms.length
-                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                    : 'bg-slate-950/80 text-slate-400 border-slate-800 hover:text-slate-200'
-                }`}
-                title="Pilih Semua Formulir Terfilter"
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedFormIds.length > 0 && selectedFormIds.length === filteredForms.length}
-                  onChange={() => {}}
-                  className="w-3.5 h-3.5 rounded border-slate-700 bg-slate-950 text-emerald-500 pointer-events-none"
-                />
-                <span>Select All</span>
-              </button>
-
-              {/* Bulk Delete Action Button */}
-              {selectedFormIds.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setIsBulkDeleteModalOpen(true)}
-                  className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-rose-600/30 transition-all cursor-pointer animate-pulse"
-                >
-                  <Icon name="trash" className="w-3.5 h-3.5" />
-                  <span>Hapus {selectedFormIds.length} Terpilih</span>
-                </button>
-              )}
-
-              {/* View Mode Switcher */}
-              <div className="flex items-center p-0.5 bg-slate-950/80 border border-slate-800 rounded-xl shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setViewMode('grid')}
-                  className={`p-1.5 rounded-lg text-xs transition-all cursor-pointer ${
-                    viewMode === 'grid'
-                      ? 'bg-slate-800 text-emerald-400 font-bold border border-slate-700 shadow-sm'
-                      : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                  title="Tampilan Grid Card Aesthetic"
-                >
-                  <Icon name="grid" className="w-4 h-4" />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setViewMode('list')}
-                  className={`p-1.5 rounded-lg text-xs transition-all cursor-pointer ${
-                    viewMode === 'list'
-                      ? 'bg-slate-800 text-emerald-400 font-bold border border-slate-700 shadow-sm'
-                      : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                  title="Tampilan Daftar Compact Row"
-                >
-                  <Icon name="list" className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <FormsLifecycleFilter
+          lifecycleTab={lifecycleTab}
+          tabCounts={tabCounts}
+          searchTerm={searchTerm}
+          categories={categories}
+          categoryFilter={categoryFilter}
+          sortBy={sortBy}
+          viewMode={viewMode}
+          selectedFormIds={selectedFormIds}
+          filteredFormsCount={filteredForms.length}
+          onTabChange={(tab) => {
+            setLifecycleTab(tab)
+            setCurrentPage(1)
+          }}
+          onSearchChange={(value) => {
+            setSearchTerm(value)
+            setCurrentPage(1)
+          }}
+          onCategoryChange={(value) => {
+            setCategoryFilter(value)
+            setCurrentPage(1)
+          }}
+          onSortChange={(value) => setSortBy(value)}
+          onViewModeChange={(mode) => setViewMode(mode)}
+          onSelectAll={() => handleSelectAllToggle(filteredForms)}
+          onBulkDelete={() => setIsBulkDeleteModalOpen(true)}
+        />
 
         {/* ERROR STATE */}
         {error && (
@@ -787,534 +562,55 @@ export default function V15FormsDashboardPage() {
           /* FORM ITEM CONTAINER: GRID VIEW VS COMPACT LIST VIEW */
           <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4' : 'space-y-3'}>
             {paginatedForms.map((form) => {
-              const derived = getDerivedLifecycle(form)
-              const aspectCount = form.aspects?.length || 0
-              const questionCount = form.questions?.length || 0
-              const responseCount = (form as any).responseCount || 0
-              const activeDistCount = (form as any).activeDistributionCount || 0
               const isMenuOpen = activeMenuFormId === form.formId
-              const lastUpdatedDate = form.updatedAt
-                ? new Date(form.updatedAt).toLocaleDateString('id-ID', {
-                    day: 'numeric',
-                    month: 'long',
-                    year: 'numeric',
-                  })
-                : '—'
 
               if (viewMode === 'grid') {
                 /* AESTHETIC GRID CARD VIEW */
                 return (
-                  <div
+                  <FormsCard
                     key={form.formId}
-                    className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800/90 hover:border-slate-700/80 transition-all flex flex-col justify-between space-y-4 shadow-sm group hover:shadow-emerald-500/5 relative"
-                  >
-                    {/* TOP BADGES & ACTIONS */}
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={selectedFormIds.includes(form.formId)}
-                            onChange={() => handleSelectFormToggle(form.formId)}
-                            className="w-4 h-4 rounded border-slate-700 bg-slate-950 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-slate-950 cursor-pointer shrink-0"
-                            title="Pilih formulir ini"
-                          />
-                          <span
-                            className={`text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full border ${derived.colorClass}`}
-                          >
-                            {derived.label.toUpperCase()}
-                          </span>
-                        </div>
-
-                        <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
-                          {form.metadata?.category || 'Umum'}
-                        </span>
-                      </div>
-
-                      {/* TITLE & DESCRIPTION */}
-                      <div className="space-y-1">
-                        <h3 className="text-sm font-bold text-slate-100 group-hover:text-emerald-300 transition-colors line-clamp-1">
-                          {form.metadata?.title || form.formId}
-                        </h3>
-                        {form.metadata?.description && (
-                          <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed">
-                            {form.metadata.description}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* METRICS & FOOTER */}
-                    <div className="space-y-3 pt-2 border-t border-slate-800/60">
-                      <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-slate-300 font-bold">V{form.activeVersionNumber || 1}.0</span>
-                          <span>·</span>
-                          <span>{aspectCount} Aspek</span>
-                          <span>·</span>
-                          <span>{questionCount} Soal</span>
-                        </div>
-
-                        <span className="text-[10px] text-slate-400">{lastUpdatedDate}</span>
-                      </div>
-
-                      <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800/80 flex items-center justify-between text-xs font-mono">
-                        <span className="text-slate-400">Respons & Distribusi</span>
-                        <span className="font-bold text-emerald-400">{responseCount} Respons · {activeDistCount} Distribusi</span>
-                      </div>
-
-                      {/* CARD ACTIONS FOOTER */}
-                      <div className="flex items-center justify-between gap-2 pt-1">
-                        {derived.status === 'draft' && (
-                          <button
-                            type="button"
-                            onClick={() => router.push(`/dashboard/forms/${form.formId}/builder`)}
-                            className="flex-1 py-2 rounded-xl bg-purple-600/90 hover:bg-purple-500 text-white text-xs font-bold shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                          >
-                            <Icon name="edit" className="w-3.5 h-3.5" />
-                            <span>Lanjutkan</span>
-                          </button>
-                        )}
-
-                        {derived.status === 'ready' && (
-                          <button
-                            type="button"
-                            onClick={() => router.push(`/dashboard/forms/${form.formId}/builder?step=4`)}
-                            className="flex-1 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                          >
-                            <Icon name="checkCircle" className="w-3.5 h-3.5" />
-                            <span>Publikasikan</span>
-                          </button>
-                        )}
-
-                        {(derived.status === 'published' || derived.status === 'active') && (
-                          <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                            {isGlobalRole ? (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={() => setDistributionModalForm(form)}
-                                  className="flex-1 py-2 px-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md transition-all flex items-center justify-center gap-1 cursor-pointer truncate"
-                                  title="Atur izin distribusi kader & mitra"
-                                >
-                                  <Icon name="send" className="w-3.5 h-3.5 shrink-0" />
-                                  <span className="truncate">Akses Distribusi</span>
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() => setEditConfirmForm(form)}
-                                  className="py-2 px-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 shadow-md transition-all flex items-center justify-center gap-1 cursor-pointer shrink-0"
-                                  title="Pratinjau formulir & konfirmasi pembuatan versi draft baru"
-                                >
-                                  <Icon name="edit" className="w-3.5 h-3.5 shrink-0 text-purple-400" />
-                                  <span>Pratinjau & Edit</span>
-                                </button>
-                              </>
-                            ) : form.allowCadreDistribution !== false ? (
-                              <button
-                                type="button"
-                                onClick={() => router.push(`/dashboard/distributions?formId=${form.formId}`)}
-                                className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                              >
-                                <Icon name="send" className="w-3.5 h-3.5 shrink-0" />
-                                <span>Buat Kode Distribusi Saya →</span>
-                              </button>
-                            ) : (
-                              <div className="flex items-center justify-between w-full">
-                                <span className="text-[10px] font-mono font-bold text-rose-400 px-2 py-1 rounded bg-rose-500/10 border border-rose-500/20">
-                                  🔒 Khusus BPOM Pusat
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => setPreviewFormDoc(form)}
-                                  className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700"
-                                >
-                                  Pratinjau
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        )}
-
-                        {derived.status === 'archived' && (
-                          <button
-                            type="button"
-                            onClick={() => handleRestoreForm(form.formId)}
-                            className="flex-1 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                          >
-                            <Icon name="refresh" className="w-3.5 h-3.5" />
-                            <span>Pulihkan</span>
-                          </button>
-                        )}
-
-                        {/* Secondary Dropdown Menu */}
-                        <div className="relative">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setActiveMenuFormId(isMenuOpen ? null : form.formId)
-                            }}
-                            className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-slate-200 border border-slate-700/80 transition-all cursor-pointer"
-                          >
-                            <Icon name="moreHorizontal" className="w-4 h-4" />
-                          </button>
-
-                          {isMenuOpen && (
-                            <div
-                              onClick={(e) => e.stopPropagation()}
-                              className="absolute right-0 bottom-full mb-2 w-48 rounded-xl bg-slate-900 border border-slate-800 shadow-xl z-20 py-1 space-y-0.5 text-xs text-slate-200"
-                            >
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setActiveMenuFormId(null)
-                                  setPreviewFormDoc(form)
-                                }}
-                                className="w-full text-left px-3.5 py-2 hover:bg-slate-800 flex items-center gap-2 transition-colors cursor-pointer"
-                              >
-                                <Icon name="eye" className="w-3.5 h-3.5 text-slate-400" />
-                                <span>Pratinjau Responden</span>
-                              </button>
-
-                              {(derived.status === 'published' || derived.status === 'active') && (
-                                <>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setActiveMenuFormId(null)
-                                      setDistributionModalForm(form)
-                                    }}
-                                    className="w-full text-left px-3.5 py-2 hover:bg-slate-800 flex items-center gap-2 transition-colors cursor-pointer text-emerald-300"
-                                  >
-                                    <Icon name="send" className="w-3.5 h-3.5 text-emerald-400" />
-                                    <span>Akses Distribusi Kader</span>
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setActiveMenuFormId(null)
-                                      setEditConfirmForm(form)
-                                    }}
-                                    className="w-full text-left px-3.5 py-2 hover:bg-slate-800 flex items-center gap-2 transition-colors cursor-pointer text-purple-300"
-                                  >
-                                    <Icon name="edit" className="w-3.5 h-3.5 text-purple-400" />
-                                    <span>Pratinjau & Edit Versi</span>
-                                  </button>
-                                </>
-                              )}
-
-                              <button
-                                type="button"
-                                onClick={() => handleOpenEditTitleModal(form)}
-                                className="w-full text-left px-3.5 py-2 hover:bg-slate-800 flex items-center gap-2 transition-colors cursor-pointer text-amber-300 font-semibold"
-                              >
-                                <Icon name="edit" className="w-3.5 h-3.5 text-amber-400" />
-                                <span>Ubah Nama Formulir</span>
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setActiveMenuFormId(null)
-                                  setSelectedHistoryFormId(form.formId)
-                                }}
-                                className="w-full text-left px-3.5 py-2 hover:bg-slate-800 flex items-center gap-2 transition-colors cursor-pointer"
-                              >
-                                <Icon name="history" className="w-3.5 h-3.5 text-slate-400" />
-                                <span>Riwayat Versi</span>
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setActiveMenuFormId(null)
-                                  router.push(`/dashboard/responses?formId=${form.formId}`)
-                                }}
-                                className="w-full text-left px-3.5 py-2 hover:bg-slate-800 flex items-center gap-2 transition-colors cursor-pointer"
-                              >
-                                <Icon name="barChart" className="w-3.5 h-3.5 text-slate-400" />
-                                <span>Hasil & Respons</span>
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => handleDuplicateForm(form.formId)}
-                                disabled={duplicatingFormId === form.formId}
-                                className="w-full text-left px-3.5 py-2 hover:bg-slate-800 flex items-center gap-2 transition-colors cursor-pointer text-cyan-300"
-                              >
-                                <Icon name="copy" className="w-3.5 h-3.5 text-cyan-400" />
-                                <span>{duplicatingFormId === form.formId ? 'Menduplikat...' : 'Duplikat Formulir'}</span>
-                              </button>
-
-                              {derived.status !== 'archived' && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleArchiveForm(form.formId)}
-                                  className="w-full text-left px-3.5 py-2 hover:bg-rose-500/10 hover:text-rose-300 flex items-center gap-2 transition-colors cursor-pointer text-rose-400 border-t border-slate-800"
-                                >
-                                  <Icon name="archive" className="w-3.5 h-3.5" />
-                                  <span>Arsipkan</span>
-                                </button>
-                              )}
-
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setActiveMenuFormId(null)
-                                  setFormToDelete(form)
-                                }}
-                                className="w-full text-left px-3.5 py-2 hover:bg-rose-500/20 flex items-center gap-2 transition-colors cursor-pointer text-rose-400 font-bold border-t border-slate-800/80"
-                              >
-                                <Icon name="trash" className="w-3.5 h-3.5 text-rose-400" />
-                                <span>Hapus Formulir Permanen</span>
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                    form={form}
+                    selected={selectedFormIds.includes(form.formId)}
+                    onToggleSelect={handleSelectFormToggle}
+                    menuOpen={isMenuOpen}
+                    onMenuToggle={() => setActiveMenuFormId(isMenuOpen ? null : form.formId)}
+                    onMenuClose={() => setActiveMenuFormId(null)}
+                    isGlobalRole={isGlobalRole}
+                    duplicatingFormId={duplicatingFormId}
+                    onRestore={handleRestoreForm}
+                    onPreview={setPreviewFormDoc}
+                    onDistribution={setDistributionModalForm}
+                    onEditVersion={setEditConfirmForm}
+                    onEditTitle={handleOpenEditTitleModal}
+                    onHistory={setSelectedHistoryFormId}
+                    onResponses={handleResponses}
+                    onDuplicate={handleDuplicateForm}
+                    onArchive={handleArchiveForm}
+                    onDelete={setFormToDelete}
+                  />
                 )
               }
 
               /* COMPACT ROW LIST VIEW */
               return (
-                <div
+                <FormsListRow
                   key={form.formId}
-                  className="p-4 sm:p-5 rounded-2xl bg-slate-900/80 border border-slate-800/90 hover:border-slate-700/80 transition-all space-y-3 shadow-sm group"
-                >
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    {/* LEFT: Title & Badges */}
-                    <div className="space-y-1 min-w-0 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="text-sm font-bold text-slate-100 group-hover:text-emerald-300 transition-colors truncate">
-                          {form.metadata?.title || form.formId}
-                        </h3>
-
-                        <span
-                          className={`text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full border ${derived.colorClass}`}
-                        >
-                          {derived.label.toUpperCase()}
-                        </span>
-
-                        <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
-                          {form.metadata?.category || 'Umum'}
-                        </span>
-                      </div>
-
-                      <div className="text-[11px] text-slate-400 font-mono flex items-center gap-2 flex-wrap">
-                        <span className="text-slate-300 font-bold">V{form.activeVersionNumber || 1}.0</span>
-                        <span>·</span>
-                        <span>{aspectCount} Aspek</span>
-                        <span>·</span>
-                        <span>{questionCount} Pertanyaan</span>
-                      </div>
-                    </div>
-
-                    {/* RIGHT: Primary Contextual Action & Menu */}
-                    <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
-                      {/* Contextual Primary Action Button */}
-                      {derived.status === 'draft' && (
-                        <button
-                          type="button"
-                          onClick={() => router.push(`/dashboard/forms/${form.formId}/builder`)}
-                          className="px-4 py-2 rounded-xl bg-purple-600/90 hover:bg-purple-500 text-white text-xs font-bold shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
-                        >
-                          <Icon name="edit" className="w-3.5 h-3.5" />
-                          <span>Lanjutkan</span>
-                        </button>
-                      )}
-
-                      {derived.status === 'ready' && (
-                        <button
-                          type="button"
-                          onClick={() => router.push(`/dashboard/forms/${form.formId}/builder?step=4`)}
-                          className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
-                        >
-                          <Icon name="checkCircle" className="w-3.5 h-3.5" />
-                          <span>Publikasikan</span>
-                        </button>
-                      )}
-
-                      {(derived.status === 'published' || derived.status === 'active') && (
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => setDistributionModalForm(form)}
-                            className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
-                            title="Atur izin distribusi kader & mitra"
-                          >
-                            <Icon name="send" className="w-3.5 h-3.5" />
-                            <span>Akses Distribusi</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => setEditConfirmForm(form)}
-                            className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
-                            title="Pratinjau formulir & konfirmasi pembuatan versi draft baru"
-                          >
-                            <Icon name="edit" className="w-3.5 h-3.5 text-purple-400" />
-                            <span>Pratinjau & Edit</span>
-                          </button>
-                        </div>
-                      )}
-
-                      {derived.status === 'archived' && (
-                        <button
-                          type="button"
-                          onClick={() => handleRestoreForm(form.formId)}
-                          className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
-                        >
-                          <Icon name="refresh" className="w-3.5 h-3.5" />
-                          <span>Pulihkan</span>
-                        </button>
-                      )}
-
-                      {/* Secondary Action Dropdown Menu Trigger */}
-                      <div className="relative">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setActiveMenuFormId(isMenuOpen ? null : form.formId)
-                          }}
-                          className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-slate-200 border border-slate-700/80 transition-all cursor-pointer"
-                        >
-                          <Icon name="moreHorizontal" className="w-4 h-4" />
-                        </button>
-
-                        {/* Dropdown Menu Content */}
-                        {isMenuOpen && (
-                          <div
-                            onClick={(e) => e.stopPropagation()}
-                            className="absolute right-0 top-full mt-2 w-48 rounded-xl bg-slate-900 border border-slate-800 shadow-xl z-20 py-1 space-y-0.5 text-xs text-slate-200"
-                          >
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setActiveMenuFormId(null)
-                                setPreviewFormDoc(form)
-                              }}
-                              className="w-full text-left px-3.5 py-2 hover:bg-slate-800 flex items-center gap-2 transition-colors cursor-pointer"
-                            >
-                              <Icon name="eye" className="w-3.5 h-3.5 text-slate-400" />
-                              <span>Pratinjau Responden</span>
-                            </button>
-
-                            {(derived.status === 'published' || derived.status === 'active') && (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setActiveMenuFormId(null)
-                                    setDistributionModalForm(form)
-                                  }}
-                                  className="w-full text-left px-3.5 py-2 hover:bg-slate-800 flex items-center gap-2 transition-colors cursor-pointer text-emerald-300"
-                                >
-                                  <Icon name="send" className="w-3.5 h-3.5 text-emerald-400" />
-                                  <span>Akses Distribusi Kader</span>
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setActiveMenuFormId(null)
-                                    setEditConfirmForm(form)
-                                  }}
-                                  className="w-full text-left px-3.5 py-2 hover:bg-slate-800 flex items-center gap-2 transition-colors cursor-pointer text-purple-300"
-                                >
-                                  <Icon name="edit" className="w-3.5 h-3.5 text-purple-400" />
-                                  <span>Pratinjau & Edit Versi</span>
-                                </button>
-                              </>
-                            )}
-
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEditTitleModal(form)}
-                              className="w-full text-left px-3.5 py-2 hover:bg-slate-800 flex items-center gap-2 transition-colors cursor-pointer text-amber-300 font-semibold"
-                            >
-                              <Icon name="edit" className="w-3.5 h-3.5 text-amber-400" />
-                              <span>Ubah Nama Formulir</span>
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setActiveMenuFormId(null)
-                                setSelectedHistoryFormId(form.formId)
-                              }}
-                              className="w-full text-left px-3.5 py-2 hover:bg-slate-800 flex items-center gap-2 transition-colors cursor-pointer"
-                            >
-                              <Icon name="history" className="w-3.5 h-3.5 text-slate-400" />
-                              <span>Riwayat Versi</span>
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setActiveMenuFormId(null)
-                                router.push(`/dashboard/responses?formId=${form.formId}`)
-                              }}
-                              className="w-full text-left px-3.5 py-2 hover:bg-slate-800 flex items-center gap-2 transition-colors cursor-pointer"
-                            >
-                              <Icon name="barChart" className="w-3.5 h-3.5 text-slate-400" />
-                              <span>Hasil & Respons</span>
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => handleDuplicateForm(form.formId)}
-                              disabled={duplicatingFormId === form.formId}
-                              className="w-full text-left px-3.5 py-2 hover:bg-slate-800 flex items-center gap-2 transition-colors cursor-pointer text-cyan-300"
-                            >
-                              <Icon name="copy" className="w-3.5 h-3.5 text-cyan-400" />
-                              <span>{duplicatingFormId === form.formId ? 'Menduplikat...' : 'Duplikat Formulir'}</span>
-                            </button>
-
-                            {derived.status !== 'archived' && (
-                              <button
-                                type="button"
-                                onClick={() => handleArchiveForm(form.formId)}
-                                className="w-full text-left px-3.5 py-2 hover:bg-rose-500/10 hover:text-rose-300 flex items-center gap-2 transition-colors cursor-pointer text-rose-400 border-t border-slate-800"
-                              >
-                                <Icon name="archive" className="w-3.5 h-3.5" />
-                                <span>Arsipkan</span>
-                              </button>
-                            )}
-
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setActiveMenuFormId(null)
-                                setFormToDelete(form)
-                              }}
-                              className="w-full text-left px-3.5 py-2 hover:bg-rose-500/20 flex items-center gap-2 transition-colors cursor-pointer text-rose-400 font-bold border-t border-slate-800/80"
-                            >
-                              <Icon name="trash" className="w-3.5 h-3.5 text-rose-400" />
-                              <span>Hapus Formulir Permanen</span>
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* BOTTOM STATS & TIMESTAMP */}
-                  <div className="flex items-center justify-between text-[11px] font-mono text-slate-400 pt-2 border-t border-slate-800/60">
-                    <div className="flex items-center gap-3">
-                      <span>{responseCount} Respons</span>
-                      <span>·</span>
-                      <span>{activeDistCount} Distribusi</span>
-                    </div>
-
-                    <span>Terakhir diperbarui {lastUpdatedDate}</span>
-                  </div>
-                </div>
+                  form={form}
+                  menuOpen={isMenuOpen}
+                  onMenuToggle={() => setActiveMenuFormId(isMenuOpen ? null : form.formId)}
+                  onMenuClose={() => setActiveMenuFormId(null)}
+                  duplicatingFormId={duplicatingFormId}
+                  onRestore={handleRestoreForm}
+                  onPreview={setPreviewFormDoc}
+                  onDistribution={setDistributionModalForm}
+                  onEditVersion={setEditConfirmForm}
+                  onEditTitle={handleOpenEditTitleModal}
+                  onHistory={setSelectedHistoryFormId}
+                  onResponses={handleResponses}
+                  onDuplicate={handleDuplicateForm}
+                  onArchive={handleArchiveForm}
+                  onDelete={setFormToDelete}
+                />
               )
             })}
           </div>
