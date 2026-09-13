@@ -1,4 +1,4 @@
-import { safeGetDoc, safeGetCollectionDocs, safeSetDoc, safeDeleteDoc } from './safeFirestore'
+import { safeGetDoc, safeGetCollectionDocs, safeSetDoc, safeDeleteDoc } from './safe-firestore'
 import type { ResponseDoc, ResponseFilterOptions } from '@/lib/forms/v1_5/responseTypes'
 import { ScoringEngine } from '@/lib/scoring/scoringEngine'
 import { calculateResponseScore } from '@/lib/forms/v1_5/scoring/scoringEngine'

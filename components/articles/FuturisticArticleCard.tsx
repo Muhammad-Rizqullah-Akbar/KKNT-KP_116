@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { Icon } from '@/components/ui/Icons'
-import { getCategoryStyle, type ArticleData } from '@/lib/firebase/repositories/articles.repo'
+import { getCategoryStyle, type ArticleData } from '@/lib/repositories/articles.repo'
 
 interface FuturisticArticleCardProps {
   article: ArticleData

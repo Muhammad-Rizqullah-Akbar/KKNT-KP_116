@@ -53,7 +53,7 @@ export async function getAuthorizationContext(): Promise<AuthorizationContext | 
 
   // 1. Try reading role from trusted Firestore profile
   try {
-    const { safeGetDoc } = await import('@/lib/firebase/repositories/v1_5/safeFirestore')
+    const { safeGetDoc } = await import('@/lib/repositories/safe-firestore')
     const userDoc = await safeGetDoc('users', uid)
     if (userDoc?.data?.role && isStoredRole(userDoc.data.role)) {
       role = userDoc.data.role

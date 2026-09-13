@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { adminAuth, adminFirestore } from '@/lib/firebaseAdmin'
 import { getAuthorizationContext } from '@/lib/auth/server'
-import { safeSetDoc } from '@/lib/firebase/repositories/v1_5/safeFirestore'
+import { safeSetDoc } from '@/lib/repositories/safe-firestore'
 
 const VALID_ROLES = ['super_admin', 'admin', 'internal_bpom', 'cadre', 'partnership']
 

@@ -4,7 +4,7 @@ import {
   grantFormAccessDoc,
   listFormAccessDoc,
   revokeFormAccessDoc,
-} from '@/lib/firebase/repositories/v1_5/formAccess.repo'
+} from '@/lib/repositories/form-access.repo'
 
 /**
  * GET /api/v1_5/form-access

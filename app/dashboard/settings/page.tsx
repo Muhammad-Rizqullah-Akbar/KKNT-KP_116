@@ -9,7 +9,7 @@ import {
   getLandingPageSettings, 
   updateLandingPageSettings,
   type LandingPageSettings 
-} from '@/lib/firebase/repositories/settings.repo'
+} from '@/lib/repositories/settings.repo'
 import { uploadSettingsImage, uploadGalleryImage, uploadOptimizedArticleImage } from '@/lib/firebase/storage'
 
 // ============ DATA DEFAULT / FALLBACK ============

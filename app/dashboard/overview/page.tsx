@@ -4,10 +4,10 @@ import { useState, useMemo, useEffect } from 'react'
 import { Topbar } from '@/components/dashboard/Topbar'
 import { Icon } from '@/components/ui/Icons'
 import Link from 'next/link'
-import { type FormResponse, type FormData } from '@/lib/firebase/repositories/forms.repo'
+import { type FormResponse, type FormData } from '@/lib/repositories/forms.repo'
 import { useAuth } from '@/context/AuthContext'
 import { safeFetchJson } from '@/lib/shared/safeFetch'
-import { getArticles } from '@/lib/firebase/repositories/articles.repo'
+import { getArticles } from '@/lib/repositories/articles.repo'
 import { SkeletonCard } from '@/components/ui/Skeleton'
 
 const colorSchemes: Record<string, string[]> = {
@@ -200,7 +200,7 @@ function AdminOverviewDashboard() {
     const fetchData = async () => {
       setLoading(true)
       try {
-        const { getForms, getAllResponses } = await import('@/lib/firebase/repositories/forms.repo')
+        const { getForms, getAllResponses } = await import('@/lib/repositories/forms.repo')
         const { safeFetchJson } = await import('@/lib/shared/safeFetch')
         const [responsesData, formsData, v15RespRes] = await Promise.all([
           getAllResponses().catch(() => []),

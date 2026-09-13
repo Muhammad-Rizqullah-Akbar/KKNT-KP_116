@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { safeGetDoc, safeSetDoc } from '@/lib/firebase/repositories/v1_5/safeFirestore'
+import { safeGetDoc, safeSetDoc } from '@/lib/repositories/safe-firestore'
 
 export async function POST(request: Request) {
   try {

@@ -18,11 +18,11 @@ import {
   getArticles,
   incrementArticleViews,
   type ArticleData
-} from '@/lib/firebase/repositories/articles.repo'
+} from '@/lib/repositories/articles.repo'
 
 import {
   getLandingPageSettings
-} from '@/lib/firebase/repositories/settings.repo'
+} from '@/lib/repositories/settings.repo'
 
 // ============ DATA FALLBACK (DEFAULT) ============
 const defaultPartnershipData = {

@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
 import { getAuthorizationContext, requireRole } from '@/lib/auth/server'
-import { getFormAggregateFromDb } from '@/lib/firebase/repositories/v1_5/v1_5Forms.repo'
+import { getFormAggregateFromDb } from '@/lib/repositories/v1_5-forms.repo'
 import { saveDraftWorkflow, updateFormMetadataWorkflow } from '@/lib/forms/v1_5/formManagement.service'
-import { deleteForm } from '@/lib/firebase/repositories/forms.repo'
+import { deleteForm } from '@/lib/repositories/forms.repo'
 
 /**
  * PATCH /api/v1_5/forms/[formId]

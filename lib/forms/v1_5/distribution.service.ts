@@ -9,13 +9,13 @@ import {
   pauseDistributionDoc,
   archiveDistributionDoc,
   deleteDistributionDoc,
-} from '@/lib/firebase/repositories/v1_5/distributions.repo'
-import { safeGetDoc, safeGetCollectionDocs } from '@/lib/firebase/repositories/v1_5/safeFirestore'
-import { checkFormAccessDoc } from '@/lib/firebase/repositories/v1_5/formAccess.repo'
+} from '@/lib/repositories/distributions.repo'
+import { safeGetDoc, safeGetCollectionDocs } from '@/lib/repositories/safe-firestore'
+import { checkFormAccessDoc } from '@/lib/repositories/form-access.repo'
 import {
   getFormAggregateFromDb,
   getFormVersionSnapshotsFromDb,
-} from '@/lib/firebase/repositories/v1_5/v1_5Forms.repo'
+} from '@/lib/repositories/v1_5-forms.repo'
 import { toPublicFormProjection } from '@/lib/forms/v1_5/legacyAdapter'
 import type { AuthorizationContext } from '@/lib/auth/server'
 import type {

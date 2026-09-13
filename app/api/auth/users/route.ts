@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { adminAuth } from '@/lib/firebaseAdmin'
 import { getAuthorizationContext } from '@/lib/auth/server'
-import { safeGetCollectionDocs } from '@/lib/firebase/repositories/v1_5/safeFirestore'
+import { safeGetCollectionDocs } from '@/lib/repositories/safe-firestore'
 
 let cachedUserDocs: any[] | null = null
 let cacheTimestamp = 0
@@ -124,7 +124,7 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    const { safeDeleteDoc } = await import('@/lib/firebase/repositories/v1_5/safeFirestore')
+    const { safeDeleteDoc } = await import('@/lib/repositories/safe-firestore')
 
     let deletedCount = 0
     for (const uid of targetUids) {
@@ -157,7 +157,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ success: false, message: 'UID atau role tidak valid' }, { status: 400 })
     }
 
-    const { safeGetDoc, safeSetDoc } = await import('@/lib/firebase/repositories/v1_5/safeFirestore')
+    const { safeGetDoc, safeSetDoc } = await import('@/lib/repositories/safe-firestore')
     const existing = await safeGetDoc('users', uid)
 
     const updatePayload = {

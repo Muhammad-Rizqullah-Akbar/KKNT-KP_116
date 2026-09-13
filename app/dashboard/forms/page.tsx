@@ -14,7 +14,7 @@ import {
   deleteForm,
   type FormData as LegacyFormData,
   type FormGroup,
-} from '@/lib/firebase/repositories/forms.repo'
+} from '@/lib/repositories/forms.repo'
 import { useAuth } from '@/context/AuthContext'
 
 export default function LegacyFormsPage() {

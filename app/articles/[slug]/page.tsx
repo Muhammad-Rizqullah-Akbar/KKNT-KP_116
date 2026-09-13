@@ -12,7 +12,7 @@ import {
   updateArticle, 
   getCategoryStyle,
   type ArticleData 
-} from '@/lib/firebase/repositories/articles.repo'
+} from '@/lib/repositories/articles.repo'
 import { auth, storage } from '@/lib/firebaseClient'
 import { uploadOptimizedArticleImage } from '@/lib/firebase/storage'
 import { onAuthStateChanged } from 'firebase/auth'

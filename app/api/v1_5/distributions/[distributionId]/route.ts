@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthorizationContext } from '@/lib/auth/server'
-import { getDistributionDoc } from '@/lib/firebase/repositories/v1_5/distributions.repo'
-import { getFormAggregateFromDb } from '@/lib/firebase/repositories/v1_5/v1_5Forms.repo'
+import { getDistributionDoc } from '@/lib/repositories/distributions.repo'
+import { getFormAggregateFromDb } from '@/lib/repositories/v1_5-forms.repo'
 import { updateDistributionWorkflow, deleteDistributionWorkflow } from '@/lib/forms/v1_5/distribution.service'
 
 interface RouteParams {

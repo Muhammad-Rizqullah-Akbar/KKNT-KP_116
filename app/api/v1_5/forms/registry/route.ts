@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import {
   getFormCategoriesFromDb,
   getRespondentTargetsFromDb,
-} from '@/lib/firebase/repositories/v1_5/v1_5Registry.repo'
+} from '@/lib/repositories/form-registry.repo'
 
 export async function GET() {
   try {

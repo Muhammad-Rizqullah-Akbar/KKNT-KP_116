@@ -9,7 +9,7 @@ import {
   getFormVersionSnapshotsFromDb,
   type FormAggregateDoc,
   type FormVersionSnapshotDoc,
-} from '@/lib/firebase/repositories/v1_5/v1_5Forms.repo'
+} from '@/lib/repositories/v1_5-forms.repo'
 import { validateCanonicalForm } from '@/lib/forms/v1_5/validation'
 import type { FormMetadata } from '@/lib/forms/v1_5/types'
 import type { BuilderState } from '@/lib/forms/v1_5/builderState'
@@ -24,7 +24,7 @@ export {
   formAggregateToCanonicalForm,
 } from '@/lib/forms/v1_5/formConverters'
 
-import { registerNewMetadataEntry } from '@/lib/firebase/repositories/v1_5/v1_5Registry.repo'
+import { registerNewMetadataEntry } from '@/lib/repositories/form-registry.repo'
 
 export async function createFormWorkflow(
   metadata: FormMetadata,
@@ -74,7 +74,7 @@ export async function createFormWorkflow(
   return await saveFormAggregateToDb(formId, initialPayload, sessionUid)
 }
 
-import { safeSetDoc } from '@/lib/firebase/repositories/v1_5/safeFirestore'
+import { safeSetDoc } from '@/lib/repositories/safe-firestore'
 
 export async function updateFormMetadataWorkflow(
   formId: string,
@@ -179,7 +179,7 @@ export async function restoreFormWorkflow(
   formId: string,
   sessionUid: string
 ): Promise<FormAggregateDoc> {
-  const { restoreFormInDb } = await import('@/lib/firebase/repositories/v1_5/v1_5Forms.repo')
+  const { restoreFormInDb } = await import('@/lib/repositories/v1_5-forms.repo')
   return await restoreFormInDb(formId, sessionUid)
 }
 

@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { safeFetchJson } from '@/lib/shared/safeFetch'
-import { getArticles } from '@/lib/firebase/repositories/articles.repo'
+import { getArticles } from '@/lib/repositories/articles.repo'
 import { Icon } from '@/components/ui/Icons'
 
 type UserProfile = {

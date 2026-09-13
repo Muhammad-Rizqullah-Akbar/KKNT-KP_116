@@ -32,7 +32,7 @@ import {
   createFormGroup,
   type FormData,
   type FormGroup,
-} from '@/lib/firebase/repositories/forms.repo'
+} from '@/lib/repositories/forms.repo'
 
 const generateId = () => Math.random().toString(36).substring(2, 9)
 

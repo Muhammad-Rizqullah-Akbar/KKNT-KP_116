@@ -6,12 +6,12 @@ import {
   getResponseDoc,
   submitResponseDoc,
   listResponsesDoc,
-} from '@/lib/firebase/repositories/v1_5/responses.repo'
-import { getDistributionByCodeDoc, listDistributionsDoc } from '@/lib/firebase/repositories/v1_5/distributions.repo'
+} from '@/lib/repositories/v1_5-responses.repo'
+import { getDistributionByCodeDoc, listDistributionsDoc } from '@/lib/repositories/distributions.repo'
 import {
   getFormAggregateFromDb,
   getFormVersionSnapshotsFromDb,
-} from '@/lib/firebase/repositories/v1_5/v1_5Forms.repo'
+} from '@/lib/repositories/v1_5-forms.repo'
 import { validateResponseAnswers } from '@/lib/forms/v1_5/response.validation'
 import { calculateResponseScore } from '@/lib/forms/v1_5/scoring/scoringEngine'
 import { toPublicFormProjection } from '@/lib/forms/v1_5/legacyAdapter'
@@ -467,7 +467,7 @@ export async function listResponsesWorkflow(
     let partnerOrg = ''
 
     try {
-      const { safeGetDoc, safeGetCollectionDocs } = await import('@/lib/firebase/repositories/v1_5/safeFirestore')
+      const { safeGetDoc, safeGetCollectionDocs } = await import('@/lib/repositories/safe-firestore')
       const [userDoc, allUsers, allDists] = await Promise.all([
         safeGetDoc('users', authContext.uid),
         safeGetCollectionDocs('users'),

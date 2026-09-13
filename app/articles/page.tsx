@@ -10,7 +10,7 @@ import {
   getArticles, 
   getArticleCategories,
   type ArticleData 
-} from '@/lib/firebase/repositories/articles.repo'
+} from '@/lib/repositories/articles.repo'
 import { FuturisticArticleCard } from '@/components/articles/FuturisticArticleCard'
 
 // ============ KONSTANTA LOGO ============

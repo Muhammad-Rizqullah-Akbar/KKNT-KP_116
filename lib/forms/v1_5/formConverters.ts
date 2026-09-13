@@ -1,6 +1,6 @@
 import type { CanonicalForm } from '@/lib/forms/v1_5/types'
 import type { BuilderState } from '@/lib/forms/v1_5/builderState'
-import type { FormAggregateDoc } from '@/lib/firebase/repositories/v1_5/v1_5Forms.repo'
+import type { FormAggregateDoc } from '@/lib/repositories/v1_5-forms.repo'
 
 /**
  * Convert BuilderState to FormAggregateDoc payload.

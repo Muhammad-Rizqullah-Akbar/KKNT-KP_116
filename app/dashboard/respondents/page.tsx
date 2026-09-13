@@ -15,7 +15,7 @@ import {
   type FormResponse,
   type FormData,
   type FormGroup,
-} from '@/lib/firebase/repositories/forms.repo'
+} from '@/lib/repositories/forms.repo'
 import { ScoringEngine } from '@/lib/scoring/scoringEngine'
 import { isBiodataAspect } from '@/lib/forms/v1_5/scoring/scoringEngine'
 import { extractRespondentName, extractRespondentEmail } from '@/lib/forms/v1_5/respondentUtils'

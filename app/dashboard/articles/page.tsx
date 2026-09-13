@@ -13,8 +13,8 @@ import {
   getArticleCategories,
   createArticleCategory,
   type ArticleData 
-} from '@/lib/firebase/repositories/articles.repo'
-import { getForms } from '@/lib/firebase/repositories/forms.repo'
+} from '@/lib/repositories/articles.repo'
+import { getForms } from '@/lib/repositories/forms.repo'
 import { storage } from '@/lib/firebaseClient'
 import { uploadOptimizedArticleImage } from '@/lib/firebase/storage'
 import { ref, uploadBytes, getDownloadURL, listAll } from 'firebase/storage'

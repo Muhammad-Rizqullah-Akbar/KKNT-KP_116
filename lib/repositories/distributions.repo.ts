@@ -1,4 +1,4 @@
-import { safeGetDoc, safeGetCollectionDocs, safeSetDoc, safeDeleteDoc } from './safeFirestore'
+import { safeGetDoc, safeGetCollectionDocs, safeSetDoc, safeDeleteDoc } from './safe-firestore'
 import type { DistributionDoc } from '@/lib/forms/v1_5/distributionTypes'
 
 const DISTRIBUTIONS_COLLECTION = 'distributions'

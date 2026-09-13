@@ -1,4 +1,4 @@
-import { safeGetDoc, safeGetCollectionDocs, safeSetDoc } from './safeFirestore'
+import { safeGetDoc, safeGetCollectionDocs, safeSetDoc } from './safe-firestore'
 import type { FormAccessDoc } from '@/lib/forms/v1_5/distributionTypes'
 
 const FORM_ACCESS_COLLECTION = 'formAccess'

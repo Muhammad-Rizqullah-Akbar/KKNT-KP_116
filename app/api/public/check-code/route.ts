@@ -1,7 +1,7 @@
 // app/api/public/check-code/route.ts
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getFormByCode, getFormGroupByCode } from '@/lib/firebase/repositories/forms.repo'
+import { getFormByCode, getFormGroupByCode } from '@/lib/repositories/forms.repo'
 
 export async function GET(request: NextRequest) {
   try {

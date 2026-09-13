@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Icon } from '@/components/ui/Icons'
-import { getLandingPageSettings } from '@/lib/firebase/repositories/settings.repo'
+import { getLandingPageSettings } from '@/lib/repositories/settings.repo'
 
 const LOGO_SRC = '/logo.png'
 

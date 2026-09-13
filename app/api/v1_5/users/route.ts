@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireRole } from '@/lib/auth/server'
-import { safeGetCollectionDocs } from '@/lib/firebase/repositories/v1_5/safeFirestore'
+import { safeGetCollectionDocs } from '@/lib/repositories/safe-firestore'
 
 export async function GET(request: NextRequest) {
   try {

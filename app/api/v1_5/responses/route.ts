@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthorizationContext } from '@/lib/auth/server'
 import { listResponsesWorkflow } from '@/lib/forms/v1_5/response.service'
-import { getFormAndDistributionOptions } from '@/lib/firebase/repositories/v1_5/responses.repo'
+import { getFormAndDistributionOptions } from '@/lib/repositories/v1_5-responses.repo'
 
 /**
  * GET /api/v1_5/responses
@@ -88,7 +88,7 @@ export async function DELETE(request: Request) {
       )
     }
 
-    const { deleteMultipleResponseDocs } = await import('@/lib/firebase/repositories/v1_5/responses.repo')
+    const { deleteMultipleResponseDocs } = await import('@/lib/repositories/v1_5-responses.repo')
     await deleteMultipleResponseDocs(idsToDelete)
 
     return NextResponse.json({
