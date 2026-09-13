@@ -6,6 +6,8 @@ import type { FormAspect, BuilderQuestion } from '@/lib/domain/forms/builder-sta
 import { QUESTION_TYPES } from '@/lib/domain/forms/types'
 import { LikertScaleEditor } from '././LikertScaleEditor'
 import { Icon } from '@/components/ui/Icons'
+import { BiodataNormalizationPanel } from './BiodataNormalizationPanel'
+import { QuestionMediaEditor } from './QuestionMediaEditor'
 
 interface QuestionEditorProps {
   question: BuilderQuestion
@@ -80,33 +82,7 @@ export function QuestionEditor({ question, aspects = [], onUpdate }: QuestionEdi
 
   return (
     <div className="p-4 border-t border-slate-800 bg-slate-950/90 rounded-b-2xl space-y-4 shadow-inner">
-      {!isScoredAspect && (
-        <div className="p-3.5 rounded-xl bg-purple-500/10 border border-purple-500/30 space-y-2">
-          <div className="flex items-center gap-2 text-xs text-purple-300 font-bold">
-            <Icon name="info" className="w-4 h-4 text-purple-400 shrink-0" />
-            <span>Standardisasi Identitas Responden (Biodata Field Normalization):</span>
-          </div>
-          <p className="text-[11px] text-purple-300/80 leading-relaxed">
-            Pilih peran identitas data ini agar otomatis ternormalisasi pada laporan hasil, analisis responden, dan ekspor data tanpa perlu dinilai.
-          </p>
-
-          <div className="pt-1">
-            <select
-              value={question.biodataKey || 'custom_biodata'}
-              onChange={(e) => onUpdate({ biodataKey: e.target.value as BiodataKey })}
-              className="w-full bg-slate-900 border border-purple-500/40 text-purple-200 text-xs font-semibold rounded-xl px-3 py-2 focus:outline-none focus:border-purple-400"
-            >
-              <option value="custom_biodata">Data Informasi Umum / Biodata Lainnya</option>
-              <option value="respondent_name">Nama Lengkap Responden (respondent_name)</option>
-              <option value="respondent_phone">Nomor Telepon / WhatsApp (respondent_phone)</option>
-              <option value="respondent_email">Alamat Email (respondent_email)</option>
-              <option value="respondent_institution">Instansi / Organisasi / Nama Sarana (respondent_institution)</option>
-              <option value="respondent_address">Alamat Lengkap / Lokasi (respondent_address)</option>
-              <option value="source_info">Sumber Informasi / Media (source_info)</option>
-            </select>
-          </div>
-        </div>
-      )}
+      {!isScoredAspect && <BiodataNormalizationPanel question={question} onUpdate={onUpdate} />}
 
       {/* 2 Focused Tabs */}
       <div className="flex items-center gap-2 p-1 bg-slate-900 border border-slate-800 rounded-xl">
@@ -282,145 +258,7 @@ export function QuestionEditor({ question, aspects = [], onUpdate }: QuestionEdi
           </div>
 
           {/* Lampiran Gambar */}
-          <div className="p-3.5 rounded-xl border border-slate-800 bg-slate-900/40 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-300 flex items-center gap-2">
-                <Icon name="image" className="w-4 h-4 text-cyan-400" />
-                Lampiran Gambar Pertanyaan
-              </span>
-              <button
-                type="button"
-                onClick={() =>
-                  onUpdate({
-                    presentation: {
-                      ...question.presentation,
-                      media:
-                        question.presentation.media?.type === 'image'
-                          ? { type: 'none' }
-                          : { type: 'image', url: '', caption: '' },
-                    },
-                  })
-                }
-                className="text-xs text-cyan-400 hover:underline font-medium"
-              >
-                {question.presentation.media?.type === 'image' ? 'Hapus Lampiran' : 'Tambah Lampiran'}
-              </button>
-            </div>
-
-            {question.presentation.media?.type === 'image' && (
-              <div className="space-y-3 pt-2">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[11px] text-slate-400 mb-1">Upload Gambar dari Komputer</label>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={async (e) => {
-                        const file = e.target.files?.[0]
-                        if (!file) return
-                        try {
-                          const formData = new FormData()
-                          formData.append('file', file)
-                          const res = await fetch('/api/upload', { method: 'POST', body: formData })
-                          const data = await res.json()
-                          if (data.success && data.url) {
-                            onUpdate({
-                              imageUrl: data.url,
-                              mediaUrl: data.url,
-                              presentation: {
-                                ...question.presentation,
-                                media: { ...question.presentation?.media, type: 'image', url: data.url },
-                              },
-                            })
-                          } else {
-                            const reader = new FileReader()
-                            reader.onload = (evt) => {
-                              if (evt.target?.result) {
-                                const base64 = String(evt.target.result)
-                                onUpdate({
-                                  imageUrl: base64,
-                                  mediaUrl: base64,
-                                  presentation: {
-                                    ...question.presentation,
-                                    media: { ...question.presentation?.media, type: 'image', url: base64 },
-                                  },
-                                })
-                              }
-                            }
-                            reader.readAsDataURL(file)
-                          }
-                        } catch (err) {
-                          const reader = new FileReader()
-                          reader.onload = (evt) => {
-                            if (evt.target?.result) {
-                              const base64 = String(evt.target.result)
-                              onUpdate({
-                                imageUrl: base64,
-                                mediaUrl: base64,
-                                presentation: {
-                                  ...question.presentation,
-                                  media: { ...question.presentation?.media, type: 'image', url: base64 },
-                                },
-                              })
-                            }
-                          }
-                          reader.readAsDataURL(file)
-                        }
-                      }}
-                      className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-cyan-500/20 file:text-cyan-300"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] text-slate-400 mb-1">URL Gambar (atau Paste Link)</label>
-                    <input
-                      type="url"
-                      value={question.presentation.media.url || ''}
-                      onChange={(e) =>
-                        onUpdate({
-                          presentation: {
-                            ...question.presentation,
-                            media: { ...question.presentation.media, type: 'image', url: e.target.value },
-                          },
-                        })
-                      }
-                      placeholder="https://example.com/image.jpg"
-                      className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-cyan-500"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-[11px] text-slate-400 mb-1">Caption / Keterangan Gambar</label>
-                  <input
-                    type="text"
-                    value={question.presentation.media.caption || ''}
-                    onChange={(e) =>
-                      onUpdate({
-                        presentation: {
-                          ...question.presentation,
-                          media: { ...question.presentation.media, type: 'image', caption: e.target.value },
-                        },
-                      })
-                    }
-                    placeholder="Contoh: Foto fasilitas sanitasi sarana kantin"
-                    className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-cyan-500"
-                  />
-                </div>
-
-                {question.presentation.media.url && (
-                  <div className="p-2 rounded-lg bg-slate-950 border border-slate-800 flex items-center gap-3">
-                    <img
-                      src={question.presentation.media.url}
-                      alt={question.presentation.media.caption || 'Preview'}
-                      className="w-16 h-16 object-cover rounded-md border border-slate-700 shrink-0"
-                    />
-                    <span className="text-[11px] text-emerald-400 font-medium">✓ Gambar Terlampir & Siap Ditampilkan</span>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+          <QuestionMediaEditor question={question} onUpdate={onUpdate} />
         </div>
       )}
 
