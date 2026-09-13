@@ -2,17 +2,26 @@
 
 import React, { useState, useEffect, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Topbar } from '@/features/dashboard/components/layout/Topbar'
-import { Icon } from '@/components/ui/Icons'
 import type { DistributionDoc } from '@/lib/domain/distributions/distribution-types'
 import type { FormAggregateDoc } from '@/lib/repositories/form-versions.repo'
 import { useAuth } from '@/context/AuthContext'
 import { safeFetchJson } from '@/lib/infra/safe-fetch'
-import { SkeletonTable } from '@/components/ui/Skeleton'
 import { queryKeys } from '@/lib/query-keys'
 import { useToast } from '@/lib/hooks'
+import StatsSection from './stats-section'
+import FiltersAndActions from './filters-and-actions'
+import DistributionsTable from './distributions-table'
+import Pagination from './pagination'
+import BulkActionBar from './bulk-action-bar'
+import CreateDistributionModal from './create-distribution-modal'
+import DetailModal from './detail-modal'
+import EditModal from './edit-modal'
+import DeleteConfirmModal from './delete-confirm-modal'
+import PermissionModal from './permission-modal'
+import ToastNotification from './toast-notification'
+import type { DistributionDetail, VersionItem, DeleteTarget } from './types'
 
 export default function DistributionsDashboardPage() {
   const router = useRouter()
@@ -76,7 +85,7 @@ export default function DistributionsDashboardPage() {
   const [formCategoryFilter, setFormCategoryFilter] = useState('all')
 
   // Detail & Edit Modal States
-  const [selectedDetail, setSelectedDetail] = useState<{ distribution: DistributionDoc; formSummary: any } | null>(null)
+  const [selectedDetail, setSelectedDetail] = useState<DistributionDetail | null>(null)
   const [isDetailOpen, setIsDetailOpen] = useState(false)
   const [isDetailLoading, setIsDetailLoading] = useState(false)
 
@@ -94,17 +103,35 @@ export default function DistributionsDashboardPage() {
   const [selectedDistIds, setSelectedDistIds] = useState<string[]>([])
 
   // Custom Delete Confirmation Modal State
-  const [deleteTargetDoc, setDeleteTargetDoc] = useState<{ id: string; code: string; title: string } | null>(null)
+  const [deleteTargetDoc, setDeleteTargetDoc] = useState<DeleteTarget | null>(null)
   const [isExecutingDelete, setIsExecutingDelete] = useState(false)
 
   // Distribution Access Permission & Active Version Snapshot Modal State
   const [isPermissionModalOpen, setIsPermissionModalOpen] = useState(false)
   const [permissionFormId, setPermissionFormId] = useState('')
   const [permissionAllowCadre, setPermissionAllowCadre] = useState(true)
-  const [permissionVersions, setPermissionVersions] = useState<any[]>([])
+  const [permissionVersions, setPermissionVersions] = useState<VersionItem[]>([])
   const [permissionActiveVersionId, setPermissionActiveVersionId] = useState('')
   const [isSavingPermission, setIsSavingPermission] = useState(false)
   const [isLoadingPermissionVersions, setIsLoadingPermissionVersions] = useState(false)
+
+  // Versions State
+  const [availableVersions, setAvailableVersions] = useState<VersionItem[]>([])
+
+  const fetchFormVersions = async (formId: string) => {
+    if (!formId) return
+    try {
+      const res = await safeFetchJson(`/api/forms/${formId}/versions`)
+      if (res.ok && res.data && Array.isArray(res.data.versions)) {
+        setAvailableVersions(res.data.versions)
+        if (res.data.versions.length > 0) {
+          setPinnedVersionId(res.data.versions[0].versionId)
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to fetch versions for form:', formId)
+    }
+  }
 
   const openPermissionModal = async (formIdToSelect?: string) => {
     setIsPermissionModalOpen(true)
@@ -168,7 +195,6 @@ export default function DistributionsDashboardPage() {
       setIsSavingPermission(false)
     }
   }
-
 
   const openDetailModal = async (distId: string) => {
     setIsDetailLoading(true)
@@ -234,24 +260,6 @@ export default function DistributionsDashboardPage() {
       toast.show('Terjadi kesalahan saat menyimpan perubahan.')
     } finally {
       setIsSavingEdit(false)
-    }
-  }
-
-  // Versions State
-  const [availableVersions, setAvailableVersions] = useState<any[]>([])
-
-  const fetchFormVersions = async (formId: string) => {
-    if (!formId) return
-    try {
-      const res = await safeFetchJson(`/api/forms/${formId}/versions`)
-      if (res.ok && res.data && Array.isArray(res.data.versions)) {
-        setAvailableVersions(res.data.versions)
-        if (res.data.versions.length > 0) {
-          setPinnedVersionId(res.data.versions[0].versionId)
-        }
-      }
-    } catch (e) {
-      console.warn('Failed to fetch versions for form:', formId)
     }
   }
 
@@ -442,1012 +450,136 @@ export default function DistributionsDashboardPage() {
       />
 
       <div className="flex-1 p-4 sm:p-6 space-y-6 max-w-7xl mx-auto w-full">
-        {/* Header Action Bar */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Search Input */}
-            <div className="relative">
-              <Icon name="search" className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-              <input
-                type="text"
-                placeholder="Cari kode / judul / kader..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 pr-4 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500 w-full sm:w-64"
-              />
-            </div>
+        <FiltersAndActions
+          searchTerm={searchTerm}
+          onSearchChange={setSearchTerm}
+          statusFilter={statusFilter}
+          onStatusChange={setStatusFilter}
+          ownerFilter={ownerFilter}
+          onOwnerChange={setOwnerFilter}
+          isGlobalRole={isGlobalRole}
+          isPartnershipRole={isPartnershipRole}
+          onRefresh={loadData}
+          onOpenPermissionModal={() => openPermissionModal()}
+          onOpenCreateModal={() => setIsCreateModalOpen(true)}
+        />
 
-            {/* Status Filter */}
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
-            >
-              <option value="all">Semua Status</option>
-              <option value="active">Aktif Menyebar</option>
-              <option value="paused">Dijeda</option>
-              <option value="expired">Masa Berlaku Habis</option>
-            </select>
+        <StatsSection stats={stats} />
 
-            {/* Owner Filter (Global Roles Only) */}
-            {isGlobalRole ? (
-              <select
-                value={ownerFilter}
-                onChange={(e) => setOwnerFilter(e.target.value)}
-                className="px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
-              >
-                <option value="all">Semua Pemilik</option>
-                <option value="super_admin">BPOM Pusat</option>
-                <option value="cadre">Kader Desa</option>
-                <option value="partnership">Kemitraan</option>
-              </select>
-            ) : isPartnershipRole ? (
-              <span className="px-3 py-1.5 rounded-xl bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 text-xs font-semibold">
-                🏢 Skop Kemitraan: [Mitra Saya + Kader Subordinat]
-              </span>
-            ) : (
-              <span className="px-3 py-1.5 rounded-xl bg-purple-500/10 text-purple-300 border border-purple-500/20 text-xs font-semibold">
-                👤 Skop Kader: [Kode Distribusi Saya]
-              </span>
-            )}
+        <DistributionsTable
+          distributions={paginatedDistributions}
+          filteredCount={filteredDistributions.length}
+          selectedDistIds={selectedDistIds}
+          isLoading={isLoading}
+          error={error}
+          onLoadData={loadData}
+          onToggleSelectDist={toggleSelectDist}
+          onToggleSelectAll={toggleSelectAll}
+          onOpenDetail={openDetailModal}
+          onOpenEdit={openEditModal}
+          onCopyLink={copyPublicLink}
+          onTogglePause={handleTogglePause}
+          onDeleteClick={handleDeleteClick}
+        />
 
-            {/* Refresh Button */}
-            <button
-              type="button"
-              onClick={loadData}
-              className="p-2 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 transition-colors"
-              title="Refresh Data"
-            >
-              <Icon name="rotateCcw" className="w-4 h-4 text-cyan-400" />
-            </button>
-          </div>
-
-          <div className="flex items-center gap-2 sm:gap-3">
-            {/* Permission & Active Version Modal Trigger (Strictly Restricted to Global Roles) */}
-            {isGlobalRole && (
-              <button
-                type="button"
-                onClick={() => openPermissionModal()}
-                className="px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 font-bold text-xs border border-slate-800 shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer"
-              >
-                <Icon name="settings" className="w-4 h-4 text-emerald-400" />
-                <span>Izin & Versi Aktif</span>
-              </button>
-            )}
-
-            {/* Create Distribution Trigger Button */}
-            <button
-              type="button"
-              onClick={() => setIsCreateModalOpen(true)}
-              className="px-4 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-extrabold text-xs shadow-lg shadow-cyan-600/20 flex items-center justify-center gap-2 transition-all cursor-pointer"
-            >
-              <Icon name="plus" className="w-4 h-4" />
-              <span>Buat Kode Distribusi</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Quick Stats Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4 shadow-sm">
-            <div className="flex items-center justify-between text-xs text-slate-400">
-              <span>Total Distribusi</span>
-              <Icon name="share2" className="w-4 h-4 text-cyan-400" />
-            </div>
-            <p className="text-2xl font-bold font-mono text-slate-100 mt-2">{stats.total}</p>
-          </div>
-
-          <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4 shadow-sm">
-            <div className="flex items-center justify-between text-xs text-slate-400">
-              <span>Aktif Menyebar</span>
-              <Icon name="checkCircle" className="w-4 h-4 text-emerald-400" />
-            </div>
-            <p className="text-2xl font-bold font-mono text-emerald-300 mt-2">{stats.active}</p>
-          </div>
-
-          <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4 shadow-sm">
-            <div className="flex items-center justify-between text-xs text-slate-400">
-              <span>Dijeda Sementara</span>
-              <Icon name="pauseCircle" className="w-4 h-4 text-amber-400" />
-            </div>
-            <p className="text-2xl font-bold font-mono text-amber-300 mt-2">{stats.paused}</p>
-          </div>
-
-          <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4 shadow-sm">
-            <div className="flex items-center justify-between text-xs text-slate-400">
-              <span>Masa Berlaku Habis</span>
-              <Icon name="clock" className="w-4 h-4 text-rose-400" />
-            </div>
-            <p className="text-2xl font-bold font-mono text-rose-300 mt-2">{stats.expired}</p>
-          </div>
-        </div>
-
-        {/* Distribution Cards & Table */}
-        <div className="rounded-2xl bg-slate-900 border border-slate-800 overflow-hidden shadow-md">
-          {/* Table Select-All Header Control */}
-          {filteredDistributions.length > 0 && (
-            <div className="p-3.5 px-5 bg-slate-950 border-b border-slate-800 flex items-center justify-between gap-4 text-xs">
-              <label className="flex items-center gap-2.5 font-mono font-bold text-slate-300 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={selectedDistIds.length > 0 && selectedDistIds.length === filteredDistributions.length}
-                  onChange={toggleSelectAll}
-                  className="w-4 h-4 rounded accent-cyan-500 cursor-pointer"
-                />
-                <span>Pilih Semua ({filteredDistributions.length} Kode Distribusi)</span>
-              </label>
-
-              {selectedDistIds.length > 0 && (
-                <span className="text-[11px] font-mono text-cyan-400 font-bold bg-cyan-950/80 px-2.5 py-0.5 rounded-md border border-cyan-500/30">
-                  {selectedDistIds.length} Terpilih
-                </span>
-              )}
-            </div>
-          )}
-
-          {isLoading ? (
-            <SkeletonTable rows={6} cols={6} />
-          ) : error ? (
-            <div className="p-8 text-center text-xs text-rose-300 space-y-2">
-              <p className="font-semibold">{error}</p>
-              <button onClick={loadData} className="px-3 py-1.5 rounded-lg bg-rose-950 border border-rose-500/40 text-rose-200">
-                Coba Ulang
-              </button>
-            </div>
-          ) : filteredDistributions.length === 0 ? (
-            <div className="text-center py-16 text-slate-500 space-y-2">
-              <Icon name="share2" className="w-10 h-10 mx-auto text-slate-700" />
-              <p className="text-sm font-semibold text-slate-300">Belum Ada Kode Distribusi</p>
-              <p className="text-xs text-slate-500">Klik "+ Buat Kode Distribusi" untuk menghasilkan tautan publik baru.</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-slate-800/80">
-              {paginatedDistributions.map((distribution) => {
-                const isActive = distribution.status === 'active'
-                const isPaused = distribution.status === 'paused'
-                const isChecked = selectedDistIds.includes(distribution.distributionId)
-
-                return (
-                  <div
-                    key={distribution.distributionId}
-                    className={`p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-colors border-b border-slate-800/50 last:border-0 ${
-                      isChecked ? 'bg-slate-800/60' : 'hover:bg-slate-800/30'
-                    }`}
-                  >
-                    <div className="flex items-start gap-3.5 max-w-xl">
-                      {/* Item Checkbox */}
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={() => toggleSelectDist(distribution.distributionId)}
-                        className="w-4 h-4 rounded accent-cyan-500 cursor-pointer mt-1 flex-shrink-0"
-                      />
-
-                      <div className="space-y-1.5">
-                        <div className="flex items-center gap-2.5 flex-wrap">
-                          <span className="font-mono text-cyan-400 font-extrabold text-sm px-2.5 py-0.5 rounded-lg bg-cyan-950 border border-cyan-500/30">
-                            {distribution.code}
-                          </span>
-
-                          <span
-                            className={`text-[10px] font-bold px-2.5 py-0.5 rounded-md uppercase border ${
-                              isActive
-                                ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
-                                : isPaused
-                                ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
-                                : 'bg-rose-500/10 text-rose-300 border-rose-500/30'
-                            }`}
-                          >
-                            {distribution.status}
-                          </span>
-
-                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-950 text-slate-400 border border-slate-800">
-                            {distribution.versionMode === 'pinned' ? `Pinned (${distribution.pinnedVersionId})` : 'Auto-Active (Versi Publik Terbaru)'}
-                          </span>
-
-                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-purple-950/40 text-purple-300 border border-purple-500/30 capitalize">
-                            {distribution.ownerType === 'super_admin' ? 'BPOM Pusat' : distribution.ownerType === 'cadre' ? 'Kader Desa' : 'Kemitraan'}
-                          </span>
-                        </div>
-
-                        <h4 className="text-sm font-bold text-slate-100">{distribution.title}</h4>
-                        <p className="text-xs text-slate-400 line-clamp-1">{distribution.description || 'Tidak ada deskripsi tambahan.'}</p>
-
-                        <div className="flex items-center gap-3 text-[11px] text-slate-500 font-mono pt-1">
-                          <span>Form ID: {distribution.formId}</span>
-                          <span>•</span>
-                          <span>Pemilik: {distribution.ownerName}</span>
-                          <span>•</span>
-                          <span>Dibuat: {new Date(distribution.createdAt).toLocaleDateString('id-ID')}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Controls */}
-                    <div className="flex items-center gap-2 self-start md:self-center flex-wrap pl-7 md:pl-0">
-                      <button
-                        type="button"
-                        onClick={() => openDetailModal(distribution.distributionId)}
-                        className="px-3 py-1.5 rounded-xl bg-purple-950/40 hover:bg-purple-900/60 text-purple-200 border border-purple-500/40 text-xs font-semibold flex items-center gap-1.5 transition-colors"
-                      >
-                        <Icon name="eye" className="w-3.5 h-3.5 text-purple-300" />
-                        <span>Detail & Form</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => openEditModal(distribution)}
-                        className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-colors"
-                      >
-                        <Icon name="edit" className="w-3.5 h-3.5 text-amber-400" />
-                        <span>Edit</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => copyPublicLink(distribution.code)}
-                        className="px-3 py-1.5 rounded-xl bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-200 border border-cyan-500/40 text-xs font-semibold flex items-center gap-1.5 transition-colors"
-                      >
-                        <Icon name="copy" className="w-3.5 h-3.5" />
-                        <span>Salin Link</span>
-                      </button>
-
-                      <a
-                        href={`/form/${distribution.code}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-colors"
-                      >
-                        <Icon name="externalLink" className="w-3.5 h-3.5 text-cyan-400" />
-                        <span>Buka</span>
-                      </a>
-
-                      <button
-                        type="button"
-                        onClick={() => handleTogglePause(distribution.distributionId)}
-                        className={`px-3 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-colors ${
-                          isPaused
-                            ? 'bg-emerald-950/40 hover:bg-emerald-900/50 text-emerald-200 border-emerald-500/40'
-                            : 'bg-amber-950/40 hover:bg-amber-900/50 text-amber-200 border-amber-500/40'
-                        }`}
-                      >
-                        <Icon name={isPaused ? 'play' : 'pause'} className="w-3.5 h-3.5" />
-                        <span>{isPaused ? 'Aktifkan' : 'Jeda'}</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteClick(distribution.distributionId, distribution.code, distribution.title)}
-                        className="px-3 py-1.5 rounded-xl bg-rose-950/40 hover:bg-rose-900/60 text-rose-200 border border-rose-500/40 text-xs font-semibold flex items-center gap-1.5 transition-colors"
-                        title="Hapus Kode Distribusi Permanen"
-                      >
-                        <Icon name="trash" className="w-3.5 h-3.5 text-rose-400" />
-                        <span>Hapus</span>
-                      </button>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Pagination Controls Footer */}
         {filteredDistributions.length > 0 && (
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-slate-900 border border-slate-800 text-xs text-slate-400">
-            <div>
-              Menampilkan <span className="font-bold text-slate-200">{(currentPage - 1) * pageSize + 1}</span> - <span className="font-bold text-slate-200">{Math.min(currentPage * pageSize, filteredDistributions.length)}</span> dari <span className="font-bold text-slate-200">{filteredDistributions.length}</span> distribusi
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage <= 1}
-                className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 hover:bg-slate-800 disabled:opacity-40 font-bold"
-              >
-                ← Prev
-              </button>
-
-              <span className="font-mono text-cyan-400 font-bold px-2">
-                {currentPage} / {totalPages}
-              </span>
-
-              <button
-                type="button"
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                disabled={currentPage >= totalPages}
-                className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 hover:bg-slate-800 disabled:opacity-40 font-bold"
-              >
-                Next →
-              </button>
-            </div>
-          </div>
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            totalItems={filteredDistributions.length}
+            onPrev={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            onNext={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+          />
         )}
       </div>
 
-      {/* FLOATING BULK ACTION BAR */}
-      {selectedDistIds.length > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center justify-between gap-4 px-6 py-3.5 rounded-full bg-slate-900/95 border-2 border-rose-500/80 text-slate-100 shadow-2xl backdrop-blur-md max-w-lg w-[92%] sm:w-auto animate-in slide-in-from-bottom-4">
-          <div className="flex items-center gap-3">
-            <span className="w-3 h-3 rounded-full bg-rose-500 animate-ping flex-shrink-0" />
-            <span className="text-xs font-mono font-bold text-slate-200">
-              <strong className="text-rose-400 font-extrabold text-sm">{selectedDistIds.length}</strong> Kode Terpilih
-            </span>
-          </div>
+      <BulkActionBar
+        selectedCount={selectedDistIds.length}
+        onCancel={() => setSelectedDistIds([])}
+        onBulkDelete={handleBulkDeleteClick}
+      />
 
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setSelectedDistIds([])}
-              className="px-3.5 py-1.5 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-colors"
-            >
-              Batal
-            </button>
-            <button
-              type="button"
-              onClick={handleBulkDeleteClick}
-              className="px-4 py-1.5 rounded-full bg-rose-600 hover:bg-rose-500 text-white text-xs font-extrabold shadow-lg shadow-rose-600/30 flex items-center gap-1.5 transition-all"
-            >
-              <Icon name="trash" className="w-3.5 h-3.5 text-white" />
-              <span>Hapus Semua Terpilih ({selectedDistIds.length})</span>
-            </button>
-          </div>
-        </div>
-      )}
+      <CreateDistributionModal
+        isOpen={isCreateModalOpen}
+        publishedForms={publishedForms}
+        selectedFormId={selectedFormId}
+        onSelectForm={(formId) => {
+          setSelectedFormId(formId)
+          fetchFormVersions(formId)
+        }}
+        customTitle={customTitle}
+        onCustomTitleChange={setCustomTitle}
+        customDescription={customDescription}
+        onCustomDescriptionChange={setCustomDescription}
+        versionMode={versionMode}
+        onVersionModeChange={setVersionMode}
+        pinnedVersionId={pinnedVersionId}
+        onPinnedVersionIdChange={setPinnedVersionId}
+        availableVersions={availableVersions}
+        expiresAt={expiresAt}
+        onExpiresAtChange={setExpiresAt}
+        isCreating={isCreating}
+        onSubmit={handleCreateDistribution}
+        onClose={() => setIsCreateModalOpen(false)}
+      />
 
-      {/* CREATE DISTRIBUTION MODAL */}
-      {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="relative w-full max-w-xl bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-              <div>
-                <h3 className="text-base font-bold text-slate-100">Terbitkan Kode Distribusi Baru</h3>
-                <p className="text-xs text-slate-400">Pilih formulir terpublikasi & tentukan parameter kanal distribusi</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsCreateModalOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800"
-              >
-                <Icon name="x" className="w-5 h-5" />
-              </button>
-            </div>
+      <DetailModal
+        isOpen={isDetailOpen}
+        isLoading={isDetailLoading}
+        detail={selectedDetail}
+        onClose={() => setIsDetailOpen(false)}
+        onCopyLink={copyPublicLink}
+      />
 
-            <form onSubmit={handleCreateDistribution} className="space-y-4 text-xs">
-              <div>
-                <label className="block font-semibold text-slate-300 mb-2">Pilih Formulir Resmi (Diizinkan Admin) *</label>
-                {publishedForms.length === 0 ? (
-                  <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs space-y-1">
-                    <p className="font-bold flex items-center gap-1.5">
-                      <Icon name="alertTriangle" className="w-4 h-4 text-amber-400" />
-                      Tidak Ada Formulir Yang Diizinkan Admin
-                    </p>
-                    <p className="text-[11px] text-slate-300">
-                      Belum ada formulir terpublikasi yang diizinkan Admin untuk didistribusikan. Silakan aktifkan sakelar <strong>"Akses Kader & Mitra"</strong> pada menu <strong>Daftar Formulir</strong> terlebih dahulu.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-60 overflow-y-auto pr-1">
-                    {publishedForms.map((form) => {
-                      const isSelected = selectedFormId === form.formId
-                      const aspectCount = form.aspects?.length || 0
-                      const questionCount = form.questions?.length || 0
+      <EditModal
+        editingDoc={editingDoc}
+        editTitle={editTitle}
+        onEditTitleChange={setEditTitle}
+        editDescription={editDescription}
+        onEditDescriptionChange={setEditDescription}
+        editStatus={editStatus}
+        onEditStatusChange={setEditStatus}
+        editVersionMode={editVersionMode}
+        onEditVersionModeChange={setEditVersionMode}
+        editPinnedVersionId={editPinnedVersionId}
+        onEditPinnedVersionIdChange={setEditPinnedVersionId}
+        availableVersions={availableVersions}
+        editExpiresAt={editExpiresAt}
+        onEditExpiresAtChange={setEditExpiresAt}
+        isSavingEdit={isSavingEdit}
+        onSubmit={handleSaveEdit}
+        onClose={() => setIsEditOpen(false)}
+      />
 
-                      return (
-                        <div
-                          key={form.formId}
-                          onClick={() => {
-                            setSelectedFormId(form.formId)
-                            fetchFormVersions(form.formId)
-                          }}
-                          className={`cursor-pointer p-3.5 rounded-2xl border transition-all space-y-2 relative group ${
-                            isSelected
-                              ? 'bg-cyan-950/40 border-cyan-500 shadow-lg shadow-cyan-500/10 ring-1 ring-cyan-500/50'
-                              : 'bg-slate-950/70 border-slate-800 hover:border-slate-700 hover:bg-slate-900/60'
-                          }`}
-                        >
-                          {/* Selection badge check */}
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-[10px] font-mono font-extrabold px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-500/30">
-                              v{form.activeVersionNumber || 1.5}
-                            </span>
+      <DeleteConfirmModal
+        target={deleteTargetDoc}
+        selectedCount={selectedDistIds.length}
+        isExecuting={isExecutingDelete}
+        onConfirm={confirmDeleteDistribution}
+        onClose={() => setDeleteTargetDoc(null)}
+      />
 
-                            <div
-                              className={`w-5 h-5 rounded-full border flex items-center justify-center transition-all ${
-                                isSelected
-                                  ? 'bg-cyan-500 border-cyan-400 text-slate-950'
-                                  : 'border-slate-700 text-transparent group-hover:border-slate-500'
-                              }`}
-                            >
-                              <Icon name="check" className="w-3.5 h-3.5 stroke-[3]" />
-                            </div>
-                          </div>
+      <PermissionModal
+        isOpen={isPermissionModalOpen}
+        publishedForms={publishedForms}
+        permissionFormId={permissionFormId}
+        onPermissionFormIdChange={(formId) => {
+          setPermissionFormId(formId)
+          loadPermissionFormDetails(formId)
+        }}
+        permissionAllowCadre={permissionAllowCadre}
+        onToggleAllowCadre={() => setPermissionAllowCadre(!permissionAllowCadre)}
+        permissionVersions={permissionVersions}
+        permissionActiveVersionId={permissionActiveVersionId}
+        onSetActiveVersionId={setPermissionActiveVersionId}
+        isLoadingPermissionVersions={isLoadingPermissionVersions}
+        isSavingPermission={isSavingPermission}
+        onSave={handleSavePermission}
+        onClose={() => setIsPermissionModalOpen(false)}
+      />
 
-                          <div>
-                            <h4 className={`font-bold text-xs line-clamp-2 transition-colors ${isSelected ? 'text-cyan-200' : 'text-slate-200'}`}>
-                              {form.metadata?.title || form.formId}
-                            </h4>
-                            <p className="text-[10px] text-slate-400 mt-0.5 line-clamp-1">
-                              {form.metadata?.category || 'Kuesioner Evaluasi'}
-                            </p>
-                          </div>
-
-                          <div className="pt-1 flex items-center gap-2 text-[10px] text-slate-400 font-mono">
-                            <span className="text-cyan-400 font-bold">{aspectCount} Aspek</span>
-                            <span>•</span>
-                            <span>{questionCount} Soal</span>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-300 mb-1">Judul Channel / Kelompok Distribusi (Opsional)</label>
-                <input
-                  type="text"
-                  value={customTitle}
-                  onChange={(e) => setCustomTitle(e.target.value)}
-                  placeholder="Contoh: Pendampingan Posyandu Desa Sukamaju"
-                  className="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-cyan-500"
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-300 mb-1">Deskripsi Tambahan (Opsional)</label>
-                <textarea
-                  value={customDescription}
-                  onChange={(e) => setCustomDescription(e.target.value)}
-                  placeholder="Catatan khusus untuk kader atau responden..."
-                  rows={2}
-                  className="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-cyan-500"
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-300 mb-1">Mode Versi Kuesioner</label>
-                <select
-                  value={versionMode}
-                  onChange={(e) => setVersionMode(e.target.value as 'active' | 'pinned')}
-                  className="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-3.5 py-2.5 font-semibold focus:outline-none focus:border-cyan-500"
-                >
-                  <option value="active">Auto-Active (Selalu Ikut Versi Terbaru)</option>
-                  <option value="pinned">Pinned (Kunci Versi Snapshot Spesifik)</option>
-                </select>
-              </div>
-
-              {versionMode === 'pinned' && (
-                <div>
-                  <label className="block font-semibold text-slate-300 mb-1">Pilih Snapshot Versi Yang Dikunci</label>
-                  <select
-                    value={pinnedVersionId}
-                    onChange={(e) => setPinnedVersionId(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-3.5 py-2.5 font-semibold focus:outline-none focus:border-cyan-500"
-                  >
-                    {availableVersions.map((v) => (
-                      <option key={v.versionId} value={v.versionId}>
-                        Versi {v.versionNumber} ({new Date(v.createdAt).toLocaleDateString('id-ID')}) - {v.changeLogSummary || 'Snapshot versi'}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              <div>
-                <label className="block font-semibold text-slate-300 mb-1">Batas Masa Berlaku (Opsional)</label>
-                <input
-                  type="datetime-local"
-                  value={expiresAt}
-                  onChange={(e) => setExpiresAt(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-cyan-500"
-                />
-              </div>
-
-              <div className="pt-3 flex items-center justify-end gap-3 border-t border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setIsCreateModalOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  disabled={isCreating}
-                  className="px-5 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-800 text-white font-extrabold shadow-lg shadow-cyan-600/20 flex items-center gap-2"
-                >
-                  {isCreating ? <Icon name="loader" className="w-4 h-4 animate-spin" /> : <Icon name="check" className="w-4 h-4" />}
-                  <span>{isCreating ? 'Menerbitkan...' : 'Terbitkan Kode'}</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* DETAIL MODAL */}
-      {isDetailOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="relative w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-              <div>
-                <span className="text-[10px] font-mono font-bold text-cyan-400 uppercase tracking-wider">
-                  Inspeksi Detail Kode Distribusi
-                </span>
-                <h3 className="text-base font-extrabold text-slate-100 mt-0.5">
-                  {selectedDetail?.distribution.code || 'Memuat...'}
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsDetailOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800"
-              >
-                <Icon name="x" className="w-5 h-5" />
-              </button>
-            </div>
-
-            {isDetailLoading ? (
-              <div className="py-12 flex items-center justify-center text-xs text-slate-400 gap-2">
-                <Icon name="loader" className="w-5 h-5 text-cyan-400 animate-spin" />
-                <span>Mengambil metadata distribusi & skema kuesioner...</span>
-              </div>
-            ) : selectedDetail ? (
-              <div className="space-y-5 text-xs">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800">
-                    <p className="text-[10px] text-slate-400 font-mono uppercase">Judul Channel</p>
-                    <p className="text-xs font-bold text-slate-100 mt-0.5">{selectedDetail.distribution.title}</p>
-                  </div>
-                  <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800">
-                    <p className="text-[10px] text-slate-400 font-mono uppercase">Status Distribusi</p>
-                    <p className="text-xs font-bold text-emerald-400 uppercase mt-0.5">
-                      {selectedDetail.distribution.status} ✓
-                    </p>
-                  </div>
-                  <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800">
-                    <p className="text-[10px] text-slate-400 font-mono uppercase">Pemilik (Owner)</p>
-                    <p className="text-xs font-bold text-purple-300 mt-0.5">
-                      {selectedDetail.distribution.ownerName} ({selectedDetail.distribution.ownerType})
-                    </p>
-                  </div>
-                  <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800">
-                    <p className="text-[10px] text-slate-400 font-mono uppercase">Resolusi Versi</p>
-                    <p className="text-xs font-mono font-bold text-cyan-300 mt-0.5">
-                      {selectedDetail.distribution.versionMode === 'pinned'
-                        ? `Pinned (${selectedDetail.distribution.pinnedVersionId})`
-                        : 'Auto-Active (Versi Publik Terbaru)'}
-                    </p>
-                  </div>
-                </div>
-
-                {selectedDetail.formSummary && (
-                  <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-slate-200">
-                        Skema Formulir: {selectedDetail.formSummary.title}
-                      </span>
-                      <span className="text-[10px] font-mono text-cyan-400 font-bold bg-cyan-950 px-2 py-0.5 rounded border border-cyan-500/30">
-                        {selectedDetail.formSummary.questionCount} Pertanyaan
-                      </span>
-                    </div>
-
-                    <div className="space-y-1.5 font-mono text-[11px] max-h-44 overflow-y-auto pr-1">
-                      {selectedDetail.formSummary.questions.map((q: any, i: number) => (
-                        <div key={q.id || i} className="p-2 rounded-xl bg-slate-900 border border-slate-800/80 flex items-center justify-between gap-2">
-                          <span className="text-slate-300 truncate">#{i + 1}. {q.prompt}</span>
-                          <span className="text-[9px] text-slate-500 uppercase flex-shrink-0">{q.type}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <div className="p-4 rounded-2xl bg-cyan-950/30 border border-cyan-500/30 space-y-2">
-                  <span className="text-[10px] font-mono font-bold text-cyan-300 uppercase">Tautan Publik Kuesioner</span>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      readOnly
-                      value={`${typeof window !== 'undefined' ? window.location.origin : ''}/form/${selectedDetail.distribution.code}`}
-                      className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-cyan-400"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => copyPublicLink(selectedDetail.distribution.code)}
-                      className="px-3.5 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold flex items-center gap-1.5"
-                    >
-                      <Icon name="copy" className="w-3.5 h-3.5" />
-                      <span>Salin</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ) : null}
-
-            <div className="pt-3 border-t border-slate-800 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setIsDetailOpen(false)}
-                className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold"
-              >
-                Tutup
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* EDIT MODAL */}
-      {isEditOpen && editingDoc && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-              <div>
-                <h3 className="text-base font-bold text-slate-100">Edit Kode Distribusi</h3>
-                <p className="text-xs text-slate-400">Kode Akses: <strong className="font-mono text-cyan-400">{editingDoc.code}</strong></p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsEditOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800"
-              >
-                <Icon name="x" className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveEdit} className="space-y-4 text-xs">
-              <div>
-                <label className="block font-semibold text-slate-300 mb-1">Judul Channel</label>
-                <input
-                  type="text"
-                  value={editTitle}
-                  onChange={(e) => setEditTitle(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-cyan-500"
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-300 mb-1">Deskripsi Tambahan</label>
-                <textarea
-                  value={editDescription}
-                  onChange={(e) => setEditDescription(e.target.value)}
-                  rows={2}
-                  className="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-cyan-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-300 mb-1">Status Operasional</label>
-                  <select
-                    value={editStatus}
-                    onChange={(e) => setEditStatus(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-3.5 py-2.5 font-semibold focus:outline-none focus:border-cyan-500"
-                  >
-                    <option value="active">Aktif Menyebar</option>
-                    <option value="paused">Dijeda Sementara</option>
-                    <option value="archived">Diarsipkan</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-300 mb-1">Mode Versi</label>
-                  <select
-                    value={editVersionMode}
-                    onChange={(e) => setEditVersionMode(e.target.value as 'active' | 'pinned')}
-                    className="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-3.5 py-2.5 font-semibold focus:outline-none focus:border-cyan-500"
-                  >
-                    <option value="active">Auto-Active (Terbaru)</option>
-                    <option value="pinned">Pinned (Kunci Versi)</option>
-                  </select>
-                </div>
-              </div>
-
-              {editVersionMode === 'pinned' && (
-                <div>
-                  <label className="block font-semibold text-slate-300 mb-1">Versi Terkunci</label>
-                  {availableVersions.length > 0 ? (
-                    <select
-                      value={editPinnedVersionId}
-                      onChange={(e) => setEditPinnedVersionId(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-3.5 py-2.5 font-semibold focus:outline-none focus:border-cyan-500"
-                    >
-                      {availableVersions.map((v) => (
-                        <option key={v.versionId} value={v.versionId}>
-                          Versi {v.versionNumber} ({new Date(v.createdAt).toLocaleDateString('id-ID')}) - {v.changeLogSummary || 'Snapshot versi'}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input
-                      type="text"
-                      value={editPinnedVersionId}
-                      onChange={(e) => setEditPinnedVersionId(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-3.5 py-2.5"
-                      placeholder="Contoh: form_evaluasi_v1"
-                    />
-                  )}
-                </div>
-              )}
-
-              <div>
-                <label className="block font-semibold text-slate-300 mb-1">Batas Masa Berlaku (Opsional)</label>
-                <input
-                  type="datetime-local"
-                  value={editExpiresAt}
-                  onChange={(e) => setEditExpiresAt(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-3.5 py-2.5"
-                />
-              </div>
-
-              <div className="pt-2 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsEditOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSavingEdit}
-                  className="px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 disabled:bg-slate-800 text-white font-bold shadow-lg shadow-amber-600/20 flex items-center gap-1.5"
-                >
-                  {isSavingEdit ? <Icon name="loader" className="w-4 h-4 animate-spin" /> : <Icon name="check" className="w-4 h-4" />}
-                  <span>{isSavingEdit ? 'Menyimpan...' : 'Simpan Perubahan'}</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* CUSTOM DELETE CONFIRMATION MODAL (SINGLE & BULK DELETE) */}
-      {deleteTargetDoc && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ backgroundColor: 'rgba(0,0,0,0.85)' }}
-          onClick={() => setDeleteTargetDoc(null)}
-        >
-          <div
-            className="relative w-full max-w-md bg-slate-900 border border-rose-500/40 rounded-3xl p-6 shadow-2xl space-y-5"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-rose-950/80 border border-rose-500/40 flex items-center justify-center text-rose-400 flex-shrink-0">
-                <Icon name="trash" className="w-6 h-6 text-rose-400" />
-              </div>
-              <div>
-                <h3 className="text-base font-extrabold text-slate-100">
-                  {deleteTargetDoc.id === 'bulk' ? 'Hapus Masal Kode Distribusi?' : 'Hapus Kode Distribusi?'}
-                </h3>
-                <p className="text-xs text-rose-400 font-mono font-bold mt-0.5">Tindakan ini tidak dapat dibatalkan</p>
-              </div>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2 text-xs">
-              <div className="flex justify-between items-center text-slate-400">
-                <span>Target Hapus:</span>
-                <strong className="font-mono text-cyan-400 font-bold text-sm">{deleteTargetDoc.code}</strong>
-              </div>
-              <div className="flex justify-between items-center text-slate-400">
-                <span>Keterangan:</span>
-                <strong className="text-slate-200 truncate max-w-[200px]">{deleteTargetDoc.title}</strong>
-              </div>
-            </div>
-
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Apakah Anda yakin ingin menghapus {deleteTargetDoc.id === 'bulk' ? `${selectedDistIds.length} kode distribusi terpilih` : 'kode distribusi ini'} secara permanen dari database Firestore?
-            </p>
-
-            <div className="flex items-center justify-end gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setDeleteTargetDoc(null)}
-                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-colors"
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                disabled={isExecutingDelete}
-                onClick={confirmDeleteDistribution}
-                className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white text-xs font-extrabold shadow-lg shadow-rose-600/30 flex items-center gap-2 transition-all"
-              >
-                {isExecutingDelete ? (
-                  <>
-                    <Icon name="loader" className="w-4 h-4 animate-spin text-white" />
-                    <span>Menghapus...</span>
-                  </>
-                ) : (
-                  <>
-                    <Icon name="trash" className="w-4 h-4 text-white" />
-                    <span>{deleteTargetDoc.id === 'bulk' ? `Ya, Hapus All (${selectedDistIds.length})` : 'Ya, Hapus Permanen'}</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* DISTRIBUTION PERMISSION & ACTIVE VERSION SNAPSHOT MODAL */}
-      {isPermissionModalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm"
-          onClick={() => setIsPermissionModalOpen(false)}
-        >
-          <div
-            className="w-full max-w-xl bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div className="space-y-0.5">
-                <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-                  <Icon name="settings" className="w-4 h-4 text-emerald-400" />
-                  <span>Izin & Status Versi Distribusi</span>
-                </h3>
-                <p className="text-[11px] text-slate-400">
-                  Kelola hak izin distribusi kader/mitra dan tentukan versi snapshot mana yang aktif disebar ke publik.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsPermissionModalOpen(false)}
-                className="text-slate-400 hover:text-slate-200 text-xs p-1"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Select Form Dropdown */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-300">Pilih Formulir Terpublikasi</label>
-              <select
-                value={permissionFormId}
-                onChange={(e) => {
-                  setPermissionFormId(e.target.value)
-                  loadPermissionFormDetails(e.target.value)
-                }}
-                className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-emerald-500 cursor-pointer font-medium"
-              >
-                {publishedForms.map((form) => (
-                  <option key={form.formId} value={form.formId}>
-                    {form.metadata?.title || form.formId} (V{form.activeVersionNumber || 1}.0)
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Section 1: Toggle Cadre/Partner Distribution Switch */}
-            <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800/80 space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <div className="space-y-0.5">
-                  <h4 className="text-xs font-bold text-slate-200">Izin Distribusi Kader & Mitra</h4>
-                  <p className="text-[11px] text-slate-400 leading-relaxed">
-                    Bila diaktifkan, kader desa dan mitra dapat membuat kode distribusi mandiri untuk kuesioner ini.
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setPermissionAllowCadre(!permissionAllowCadre)}
-                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer border ${
-                    permissionAllowCadre
-                      ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
-                      : 'bg-rose-500/20 text-rose-300 border-rose-500/40 hover:bg-rose-500/30'
-                  }`}
-                >
-                  {permissionAllowCadre ? '✓ DIIZINKAN' : '✕ DIBATASI (ADMIN)'}
-                </button>
-              </div>
-            </div>
-
-            {/* Section 2: Published Version Snapshots & Active Version Selector */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h4 className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
-                  <Icon name="history" className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>Versi Snapshot & Status Aktif Didistribusikan</span>
-                </h4>
-                <span className="text-[11px] font-mono text-slate-400">
-                  {permissionVersions.length} Versi Terdaftar
-                </span>
-              </div>
-
-              {isLoadingPermissionVersions ? (
-                <div className="py-8 text-center space-y-2">
-                  <Icon name="spinner" className="w-6 h-6 text-emerald-400 animate-spin mx-auto" />
-                  <p className="text-xs text-slate-400">Memuat versi snapshot formulir...</p>
-                </div>
-              ) : permissionVersions.length === 0 ? (
-                <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 text-center text-xs text-slate-400">
-                  Belum ada versi snapshot terpublikasi yang terdaftar.
-                </div>
-              ) : (
-                <div className="space-y-2.5 max-h-60 overflow-y-auto pr-1">
-                  {permissionVersions.map((v) => {
-                    const isActive = v.versionId === permissionActiveVersionId
-                    return (
-                      <div
-                        key={v.versionId}
-                        className={`p-3.5 rounded-xl border transition-all flex items-center justify-between gap-3 ${
-                          isActive
-                            ? 'bg-emerald-950/30 border-emerald-500/50 shadow-sm'
-                            : 'bg-slate-950 border-slate-800/80 hover:border-slate-700'
-                        }`}
-                      >
-                        <div className="space-y-1 min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <span
-                              className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded ${
-                                isActive ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-slate-800 text-slate-400 border border-slate-700'
-                              }`}
-                            >
-                              VERSI {v.versionNumber || 1}.0
-                            </span>
-
-                            {isActive && (
-                              <span className="text-[10px] font-bold text-emerald-400 flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                                DIDISTRIBUSIKAN SAAT INI
-                              </span>
-                            )}
-                          </div>
-
-                          <div className="text-[11px] text-slate-400 font-mono">
-                            Dipublikasikan pada {v.publishedAt ? new Date(v.publishedAt).toLocaleDateString('id-ID') : '—'}
-                          </div>
-                        </div>
-
-                        {!isActive && (
-                          <button
-                            type="button"
-                            onClick={() => setPermissionActiveVersionId(v.versionId)}
-                            className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition-all cursor-pointer shrink-0"
-                          >
-                            Set Versi Aktif →
-                          </button>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* Modal Actions */}
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
-              <button
-                type="button"
-                onClick={() => setIsPermissionModalOpen(false)}
-                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs cursor-pointer"
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                onClick={handleSavePermission}
-                disabled={isSavingPermission || !permissionFormId}
-                className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 text-white font-bold text-xs shadow-lg cursor-pointer flex items-center gap-1.5"
-              >
-                {isSavingPermission ? 'Simpan...' : 'Simpan Pengaturan Izin & Versi'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Toast Notification */}
-      {toast.visible && (
-        <div className="fixed bottom-6 right-6 z-50 p-4 rounded-xl bg-slate-900 border border-slate-700 text-slate-100 text-xs font-semibold shadow-2xl animate-in slide-in-from-bottom-3">
-          {toast.message}
-        </div>
-      )}
+      <ToastNotification visible={toast.visible} message={toast.message} />
     </div>
   )
 }
