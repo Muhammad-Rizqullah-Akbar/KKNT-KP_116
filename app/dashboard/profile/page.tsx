@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useMemo, useRef } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
 import { useAuth } from '@/context/AuthContext'
@@ -29,13 +29,7 @@ export default function UserProfileProgressPage() {
     setTimeout(() => setToastMessage(null), 3500)
   }
 
-  // Keep latest user/userData available to the queryFn without re-running on every render
-  const userRef = useRef(user)
-  const userDataRef = useRef(userData)
-  userRef.current = user
-  userDataRef.current = userData
-
-  // Load User Data & Activity Progress
+  // Load User Data & Activity Progress (re-fetches when user / userData change)
   const {
     data: {
       articles = [],
@@ -51,10 +45,10 @@ export default function UserProfileProgressPage() {
     cadresCount: number
     teamResponsesCount: number
   }>({
-    queryKey: ['user-progress', user?.uid],
+    queryKey: ['user-progress', user?.uid, userData],
     queryFn: async () => {
-      const currentUser = userRef.current
-      const currentUserData = userDataRef.current
+      const currentUser = user
+      const currentUserData = userData
       const result = {
         articles: [] as ArticleData[],
         distributions: [] as DistributionDoc[],
