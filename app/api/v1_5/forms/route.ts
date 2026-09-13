@@ -44,6 +44,9 @@ function firestoreUnavailableResponse() {
 export async function GET(request: Request) {
   try {
     const authContext = await getAuthorizationContext()
+    if (!authContext) {
+      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
+    }
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status') || 'all'
     const search = searchParams.get('search') || ''
@@ -75,10 +78,9 @@ export async function GET(request: Request) {
  */
 export async function POST(request: Request) {
   try {
-    const authContext = (await getAuthorizationContext()) || {
-      uid: 'dev-user',
-      role: 'admin' as const,
-      token: {} as any,
+    const authContext = await getAuthorizationContext()
+    if (!authContext) {
+      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
     }
     const body = await request.json()
 

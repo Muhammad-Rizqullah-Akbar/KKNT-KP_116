@@ -13,10 +13,9 @@ interface RouteParams {
 export async function GET(_request: Request, { params }: RouteParams) {
   try {
     const { formId } = await params
-    const authContext = (await getAuthorizationContext()) || {
-      uid: 'dev-user',
-      role: 'super_admin' as const,
-      token: {} as any,
+    const authContext = await getAuthorizationContext()
+    if (!authContext) {
+      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
     }
 
     const snapshots = await getFormVersionsWorkflow(formId)

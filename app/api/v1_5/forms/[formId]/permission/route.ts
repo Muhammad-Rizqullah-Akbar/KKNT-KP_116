@@ -13,10 +13,9 @@ interface RouteParams {
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
     const { formId } = await params
-    const authContext = (await getAuthorizationContext()) || {
-      uid: 'dev-user',
-      role: 'admin' as const,
-      token: {} as any,
+    const authContext = await getAuthorizationContext()
+    if (!authContext) {
+      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
     }
 
     if (authContext.role !== 'admin' && authContext.role !== 'super_admin' && authContext.role !== 'internal_bpom') {

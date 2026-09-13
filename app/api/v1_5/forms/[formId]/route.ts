@@ -11,10 +11,9 @@ import { deleteForm } from '@/lib/repositories/forms.repo'
 export async function PATCH(request: Request, { params }: RouteParams) {
   try {
     const { formId } = await params
-    const authContext = (await getAuthorizationContext()) || {
-      uid: 'dev-user',
-      role: 'admin' as const,
-      token: {} as any,
+    const authContext = await getAuthorizationContext()
+    if (!authContext) {
+      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
     }
     const body = await request.json()
 
@@ -85,10 +84,9 @@ export async function GET(_request: Request, { params }: RouteParams) {
 export async function PUT(request: Request, { params }: RouteParams) {
   try {
     const { formId } = await params
-    const authContext = (await getAuthorizationContext()) || {
-      uid: 'dev-user',
-      role: 'admin' as const,
-      token: {} as any,
+    const authContext = await getAuthorizationContext()
+    if (!authContext) {
+      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
     }
     const body = await request.json()
 

@@ -12,10 +12,9 @@ interface RouteParams {
 export async function POST(_request: Request, { params }: RouteParams) {
   try {
     const { distributionId } = await params
-    const authContext = (await getAuthorizationContext()) || {
-      uid: 'dev-user',
-      role: 'super_admin' as const,
-      token: {} as any,
+    const authContext = await getAuthorizationContext()
+    if (!authContext) {
+      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
     }
 
     const updated = await archiveDistributionWorkflow(distributionId, authContext)
