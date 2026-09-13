@@ -1,6 +1,7 @@
 'use client'
 
-import React, { useEffect, useState, use } from 'react'
+import React, { useState, use } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Topbar } from '@/features/dashboard/components/layout/Topbar'
@@ -15,49 +16,45 @@ interface PageProps {
 
 export default function ResponseDetailPage({ params }: PageProps) {
   const { responseId } = use(params)
-  const [responseDoc, setResponseDoc] = useState<ResponseDoc | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [filterType, setFilterType] = useState<'all' | 'low_score' | 'indicators'>('all')
 
-  const [formDoc, setFormDoc] = useState<any>(null)
-
-  const loadResponse = async () => {
-    setIsLoading(true)
-    setError(null)
-    try {
+  const {
+    data: responseDoc,
+    isLoading,
+    error: responseError,
+  } = useQuery<ResponseDoc | null>({
+    queryKey: ['response', responseId],
+    queryFn: async () => {
       const res = await fetch(`/api/responses/${responseId}`)
       const data = await res.json()
 
       if (data.success && data.response) {
-        const resp = data.response
-        setResponseDoc(resp)
-
-        if (resp.formId) {
-          try {
-            const formRes = await fetch(`/api/forms/${resp.formId}`)
-            const formData = await formRes.json()
-            if (formData.success && formData.form) {
-              setFormDoc(formData.form)
-            }
-          } catch {
-            // Optional form definition load
-          }
-        }
-      } else {
-        setError(data.message || 'Gagal memuat detail respon.')
+        return data.response as ResponseDoc
       }
-    } catch (err: any) {
-      setError(err.message || 'Terjadi kesalahan jaringan.')
-    } finally {
-      setIsLoading(false)
-    }
-  }
+      throw new Error(data.message || 'Gagal memuat detail respon.')
+    },
+  })
 
-  useEffect(() => {
-    loadResponse()
-  }, [responseId])
+  const error = responseError ? (responseError as Error).message : null
+
+  const { data: formDoc } = useQuery<any>({
+    queryKey: ['form', responseDoc?.formId],
+    enabled: !!responseDoc?.formId,
+    queryFn: async () => {
+      try {
+        const formRes = await fetch(`/api/forms/${responseDoc!.formId}`)
+        const formData = await formRes.json()
+        if (formData.success && formData.form) {
+          return formData.form
+        }
+        return null
+      } catch {
+        // Optional form definition load
+        return null
+      }
+    },
+  })
 
   const handlePrint = () => {
     window.print()
