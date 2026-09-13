@@ -11,7 +11,7 @@ import {
   type ArticleData 
 } from '@/lib/repositories/articles.repo'
 import { getArticleCategories } from '@/lib/repositories/article-categories.repo'
-import { FuturisticArticleCard } from '@/components/articles/FuturisticArticleCard'
+import { FuturisticArticleCard } from '@/features/articles/components/FuturisticArticleCard'
 
 // ============ KONSTANTA LOGO ============
 const LOGO_SRC = '/logo.png'

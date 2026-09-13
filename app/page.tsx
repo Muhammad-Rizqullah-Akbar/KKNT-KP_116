@@ -2,14 +2,14 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Navbar } from '@/components/layout/Navbar'
-import { Footer } from '@/components/layout/Footer'
-import { HeroSection } from '@/components/home/HeroSection'
-import { ProgramSection } from '@/components/home/ProgramSection'
-import { EdukasiSection } from '@/components/home/EdukasiSection'
-import { GallerySection } from '@/components/home/GallerySection'
-import { ArticleModal } from '@/components/home/ArticleModal'
-import { CodeModal } from '@/components/home/CodeModal'
+import { Navbar } from '@/features/marketing/components/Navbar'
+import { Footer } from '@/features/marketing/components/Footer'
+import { HeroSection } from '@/features/marketing/components/HeroSection'
+import { ProgramSection } from '@/features/marketing/components/ProgramSection'
+import { EdukasiSection } from '@/features/marketing/components/EdukasiSection'
+import { GallerySection } from '@/features/marketing/components/GallerySection'
+import { ArticleModal } from '@/features/marketing/components/ArticleModal'
+import { CodeModal } from '@/features/marketing/components/CodeModal'
 import { Icon } from '@/components/ui/Icons'
 import { safeFetchJson } from '@/lib/infra/safe-fetch'
 
@@ -130,7 +130,7 @@ const categoryGradients: Record<string, string> = {
   Data: 'from-sky-600/25 via-blue-700/20 to-indigo-800/25'
 }
 
-import { SmoothScrollProvider } from '@/components/providers/SmoothScrollProvider'
+import { SmoothScrollProvider } from '@/features/providers/SmoothScrollProvider'
 
 export default function HomePage() {
   // ... rest of page code

@@ -1,4 +1,4 @@
-import { DashboardAuthGuard } from '@/components/dashboard/DashboardAuthGuard'
+import { DashboardAuthGuard } from '@/features/dashboard/components/DashboardAuthGuard'
 
 export default function DashboardLayout({
   children,

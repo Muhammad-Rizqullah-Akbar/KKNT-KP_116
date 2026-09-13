@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Topbar } from '@/components/dashboard/Topbar'
+import { Topbar } from '@/features/dashboard/components/Topbar'
 import { Icon } from '@/components/ui/Icons'
 import type { DistributionDoc } from '@/lib/domain/distributions/distribution-types'
 import type { FormAggregateDoc } from '@/lib/repositories/form-versions.repo'

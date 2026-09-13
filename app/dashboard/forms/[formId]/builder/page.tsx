@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, use } from 'react'
 import { useRouter } from 'next/navigation'
-import { FormBuilderV2 } from '@/components/forms/FormBuilderV2'
+import { FormBuilderV2 } from '@/features/form-builder/components/FormBuilderV2'
 import type { FormAggregateDoc } from '@/lib/repositories/form-versions.repo'
 import { formAggregateToBuilderState } from '@/lib/domain/forms/form-converters'
 import type { BuilderState } from '@/lib/domain/forms/builder-state'

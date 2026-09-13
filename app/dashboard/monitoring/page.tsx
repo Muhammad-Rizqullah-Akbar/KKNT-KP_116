@@ -4,9 +4,9 @@ import React, { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { safeFetchJson } from '@/lib/infra/safe-fetch'
-import { Topbar } from '@/components/dashboard/Topbar'
+import { Topbar } from '@/features/dashboard/components/Topbar'
 import { Icon } from '@/components/ui/Icons'
-import { ProfileProgressModal } from '@/components/dashboard/ProfileProgressModal'
+import { ProfileProgressModal } from '@/features/dashboard/components/ProfileProgressModal'
 import { SkeletonOverview, SkeletonTable } from '@/components/ui/Skeleton'
 
 type UserProfile = {

@@ -15,7 +15,7 @@ import {
   getQuestionsByStage,
   calculateStageWeights,
   validateDistribution,
-} from '@/components/form-builder/ElementTypes'
+} from '@/features/form-builder/components/ElementTypes'
 
 interface FormSettingsModalProps {
   isOpen: boolean

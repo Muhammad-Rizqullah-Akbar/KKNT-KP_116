@@ -1,6 +1,6 @@
 // lib/scoring/ScoringEngine.ts
 
-import { FlexibleQuestion, FormScoring, FormValidation, FormStage } from '@/components/form-builder/ElementTypes'
+import { FlexibleQuestion, FormScoring, FormValidation, FormStage } from '@/features/form-builder/components/ElementTypes'
 
 export interface ScoringResult {
   totalScore: number

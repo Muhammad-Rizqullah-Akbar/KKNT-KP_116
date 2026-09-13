@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
-import { Topbar } from '@/components/dashboard/Topbar'
+import { Topbar } from '@/features/dashboard/components/Topbar'
 import { Icon } from '@/components/ui/Icons'
 import { SkeletonTable } from '@/components/ui/Skeleton'
 import {

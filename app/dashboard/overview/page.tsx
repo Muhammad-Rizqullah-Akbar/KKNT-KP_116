@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
-import { Topbar } from '@/components/dashboard/Topbar'
+import { Topbar } from '@/features/dashboard/components/Topbar'
 import { Icon } from '@/components/ui/Icons'
 import Link from 'next/link'
 import { type FormResponse, type FormData } from '@/lib/repositories/forms.repo'
