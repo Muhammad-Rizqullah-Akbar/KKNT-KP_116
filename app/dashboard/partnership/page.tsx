@@ -11,6 +11,7 @@ import { Icon } from '@/components/ui/Icons'
 import { ProfileProgressModal } from '@/features/dashboard/components/modals/ProfileProgressModal'
 import { SkeletonCard, SkeletonTable } from '@/components/ui/Skeleton'
 import { queryKeys } from '@/lib/query-keys'
+import { useToast } from '@/lib/hooks'
 
 type UserProfile = {
   uid: string
@@ -84,7 +85,7 @@ export default function PartnershipDomainPage() {
   const invalidatePartnershipData = () =>
     queryClient.invalidateQueries({ queryKey: queryKeys.partnership.data })
 
-  const [toastMessage, setToastMessage] = useState<string | null>(null)
+  const { visible, message, show } = useToast()
 
   // Filters & Search
   const [searchTerm, setSearchTerm] = useState('')
@@ -119,10 +120,6 @@ export default function PartnershipDomainPage() {
   const [cadrePartnershipType, setCadrePartnershipType] = useState('Sekolah')
   const [isSubmittingCadre, setIsSubmittingCadre] = useState(false)
 
-  const showToast = (msg: string) => {
-    setToastMessage(msg)
-    setTimeout(() => setToastMessage(null), 3500)
-  }
 
   // Update tab in URL (For Super Admin / Admin)
   const handleTabChange = (tab: 'mitra' | 'cadres' | 'activities') => {
@@ -141,33 +138,33 @@ export default function PartnershipDomainPage() {
 
     // 1. Distributions & Survey Responses
     const cadreDists = distributions.filter(
-      (d) => d.createdBy === cadreUid || d.cadreId === cadreUid
+      (dist) => dist.createdBy === cadreUid || dist.cadreId === cadreUid
     )
     const distCodesSet = new Set<string>()
-    cadreDists.forEach((d) => {
-      if (d.code) distCodesSet.add(String(d.code).toLowerCase().trim())
-      if (d.distributionCode) distCodesSet.add(String(d.distributionCode).toLowerCase().trim())
+    cadreDists.forEach((dist) => {
+      if (dist.code) distCodesSet.add(String(dist.code).toLowerCase().trim())
+      if (dist.distributionCode) distCodesSet.add(String(dist.distributionCode).toLowerCase().trim())
     })
 
-    const cadreResponses = responses.filter((r) => {
-      const code = String(r.distributionCode || '').toLowerCase().trim()
-      return (code !== '' && distCodesSet.has(code)) || r.createdBy === cadreUid || r.cadreId === cadreUid
+    const cadreResponses = responses.filter((response) => {
+      const code = String(response.distributionCode || '').toLowerCase().trim()
+      return (code !== '' && distCodesSet.has(code)) || response.createdBy === cadreUid || response.cadreId === cadreUid
     })
 
     const scores = cadreResponses
-      .map((r) => r.result?.percentage)
+      .map((response) => response.result?.percentage)
       .filter((s): s is number => typeof s === 'number')
 
     const avgScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0
-    const passCount = cadreResponses.filter((r) => r.result?.percentage && r.result.percentage >= 75).length
+    const passCount = cadreResponses.filter((response) => response.result?.percentage && response.result.percentage >= 75).length
     const passRate = cadreResponses.length > 0 ? Math.round((passCount / cadreResponses.length) * 100) : 0
 
     // 2. CMS Articles authored by this cadre
-    const cadreArticles = articles.filter((a) => {
-      if (a.authorId && a.authorId === cadreUid) return true
-      if (a.createdBy && a.createdBy === cadreUid) return true
+    const cadreArticles = articles.filter((article) => {
+      if (article.authorId && article.authorId === cadreUid) return true
+      if (article.createdBy && article.createdBy === cadreUid) return true
 
-      const authorLower = (a.author || '').toLowerCase().trim()
+      const authorLower = (article.author || '').toLowerCase().trim()
       if (cadreEmail && authorLower === cadreEmail) return true
       if (cadreDisplayName && cadreDisplayName.length > 2 && authorLower === cadreDisplayName) return true
 
@@ -175,7 +172,7 @@ export default function PartnershipDomainPage() {
     })
 
     const articleCount = cadreArticles.length
-    const articleViews = cadreArticles.reduce((acc, a) => acc + (a.views || 0), 0)
+    const articleViews = cadreArticles.reduce((acc, article) => acc + (article.views || 0), 0)
 
     return {
       distCount: cadreDists.length,
@@ -192,10 +189,10 @@ export default function PartnershipDomainPage() {
   // Helper: Get Mitra Progress Summary
   const getMitraProgressSummary = (mitra: UserProfile) => {
     const linkedCadres = allUsers.filter(
-      (u) =>
-        u.role === 'cadre' &&
-        (u.partnershipId === mitra.uid ||
-          (u.organization && u.organization.toLowerCase() === (mitra.organization || mitra.displayName || '').toLowerCase()))
+      (account) =>
+        account.role === 'cadre' &&
+        (account.partnershipId === mitra.uid ||
+          (account.organization && account.organization.toLowerCase() === (mitra.organization || mitra.displayName || '').toLowerCase()))
     )
 
     let totalDists = 0
@@ -207,16 +204,16 @@ export default function PartnershipDomainPage() {
     // Articles authored directly by Mitra
     const mitraEmail = (mitra.email || '').toLowerCase().trim()
     const mitraDisplayName = (mitra.displayName || mitra.organization || '').toLowerCase().trim()
-    const directMitraArticles = articles.filter((a) => {
-      if (a.authorId === mitra.uid || a.createdBy === mitra.uid) return true
-      const authorLower = (a.author || '').toLowerCase().trim()
+    const directMitraArticles = articles.filter((article) => {
+      if (article.authorId === mitra.uid || article.createdBy === mitra.uid) return true
+      const authorLower = (article.author || '').toLowerCase().trim()
       if (mitraEmail && authorLower === mitraEmail) return true
       if (mitraDisplayName && mitraDisplayName.length > 2 && authorLower === mitraDisplayName) return true
       return false
     })
 
     totalArticles += directMitraArticles.length
-    totalArticleViews += directMitraArticles.reduce((acc, a) => acc + (a.views || 0), 0)
+    totalArticleViews += directMitraArticles.reduce((acc, article) => acc + (article.views || 0), 0)
 
     linkedCadres.forEach((cadre) => {
       const prog = getCadreProgressSummary(cadre.uid)
@@ -225,9 +222,9 @@ export default function PartnershipDomainPage() {
       totalArticles += prog.articleCount
       totalArticleViews += prog.articleViews
 
-      const cadreResponses = responses.filter((r) => r.createdBy === cadre.uid || r.cadreId === cadre.uid)
-      cadreResponses.forEach((r) => {
-        if (typeof r.result?.percentage === 'number') allScores.push(r.result.percentage)
+      const cadreResponses = responses.filter((response) => response.createdBy === cadre.uid || response.cadreId === cadre.uid)
+      cadreResponses.forEach((response) => {
+        if (typeof response.result?.percentage === 'number') allScores.push(response.result.percentage)
       })
     })
 
@@ -249,14 +246,14 @@ export default function PartnershipDomainPage() {
   // Filter Mitra list (If role is partnership, ONLY return the current logged-in mitra)
   const partnersList = useMemo(() => {
     if (isPartnershipRole) {
-      const me = allUsers.find((u) => u.uid === user?.uid) || (userData ? {
+      const me = allUsers.find((account) => account.uid === user?.uid) || (userData ? {
         uid: user?.uid || '',
         email: user?.email || '',
         displayName: userData.displayName || 'Akun Mitra Saya',
         role: 'partnership',
-        organization: (userData as any).organization || userData.displayName,
-        partnershipType: (userData as any).partnershipType || 'Sekolah',
-        phone: (userData as any).phone || '-',
+        organization: userData.organization || userData.displayName,
+        partnershipType: userData.partnershipType || 'Sekolah',
+        phone: userData.phone || '-',
       } : null)
 
       return me ? [me] : []
@@ -266,26 +263,26 @@ export default function PartnershipDomainPage() {
 
     // 1. Explicit partnership role users
     allUsers
-      .filter((u) => u.role === 'partnership')
-      .forEach((u) => {
-        mitraMap.set(u.uid, u)
+      .filter((account) => account.role === 'partnership')
+      .forEach((account) => {
+        mitraMap.set(account.uid, account)
       })
 
     // 2. Implicit organizations from cadres
     allUsers
-      .filter((u) => u.role === 'cadre' && u.organization)
-      .forEach((c) => {
-        const orgKey = 'org_' + (c.partnershipId || c.organization)
-        if (!mitraMap.has(orgKey) && !mitraMap.has(c.partnershipId || '')) {
+      .filter((account) => account.role === 'cadre' && account.organization)
+      .forEach((cadre) => {
+        const orgKey = 'org_' + (cadre.partnershipId || cadre.organization)
+        if (!mitraMap.has(orgKey) && !mitraMap.has(cadre.partnershipId || '')) {
           mitraMap.set(orgKey, {
             uid: orgKey,
-            email: c.email || 'mitra@kkntkp.id',
-            displayName: c.partnershipName || c.organization || 'Mitra Instansi',
+            email: cadre.email || 'mitra@kkntkp.id',
+            displayName: cadre.partnershipName || cadre.organization || 'Mitra Instansi',
             role: 'partnership',
-            organization: c.organization,
-            partnershipType: c.partnershipType || 'Sekolah',
-            phone: c.phone || '-',
-            createdAt: c.createdAt,
+            organization: cadre.organization,
+            partnershipType: cadre.partnershipType || 'Sekolah',
+            phone: cadre.phone || '-',
+            createdAt: cadre.createdAt,
           })
         }
       })
@@ -296,24 +293,24 @@ export default function PartnershipDomainPage() {
   // Get Cadres for a specific Mitra
   const getCadresForMitra = (mitra: UserProfile) => {
     return allUsers.filter(
-      (u) =>
-        u.role === 'cadre' &&
-        (u.partnershipId === mitra.uid ||
-          (u.organization && u.organization.toLowerCase() === (mitra.organization || mitra.displayName || '').toLowerCase()))
+      (account) =>
+        account.role === 'cadre' &&
+        (account.partnershipId === mitra.uid ||
+          (account.organization && account.organization.toLowerCase() === (mitra.organization || mitra.displayName || '').toLowerCase()))
     )
   }
 
   // Filtered Mitra (for Admin View)
   const filteredMitra = useMemo(() => {
-    return partnersList.filter((m) => {
+    return partnersList.filter((mitra) => {
       const term = searchTerm.toLowerCase()
       const matchesSearch =
-        m.displayName.toLowerCase().includes(term) ||
-        m.email.toLowerCase().includes(term) ||
-        (m.organization || '').toLowerCase().includes(term) ||
-        (m.phone || '').toLowerCase().includes(term)
+        mitra.displayName.toLowerCase().includes(term) ||
+        mitra.email.toLowerCase().includes(term) ||
+        (mitra.organization || '').toLowerCase().includes(term) ||
+        (mitra.phone || '').toLowerCase().includes(term)
 
-      const matchesType = typeFilter === 'all' || m.partnershipType === typeFilter
+      const matchesType = typeFilter === 'all' || mitra.partnershipType === typeFilter
       return matchesSearch && matchesType
     })
   }, [partnersList, searchTerm, typeFilter])
@@ -322,30 +319,30 @@ export default function PartnershipDomainPage() {
   const filteredCadres = useMemo(() => {
     const myOrg = (userData?.organization || userData?.displayName || '').toLowerCase().trim()
 
-    return allUsers.filter((u) => {
-      if (u.role !== 'cadre') return false
+    return allUsers.filter((account) => {
+      if (account.role !== 'cadre') return false
 
       if (isPartnershipRole) {
-        const isMatchId = u.partnershipId === user?.uid
-        const isMatchOrg = myOrg && u.organization && u.organization.toLowerCase().trim() === myOrg
-        const isMatchPartName = myOrg && u.partnershipName && u.partnershipName.toLowerCase().trim() === myOrg
+        const isMatchId = account.partnershipId === user?.uid
+        const isMatchOrg = myOrg && account.organization && account.organization.toLowerCase().trim() === myOrg
+        const isMatchPartName = myOrg && account.partnershipName && account.partnershipName.toLowerCase().trim() === myOrg
         if (!isMatchId && !isMatchOrg && !isMatchPartName) return false
-      } else if (!isSuperAdminOrAdmin && u.partnershipId !== user?.uid && u.uid !== user?.uid) {
+      } else if (!isSuperAdminOrAdmin && account.partnershipId !== user?.uid && account.uid !== user?.uid) {
         return false
       }
 
       const term = searchTerm.toLowerCase()
       const matchesSearch =
-        u.displayName.toLowerCase().includes(term) ||
-        u.email.toLowerCase().includes(term) ||
-        (u.organization || '').toLowerCase().includes(term) ||
-        (u.phone || '').toLowerCase().includes(term)
+        account.displayName.toLowerCase().includes(term) ||
+        account.email.toLowerCase().includes(term) ||
+        (account.organization || '').toLowerCase().includes(term) ||
+        (account.phone || '').toLowerCase().includes(term)
 
-      const matchesType = typeFilter === 'all' || u.partnershipType === typeFilter
+      const matchesType = typeFilter === 'all' || account.partnershipType === typeFilter
       const matchesMitra =
         selectedMitraFilter === 'all' ||
-        u.partnershipId === selectedMitraFilter ||
-        (u.organization && u.organization.toLowerCase() === selectedMitraFilter.toLowerCase())
+        account.partnershipId === selectedMitraFilter ||
+        (account.organization && account.organization.toLowerCase() === selectedMitraFilter.toLowerCase())
 
       return matchesSearch && matchesType && matchesMitra
     })
@@ -356,8 +353,8 @@ export default function PartnershipDomainPage() {
     const attachedCadresMap = new Map<string, UserProfile[]>()
     const unattachedCadres: UserProfile[] = []
 
-    partnersList.forEach((m) => {
-      attachedCadresMap.set(m.uid, [])
+    partnersList.forEach((mitra) => {
+      attachedCadresMap.set(mitra.uid, [])
     })
 
     filteredCadres.forEach((cadre) => {
@@ -368,8 +365,8 @@ export default function PartnershipDomainPage() {
       } else {
         const cOrg = (cadre.organization || cadre.partnershipName || '').toLowerCase().trim()
         if (cOrg) {
-          const found = partnersList.find((m) => {
-            const mOrg = (m.organization || m.displayName || '').toLowerCase().trim()
+          const found = partnersList.find((mitra) => {
+            const mOrg = (mitra.organization || mitra.displayName || '').toLowerCase().trim()
             return mOrg && mOrg === cOrg
           })
           if (found) matchedMitraUid = found.uid
@@ -408,12 +405,12 @@ export default function PartnershipDomainPage() {
         email: user?.email || '',
         displayName: userData.displayName || 'Mitra Saya',
         role: 'partnership',
-        organization: (userData as any).organization || userData.displayName,
-        partnershipType: (userData as any).partnershipType || 'Sekolah',
+        organization: userData.organization || userData.displayName,
+        partnershipType: userData.partnershipType || 'Sekolah',
       } : null)
       setCadreContextMitra(myMitra)
-      setCadreOrganization((userData as any)?.organization || userData?.displayName || '')
-      setCadrePartnershipType((userData as any)?.partnershipType || 'Sekolah')
+      setCadreOrganization(userData?.organization || userData?.displayName || '')
+      setCadrePartnershipType(userData?.partnershipType || 'Sekolah')
     } else if (mitra) {
       setCadreContextMitra(mitra)
       setCadreOrganization(mitra.organization || mitra.displayName)
@@ -448,7 +445,7 @@ export default function PartnershipDomainPage() {
       const data = await res.json()
       if (!res.ok || !data.success) throw new Error(data.message || 'Gagal mendaftarkan Mitra Instansi.')
 
-      showToast(`Mitra "${mitraName || mitraEmail}" berhasil didaftarkan!`)
+      show(`Mitra "${mitraName || mitraEmail}" berhasil didaftarkan!`)
       setIsCreateMitraOpen(false)
       setMitraEmail('')
       setMitraPassword('')
@@ -456,7 +453,7 @@ export default function PartnershipDomainPage() {
       setMitraPhone('')
       invalidatePartnershipData()
     } catch (err: any) {
-      showToast(`Error: ${err.message}`)
+      show(`Error: ${err.message}`)
     } finally {
       setIsSubmittingMitra(false)
     }
@@ -492,7 +489,7 @@ export default function PartnershipDomainPage() {
       const data = await res.json()
       if (!res.ok || !data.success) throw new Error(data.message || 'Gagal mendaftarkan Kader.')
 
-      showToast(`Kader "${cadreName || cadreEmail}" berhasil didaftarkan di bawah Mitra ${targetOrg}!`)
+      show(`Kader "${cadreName || cadreEmail}" berhasil didaftarkan di bawah Mitra ${targetOrg}!`)
       setIsCreateCadreOpen(false)
       setCadreEmail('')
       setCadrePassword('')
@@ -501,7 +498,7 @@ export default function PartnershipDomainPage() {
       setCadreOrganization('')
       invalidatePartnershipData()
     } catch (err: any) {
-      showToast(`Error: ${err.message}`)
+      show(`Error: ${err.message}`)
     } finally {
       setIsSubmittingCadre(false)
     }
@@ -515,9 +512,9 @@ export default function PartnershipDomainPage() {
       email: user?.email || '',
       displayName: userData?.displayName || 'Akun Mitra Saya',
       role: 'partnership',
-      organization: (userData as any)?.organization || userData?.displayName,
-      partnershipType: (userData as any)?.partnershipType || 'Sekolah',
-      phone: (userData as any)?.phone || '-',
+      organization: userData?.organization || userData?.displayName,
+      partnershipType: userData?.partnershipType || 'Sekolah',
+      phone: userData?.phone || '-',
     } as UserProfile)
   }, [isPartnershipRole, partnersList, user, userData])
 
@@ -539,10 +536,10 @@ export default function PartnershipDomainPage() {
       <Topbar title={topbarTitle} subtitle={topbarSubtitle} />
 
       {/* Toast Notification */}
-      {toastMessage && (
+      {visible && (
         <div className="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl bg-cyan-950 border border-cyan-500/50 text-cyan-200 text-xs font-bold font-mono shadow-2xl flex items-center gap-2 animate-bounce">
           <Icon name="checkCircle" className="w-4 h-4 text-cyan-400" />
-          {toastMessage}
+          {message}
         </div>
       )}
 
@@ -576,7 +573,7 @@ export default function PartnershipDomainPage() {
                     </div>
 
                     <p className="text-xs text-slate-400 font-mono">
-                      Email Login: {user?.email} • Kontak HP/WA: <span className="text-cyan-300 font-bold">{(userData as any)?.phone || '-'}</span>
+                      Email Login: {user?.email} • Kontak HP/WA: <span className="text-cyan-300 font-bold">{userData?.phone || '-'}</span>
                     </p>
                   </div>
                 </div>
