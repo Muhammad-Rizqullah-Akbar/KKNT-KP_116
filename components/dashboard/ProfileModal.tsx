@@ -33,13 +33,11 @@ export function ProfileModal({ isOpen, onClose, onLogout }: ProfileModalProps) {
 
   const getRoleLabel = () => {
     if (userRole === 'super_admin') return 'Super Admin'
-    if (userRole === 'admin') return 'Admin'
     return 'User'
   }
 
   const getRoleColor = () => {
     if (userRole === 'super_admin') return 'from-amber-500 to-orange-500'
-    if (userRole === 'admin') return 'from-cyan-500 to-violet-500'
     return 'from-gray-500 to-gray-600'
   }
 

@@ -7,7 +7,7 @@ import { safeFetchJson } from '@/lib/infra/safe-fetch'
 import { Icon, type IconName } from '@/components/ui/Icons'
 import { Topbar } from '@/components/dashboard/Topbar'
 
-type UserRole = 'super_admin' | 'admin' | 'internal_bpom' | 'cadre' | 'partnership' | null
+type UserRole = 'super_admin' | 'cadre' | 'partnership' | null
 
 type User = {
   uid: string
@@ -34,14 +34,14 @@ const ROLE_OPTIONS: { id: UserRole; label: string; icon: IconName; colorClass: s
     desc: 'Akses penuh tanpa batas seluruh fitur, manajemen user, dan pengaturan sistem.',
   },
   {
-    id: 'admin',
+    id: 'super_admin',
     label: 'Admin Systems',
     icon: 'shieldCheck',
     colorClass: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/30',
     desc: 'Akses membuat kuesioner V1.5, Form Builder, distribusi kode, dan rekap nasional.',
   },
   {
-    id: 'internal_bpom',
+    id: 'super_admin',
     label: 'Internal BPOM',
     icon: 'award',
     colorClass: 'text-blue-400 bg-blue-500/10 border-blue-500/30',
@@ -101,7 +101,7 @@ export default function UserManagementPage() {
   const [registerEmail, setRegisterEmail] = useState('')
   const [registerPassword, setRegisterPassword] = useState('')
   const [registerDisplayName, setRegisterDisplayName] = useState('')
-  const [registerRole, setRegisterRole] = useState<UserRole>('admin')
+  const [registerRole, setRegisterRole] = useState<UserRole>('super_admin')
   const [registerOrganization, setRegisterOrganization] = useState('')
   const [registerPhone, setRegisterPhone] = useState('')
   const [registerPartnershipId, setRegisterPartnershipId] = useState('')
@@ -111,7 +111,7 @@ export default function UserManagementPage() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [showEditModal, setShowEditModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
-  const [editRole, setEditRole] = useState<UserRole>('admin')
+  const [editRole, setEditRole] = useState<UserRole>('super_admin')
   const [editOrganization, setEditOrganization] = useState('')
   const [editPhone, setEditPhone] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -165,8 +165,8 @@ export default function UserManagementPage() {
 
     // 2. Group into buckets
     const superAdmins = matched.filter((u) => u.role === 'super_admin')
-    const admins = matched.filter((u) => u.role === 'admin')
-    const internalBpoms = matched.filter((u) => u.role === 'internal_bpom')
+    const admins = matched.filter((u) => u.role === 'super_admin')
+    const internalBpoms = matched.filter((u) => u.role === 'super_admin')
     const partnerships = matched.filter((u) => u.role === 'partnership')
     const cadres = matched.filter((u) => u.role === 'cadre' || !u.role)
 
@@ -337,7 +337,7 @@ export default function UserManagementPage() {
       setRegisterOrganization('')
       setRegisterPhone('')
       setRegisterPartnershipId('')
-      setRegisterRole('admin')
+      setRegisterRole('super_admin')
 
       await fetchUsers()
     } catch (err: any) {
@@ -518,7 +518,7 @@ export default function UserManagementPage() {
                   Pilih Peran Sistem <span className="text-rose-400">*</span>
                 </label>
                 <select
-                  value={registerRole || 'admin'}
+                  value={registerRole || 'super_admin'}
                   onChange={(e) => setRegisterRole(e.target.value as UserRole)}
                   className="w-full bg-slate-950 border border-slate-700 text-slate-200 rounded-xl px-3 py-2.5"
                 >
@@ -899,7 +899,7 @@ export default function UserManagementPage() {
               <div>
                 <label className="block text-slate-300 font-semibold mb-1">Role / Peran Sistem</label>
                 <select
-                  value={editRole || 'admin'}
+                  value={editRole || 'super_admin'}
                   onChange={(e) => setEditRole(e.target.value as UserRole)}
                   className="w-full bg-slate-950 border border-slate-700 text-slate-200 rounded-xl px-3 py-2"
                 >

@@ -7,7 +7,7 @@ import { Sidebar } from './Sidebar'
 import { Icon } from '@/components/ui/Icons'
 import { clsx } from 'clsx'
 
-const VALID_ROLES = ['super_admin', 'admin', 'internal_bpom', 'partnership', 'cadre']
+const VALID_ROLES = ['super_admin', 'super_admin', 'super_admin', 'partnership', 'cadre']
 
 export function DashboardAuthGuard({ children }: { children: React.ReactNode }) {
   const { user, userData, userRole, loading, isAuthenticated, logout } = useAuth()

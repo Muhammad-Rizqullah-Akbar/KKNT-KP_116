@@ -4,7 +4,7 @@ import { safeGetCollectionDocs } from '@/lib/repositories/safe-firestore'
 
 export async function GET(request: NextRequest) {
   try {
-    const authContext = await requireRole(['super_admin', 'admin', 'internal_bpom', 'partnership'])
+    const authContext = await requireRole(['super_admin', 'super_admin', 'super_admin', 'partnership'])
 
     const usersDocs = await safeGetCollectionDocs('users')
     let users = usersDocs.map((d) => ({

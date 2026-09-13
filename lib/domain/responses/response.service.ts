@@ -60,7 +60,7 @@ export async function startResponseWorkflow(
         normalizedCode: normalized,
         title: formAgg.metadata?.title || (formAgg as any).title || 'Formulir Penilaian Kebersihan & Keamanan Pangan',
         description: formAgg.metadata?.description || (formAgg as any).description || '',
-        ownerType: 'admin',
+        ownerType: 'super_admin',
         ownerId: formAgg.createdBy || 'bpom_admin',
         ownerName: 'Administrator BPOM',
         versionMode: 'active',
@@ -453,7 +453,7 @@ export async function listResponsesWorkflow(
   authContext: AuthorizationContext,
   options?: ResponseFilterOptions
 ): Promise<ResponseDoc[]> {
-  const isGlobal = authContext.role === 'admin' || authContext.role === 'super_admin' || authContext.role === 'internal_bpom'
+  const isGlobal = authContext.role === 'super_admin'
 
   if (isGlobal) {
     return await listResponsesDoc(options)
@@ -557,7 +557,7 @@ export async function getResponseDetailWorkflow(
     throw new Error(`Respon dengan ID "${responseId}" tidak ditemukan.`)
   }
 
-  const isAdmin = authContext.role === 'admin' || authContext.role === 'super_admin'
+  const isAdmin = authContext.role === 'super_admin'
   if (!isAdmin && resp.ownerId !== authContext.uid) {
     throw new Error('Anda tidak memiliki hak akses untuk melihat respon ini.')
   }

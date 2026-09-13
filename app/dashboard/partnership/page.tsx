@@ -42,7 +42,7 @@ export default function PartnershipDomainPage() {
   const initialTab = (searchParams.get('tab') as 'mitra' | 'cadres' | 'activities') || 'mitra'
   const [activeTab, setActiveTab] = useState<'mitra' | 'cadres' | 'activities'>(initialTab)
 
-  const isSuperAdminOrAdmin = userData?.role === 'super_admin' || userData?.role === 'admin' || userData?.role === 'internal_bpom'
+  const isSuperAdminOrAdmin = userData?.role === 'super_admin'
   const isPartnershipRole = userData?.role === 'partnership'
 
   const [allUsers, setAllUsers] = useState<UserProfile[]>([])

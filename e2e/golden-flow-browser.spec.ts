@@ -195,7 +195,7 @@ test.describe('Real Browser Golden Flow E2E Suite', () => {
       data: {
         formId: createdFormId,
         title: `Distribusi Browser E2E ${timestamp}`,
-        ownerType: 'admin',
+        ownerType: 'super_admin',
         versionMode: 'active',
       }
     })

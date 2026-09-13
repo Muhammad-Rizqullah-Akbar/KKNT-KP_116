@@ -18,7 +18,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
     }
 
-    if (authContext.role !== 'admin' && authContext.role !== 'super_admin' && authContext.role !== 'internal_bpom') {
+    if (authContext.role !== 'super_admin') {
       return NextResponse.json(
         { success: false, message: 'Hanya Super Admin, Admin, dan Internal BPOM yang dapat mengontrol izin distribusi dan versi aktif formulir.' },
         { status: 403 }

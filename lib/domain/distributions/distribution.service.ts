@@ -31,7 +31,7 @@ import { randomInt, randomBytes } from 'crypto'
  * Global Role Scope Boundary Check
  */
 function isGlobalRole(role: string): boolean {
-  return role === 'super_admin' || role === 'admin' || role === 'internal_bpom'
+  return role === 'super_admin' || role === 'super_admin' || role === 'super_admin'
 }
 
 /**
@@ -83,7 +83,7 @@ export async function resolveDistributionWorkflow(
           normalizedCode: normalized,
           title: formAgg.metadata?.title || (formAgg as any).title || 'Formulir Penilaian Kebersihan & Keamanan Pangan',
           description: formAgg.metadata?.description || (formAgg as any).description || '',
-          ownerType: 'admin',
+          ownerType: 'super_admin',
           ownerId: formAgg.createdBy || 'bpom_admin',
           ownerName: 'Administrator BPOM',
           versionMode: 'active',
@@ -284,7 +284,7 @@ export async function createDistributionWorkflow(
 
   const creatorRole = creatorProfile?.role || authContext.role || 'cadre'
 
-  let ownerType: 'admin' | 'cadre' | 'partnership' = 'cadre'
+  let ownerType: 'super_admin' | 'cadre' | 'partnership' = 'cadre'
   if (creatorRole === 'partnership') {
     ownerType = 'partnership'
   } else if (creatorRole === 'cadre') {
@@ -292,7 +292,7 @@ export async function createDistributionWorkflow(
   } else if (params.ownerType) {
     ownerType = params.ownerType
   } else {
-    ownerType = 'admin'
+    ownerType = 'super_admin'
   }
 
   let ownerId = authContext.uid
@@ -311,7 +311,7 @@ export async function createDistributionWorkflow(
         const targetRole = targetDoc.data.role
         if (targetRole === 'partnership') ownerType = 'partnership'
         else if (targetRole === 'cadre') ownerType = 'cadre'
-        else ownerType = 'admin'
+        else ownerType = 'super_admin'
         if (targetDoc.data.partnershipId) userPartnershipId = targetDoc.data.partnershipId
       } else if (params.targetUserName) {
         ownerName = params.targetUserName

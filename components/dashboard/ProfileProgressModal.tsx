@@ -263,9 +263,9 @@ export function ProfileProgressModal({ isOpen, onClose, userOverride }: ProfileP
   const roleLabel =
     userData?.role === 'super_admin'
       ? 'Super Admin BPOM'
-      : userData?.role === 'admin'
+      : userData?.role === 'super_admin'
       ? 'Admin Systems'
-      : userData?.role === 'internal_bpom'
+      : userData?.role === 'super_admin'
       ? 'Internal BPOM Evaluator'
       : userData?.role === 'partnership'
       ? 'Mitra / Instansi Partnership'

@@ -1,6 +1,6 @@
 import type { PublicFormProjection } from '@/lib/domain/forms/types'
 
-export type DistributionOwnerType = 'admin' | 'cadre' | 'partnership'
+export type DistributionOwnerType = 'super_admin' | 'cadre' | 'partnership'
 export type DistributionVersionMode = 'active' | 'pinned'
 export type DistributionStatus = 'draft' | 'active' | 'paused' | 'expired' | 'archived'
 

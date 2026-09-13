@@ -133,7 +133,7 @@ export default function LegacyFormsPage() {
         validation: f.validation,
         stages: f.stages,
         scoring: f.scoring,
-        createdBy: user?.email || 'admin',
+        createdBy: user?.email || 'super_admin',
       })
       showToast(`Kuesioner "${duplicated.title}" berhasil disalin!`)
       loadLegacyData()

@@ -5,9 +5,11 @@ import type { DecodedIdToken } from 'firebase-admin/auth'
 import { adminAuth, adminFirestore } from '@/lib/infra/firebase-admin'
 
 export const SESSION_COOKIE_NAME = '__session'
-export const APP_ROLES = ['super_admin', 'admin', 'internal_bpom', 'partnership', 'cadre', 'public'] as const
+// Role enum FINAL (3 nilai): admin & internal_bpom telah di-merge ke super_admin.
+// 'public' disimpan untuk backward-compat token, bukan role tersimpan aktif.
+export const APP_ROLES = ['super_admin', 'partnership', 'cadre', 'public'] as const
 export type AppRole = (typeof APP_ROLES)[number]
-export type StoredRole = AppRole
+export type StoredRole = Exclude<AppRole, 'public'>
 
 export type AuthorizationContext = {
   uid: string

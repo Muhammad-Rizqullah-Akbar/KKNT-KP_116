@@ -22,7 +22,7 @@ import {
 } from 'firebase/firestore'
 
 // ============ TYPES ============
-export type UserRole = 'super_admin' | 'admin' | 'internal_bpom' | 'partnership' | 'cadre' | null
+export type UserRole = 'super_admin' | 'partnership' | 'cadre' | null
 
 export interface UserData {
   uid: string
@@ -127,7 +127,7 @@ export const getUserData = async (uid: string): Promise<UserData | null> => {
         uid,
         email,
         displayName: auth.currentUser.displayName || 'Administrator System',
-        role: 'admin',
+        role: 'super_admin',
       }
     }
   }
@@ -222,7 +222,7 @@ export const loginWithEmail = async (
   const role = userData?.role || null
 
   // 5. Verify user has a valid registered role
-  const validRoles = ['super_admin', 'admin', 'internal_bpom', 'partnership', 'cadre']
+  const validRoles = ['super_admin', 'super_admin', 'super_admin', 'partnership', 'cadre']
   if (!role || !validRoles.includes(role)) {
     await signOut(auth)
     await clearServerSession()

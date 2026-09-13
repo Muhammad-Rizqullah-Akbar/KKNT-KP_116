@@ -3,7 +3,7 @@ import { adminAuth, adminFirestore } from '@/lib/infra/firebase-admin'
 import { getAuthorizationContext } from '@/lib/domain/auth/authorization'
 import { safeSetDoc } from '@/lib/repositories/safe-firestore'
 
-const VALID_ROLES = ['super_admin', 'admin', 'internal_bpom', 'cadre', 'partnership']
+const VALID_ROLES = ['super_admin', 'super_admin', 'super_admin', 'cadre', 'partnership']
 
 export async function POST(request: NextRequest) {
   try {
@@ -37,8 +37,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Authorization Matrix:
-    // 1. Cadre / Public roles cannot create any accounts
-    if (authContext.role === 'cadre' || authContext.role === 'public') {
+    // 1. Cadre cannot create any accounts
+    if (authContext.role === 'cadre') {
       return NextResponse.json(
         { success: false, message: 'Anda tidak memiliki hak untuk mendaftarkan akun pengguna baru.' },
         { status: 403 }
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 3. Non-super_admin users cannot create privileged admin or super_admin roles
-    if ((role === 'super_admin' || role === 'admin' || role === 'internal_bpom') && authContext.role !== 'super_admin') {
+    if ((role === 'super_admin' || role === 'super_admin' || role === 'super_admin') && authContext.role !== 'super_admin') {
       return NextResponse.json(
         { success: false, message: 'Hanya Super Admin yang diizinkan untuk membuat akun administratif.' },
         { status: 403 }

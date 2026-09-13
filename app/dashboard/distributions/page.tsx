@@ -14,7 +14,7 @@ import { SkeletonTable } from '@/components/ui/Skeleton'
 export default function DistributionsDashboardPage() {
   const router = useRouter()
   const { user, userData, userRole } = useAuth()
-  const isGlobalRole = ['super_admin', 'admin', 'internal_bpom'].includes(userRole || '')
+  const isGlobalRole = ['super_admin', 'super_admin', 'super_admin'].includes(userRole || '')
   const isPartnershipRole = userRole === 'partnership'
   const isCadreRole = userRole === 'cadre'
 
@@ -33,7 +33,7 @@ export default function DistributionsDashboardPage() {
   const [selectedFormId, setSelectedFormId] = useState('')
   const [customTitle, setCustomTitle] = useState('')
   const [customDescription, setCustomDescription] = useState('')
-  const [ownerType, setOwnerType] = useState<'admin' | 'cadre' | 'partnership'>('admin')
+  const [ownerType, setOwnerType] = useState<'super_admin' | 'cadre' | 'partnership'>('super_admin')
   const [versionMode, setVersionMode] = useState<'active' | 'pinned'>('active')
   const [pinnedVersionId, setPinnedVersionId] = useState('')
   const [expiresAt, setExpiresAt] = useState('')
@@ -253,7 +253,7 @@ export default function DistributionsDashboardPage() {
       }
 
       let formsList = formRes.ok && formRes.data && Array.isArray(formRes.data.forms) ? formRes.data.forms : []
-      const isGlobal = ['super_admin', 'admin', 'internal_bpom'].includes(userRole || '')
+      const isGlobal = ['super_admin', 'super_admin', 'super_admin'].includes(userRole || '')
       
       const permittedForms = formsList.filter((f: any) => {
         const isPublished = f.status === 'published' || f.metadata?.status === 'published'
@@ -487,7 +487,7 @@ export default function DistributionsDashboardPage() {
                 className="px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
               >
                 <option value="all">Semua Pemilik</option>
-                <option value="admin">BPOM Pusat</option>
+                <option value="super_admin">BPOM Pusat</option>
                 <option value="cadre">Kader Desa</option>
                 <option value="partnership">Kemitraan</option>
               </select>
@@ -656,7 +656,7 @@ export default function DistributionsDashboardPage() {
                           </span>
 
                           <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-purple-950/40 text-purple-300 border border-purple-500/30 capitalize">
-                            {d.ownerType === 'admin' ? 'BPOM Pusat' : d.ownerType === 'cadre' ? 'Kader Desa' : 'Kemitraan'}
+                            {d.ownerType === 'super_admin' ? 'BPOM Pusat' : d.ownerType === 'cadre' ? 'Kader Desa' : 'Kemitraan'}
                           </span>
                         </div>
 

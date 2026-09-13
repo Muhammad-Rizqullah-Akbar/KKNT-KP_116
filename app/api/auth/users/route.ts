@@ -152,7 +152,7 @@ export async function DELETE(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const { uid, role, organization, phone } = await request.json()
-    const VALID_ROLES = ['super_admin', 'admin', 'internal_bpom', 'cadre', 'partnership', null]
+    const VALID_ROLES = ['super_admin', 'super_admin', 'super_admin', 'cadre', 'partnership', null]
     if (!uid || !VALID_ROLES.includes(role)) {
       return NextResponse.json({ success: false, message: 'UID atau role tidak valid' }, { status: 400 })
     }

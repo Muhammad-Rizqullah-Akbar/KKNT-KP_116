@@ -11,7 +11,7 @@ import { useAuth } from '@/context/AuthContext'
 import { ProfileProgressModal } from './ProfileProgressModal'
 
 interface SidebarProps {
-  userRole?: 'super_admin' | 'admin' | null
+  userRole?: 'super_admin' | null
 }
 
 interface MenuItem {
@@ -272,10 +272,6 @@ export function Sidebar({ userRole }: SidebarProps) {
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                     {effectiveRole === 'super_admin'
                       ? 'Super Admin'
-                      : effectiveRole === 'admin'
-                      ? 'Admin Systems'
-                      : effectiveRole === 'internal_bpom'
-                      ? 'Internal BPOM'
                       : effectiveRole === 'partnership'
                       ? 'Mitra / Instansi'
                       : effectiveRole === 'cadre'

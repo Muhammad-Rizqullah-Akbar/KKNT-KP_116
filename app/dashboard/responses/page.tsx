@@ -775,7 +775,7 @@ export default function ResponsesDashboardPage() {
                 <option value="all">Semua Author / Orang ({availableAuthors.length})</option>
                 {availableAuthors.map((a) => (
                   <option key={a.ownerKey} value={a.ownerKey}>
-                    {a.ownerName} ({a.ownerType === 'admin' ? 'Super Admin' : a.ownerType === 'cadre' ? 'Kader' : 'Mitra'})
+                    {a.ownerName} ({a.ownerType === 'super_admin' ? 'Super Admin' : a.ownerType === 'cadre' ? 'Kader' : 'Mitra'})
                   </option>
                 ))}
               </select>

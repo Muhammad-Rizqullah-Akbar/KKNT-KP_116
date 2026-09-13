@@ -91,7 +91,7 @@ describe('Golden Flow E2E Live Verification Matrix', () => {
     const dist = await createDistributionWorkflow({
       formId: createdFormId,
       title: `Distribusi Golden Test ${timestamp}`,
-      ownerType: 'admin',
+      ownerType: 'super_admin',
       targetUserId: testUid,
       targetUserName: 'Super Admin Test',
       versionMode: 'pinned',

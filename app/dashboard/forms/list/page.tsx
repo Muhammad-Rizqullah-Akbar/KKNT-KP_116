@@ -65,7 +65,7 @@ export function getDerivedLifecycle(f: FormAggregateDoc): {
 export default function V15FormsDashboardPage() {
   const router = useRouter()
   const { user, userRole } = useAuth()
-  const isGlobalRole = ['super_admin', 'admin', 'internal_bpom'].includes(userRole || '')
+  const isGlobalRole = ['super_admin', 'super_admin', 'super_admin'].includes(userRole || '')
 
   const [forms, setForms] = useState<FormAggregateDoc[]>([])
   const [isLoading, setIsLoading] = useState(true)

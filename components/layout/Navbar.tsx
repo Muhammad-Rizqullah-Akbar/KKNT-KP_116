@@ -89,7 +89,7 @@ export function Navbar({ transparent = false, onOpenCodeModal }: NavbarProps) {
     }
   }
 
-  const hasAdminAccess = isAuthenticated && (userRole === 'admin' || userRole === 'super_admin')
+  const hasAdminAccess = isAuthenticated && userRole === 'super_admin'
 
   return (
     <nav

@@ -63,7 +63,7 @@ type AlertCardItem = {
 export default function MonitoringDomainPage() {
   const { user, userData } = useAuth()
   const router = useRouter()
-  const isSuperAdminOrAdmin = userData?.role === 'super_admin' || userData?.role === 'admin' || userData?.role === 'internal_bpom'
+  const isSuperAdminOrAdmin = userData?.role === 'super_admin'
   const isCadre = userData?.role === 'cadre'
   const isPartnershipRole = userData?.role === 'partnership'
 

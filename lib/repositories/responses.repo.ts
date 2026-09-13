@@ -735,7 +735,7 @@ export async function getFormAndDistributionOptions(): Promise<{
         code: d.data.code || 'V1-GROUP',
         title: title.replace(/^dist_[\w\-]+/g, 'Kelompok Kader'),
         ownerName: 'Admin System',
-        ownerType: 'admin',
+        ownerType: 'super_admin',
       })
     })
 

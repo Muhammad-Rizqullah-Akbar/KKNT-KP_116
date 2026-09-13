@@ -13,7 +13,7 @@ interface RouteParams {
 export async function GET(_request: Request, { params }: RouteParams) {
   try {
     const { responseId } = await params
-    const authContext = await requireRole(['admin', 'super_admin', 'cadre', 'partnership'])
+    const authContext = await requireRole(['super_admin', 'super_admin', 'cadre', 'partnership'])
 
     const responseDoc = await getResponseDetailWorkflow(responseId, authContext)
     return NextResponse.json({ success: true, response: responseDoc })

@@ -15,7 +15,7 @@ describe('Partnership Scoping & Access Boundary Tests', () => {
       uid: 'admin_1',
       displayName: 'Admin User',
       email: '[REDACTED_ADMIN_EMAIL]',
-      role: 'admin',
+      role: 'super_admin',
       organization: 'Pusat BPOM',
     },
     {
@@ -59,7 +59,7 @@ describe('Partnership Scoping & Access Boundary Tests', () => {
   ]
 
   function filterUsersByRole(allUsers: typeof mockUsers, authContext: { uid: string; role: string }) {
-    if (authContext.role === 'super_admin' || authContext.role === 'admin' || authContext.role === 'internal_bpom') {
+    if (authContext.role === 'super_admin') {
       return allUsers
     }
 
@@ -120,7 +120,7 @@ describe('Partnership Scoping & Access Boundary Tests', () => {
   })
 
   test('Admin can see all accounts across all partnerships', () => {
-    const adminAuth = { uid: 'admin_1', role: 'admin' }
+    const adminAuth = { uid: 'admin_1', role: 'super_admin' }
     const visibleUsers = filterUsersByRole(mockUsers, adminAuth)
     assert.equal(visibleUsers.length, mockUsers.length)
   })

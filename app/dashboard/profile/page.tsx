@@ -190,10 +190,6 @@ export default function UserProfileProgressPage() {
   const roleLabel =
     userData?.role === 'super_admin'
       ? 'Super Admin BPOM'
-      : userData?.role === 'admin'
-      ? 'Admin Systems'
-      : userData?.role === 'internal_bpom'
-      ? 'Internal BPOM Evaluator'
       : userData?.role === 'partnership'
       ? 'Mitra / Instansi Partnership'
       : userData?.role === 'cadre'
@@ -290,7 +286,7 @@ export default function UserProfileProgressPage() {
             <span className="text-[10px] text-slate-500 font-mono">Hasil survei kuesioner</span>
           </div>
 
-          {['mitra', 'partner', 'partnership', 'organization', 'superadmin', 'admin'].includes(userData?.role || '') && (
+          {['mitra', 'partner', 'partnership', 'organization', 'superadmin', 'super_admin'].includes(userData?.role || '') && (
             <div className="rounded-2xl bg-gradient-to-br from-cyan-950/40 via-slate-900 to-purple-950/40 border border-cyan-500/30 p-4 shadow-sm col-span-2 sm:col-span-4">
               <div className="flex items-center justify-between text-xs text-cyan-400 font-bold">
                 <span className="flex items-center gap-1.5">
