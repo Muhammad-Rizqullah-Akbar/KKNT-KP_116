@@ -24,6 +24,7 @@ import {
   type ScoringOverride,
   getScoredStages,  // ← NEW IMPORT
 } from '@/features/form-builder/components/shared/ElementTypes'
+import { VIEW_COOLDOWN_MS } from '@/lib/constants'
 import { 
   createForm, 
   updateForm, 
@@ -642,7 +643,7 @@ export default function FormBuilderPage() {
       
       setTimeout(() => {
         setShowSuccess(false)
-      }, 5000)
+      }, VIEW_COOLDOWN_MS)
     } catch (error: any) {
       console.error('Save error:', error)
       alert(error.message || 'Gagal menyimpan formulir')

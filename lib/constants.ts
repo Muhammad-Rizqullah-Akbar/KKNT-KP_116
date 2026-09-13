@@ -35,3 +35,9 @@ export const FORM_STATUS = {
   PUBLISHED: 'published',
   ARCHIVED: 'archived',
 } as const
+
+// Durasi (ms) — hindari magic number tersebar
+export const TOAST_DURATION_MS = 3000
+export const TOAST_DURATION_LONG_MS = 4000
+export const VIEW_COOLDOWN_MS = 5000
+export const MOBILE_BREAKPOINT_PX = 768

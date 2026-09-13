@@ -21,6 +21,7 @@ import { ref, uploadBytes, getDownloadURL, listAll } from 'firebase/storage'
 import { SmartUploadArticleModal } from '@/features/dashboard/components/modals/SmartUploadArticleModal'
 import { exportArticleToJson } from '@/lib/domain/articles/smart-article-parser'
 import { queryKeys } from '@/lib/query-keys'
+import { TOAST_DURATION_MS, TOAST_DURATION_LONG_MS, VIEW_COOLDOWN_MS } from '@/lib/constants'
 
 // ============ TIPE DATA & KONSTANTA ============
 type GalleryImage = { id: string; url?: string; caption: string; gradient: string }
@@ -216,7 +217,7 @@ export default function ArticlesAdminPage() {
     setIsModalOpen(false)
     setSuccessMessage('Draft artikel sementara Anda aman tersimpan di browser!')
     setShowSuccess(true)
-    setTimeout(() => setShowSuccess(false), 3000)
+    setTimeout(() => setShowSuccess(false), TOAST_DURATION_MS)
   }
 
   const handleConfirmCloseDiscardDraft = () => {
@@ -263,7 +264,7 @@ export default function ArticlesAdminPage() {
       setSelectedArticleIds([])
       setIsBulkDeleteModalOpen(false)
       queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.articles(user?.uid, userData?.role) })
-      setTimeout(() => setShowSuccess(false), 3000)
+      setTimeout(() => setShowSuccess(false), TOAST_DURATION_MS)
     } catch (err: any) {
       console.error('Gagal menghapus secara massal:', err)
       alert('Gagal menghapus beberapa artikel.')
@@ -382,7 +383,7 @@ export default function ArticlesAdminPage() {
       fetchMediaLibrary()
       setSuccessMessage(`⚡ Gambar terkompresi otomatis (${res.savedPercent}% hemat storage)!`)
       setShowSuccess(true)
-      setTimeout(() => setShowSuccess(false), 4000)
+      setTimeout(() => setShowSuccess(false), TOAST_DURATION_LONG_MS)
       return res.url
     } catch (error) {
       console.error('Gagal mengunggah file:', error)
@@ -794,7 +795,7 @@ export default function ArticlesAdminPage() {
             setIsModalOpen(true)
             setSuccessMessage('Draft artikel sementara sebelumnya berhasil dipulihkan!')
             setShowSuccess(true)
-            setTimeout(() => setShowSuccess(false), 3000)
+            setTimeout(() => setShowSuccess(false), TOAST_DURATION_MS)
             return
           }
         } catch (e) {
@@ -828,7 +829,7 @@ export default function ArticlesAdminPage() {
             setIsModalOpen(true)
             setSuccessMessage('Draft editan artikel sementara berhasil dipulihkan!')
             setShowSuccess(true)
-            setTimeout(() => setShowSuccess(false), 3000)
+            setTimeout(() => setShowSuccess(false), TOAST_DURATION_MS)
             return
           }
         } catch (e) {
@@ -905,7 +906,7 @@ export default function ArticlesAdminPage() {
       setIsPreviewOpen(false)
       setShowSuccess(true)
       queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.articles(user?.uid, userData?.role) })
-      setTimeout(() => setShowSuccess(false), 3000)
+      setTimeout(() => setShowSuccess(false), TOAST_DURATION_MS)
     } catch (error) {
       console.error('Gagal menyimpan:', error)
       alert('Gagal menyimpan ke database')
@@ -927,7 +928,7 @@ export default function ArticlesAdminPage() {
         setSuccessMessage('Artikel berhasil dihapus!')
         setShowSuccess(true)
         queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.articles(user?.uid, userData?.role) })
-        setTimeout(() => setShowSuccess(false), 3000)
+        setTimeout(() => setShowSuccess(false), TOAST_DURATION_MS)
       } catch (error) {
         console.error('Gagal menghapus:', error)
       }

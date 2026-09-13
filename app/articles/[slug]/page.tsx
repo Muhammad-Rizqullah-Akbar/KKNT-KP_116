@@ -18,6 +18,7 @@ import { auth, storage } from '@/lib/infra/firebase-client'
 import { uploadOptimizedArticleImage } from '@/lib/infra/storage'
 import { onAuthStateChanged } from 'firebase/auth'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
+import { VIEW_COOLDOWN_MS } from '@/lib/constants'
 
 // ============ UTILITY ============
 
@@ -140,7 +141,7 @@ export default function ArticleDetailPage({ params }: { params: Promise<{ slug: 
       } catch (err) {
         console.error('Gagal mencatat views:', err)
       }
-    }, 5000)
+    }, VIEW_COOLDOWN_MS)
 
     return () => clearTimeout(timer)
   }, [article?.id])
