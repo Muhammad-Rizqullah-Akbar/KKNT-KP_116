@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Topbar } from '@/features/dashboard/components/layout/Topbar'
@@ -18,10 +19,38 @@ export default function DistributionsDashboardPage() {
   const isPartnershipRole = userRole === 'partnership'
   const isCadreRole = userRole === 'cadre'
 
-  const [distributions, setDistributions] = useState<DistributionDoc[]>([])
-  const [publishedForms, setPublishedForms] = useState<FormAggregateDoc[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  // ============ SERVER-STATE (TanStack Query) ============
+  const distributionsQuery = useQuery<{ distributions: DistributionDoc[]; publishedForms: FormAggregateDoc[] }>({
+    queryKey: ['distributions', 'list', userRole],
+    queryFn: async () => {
+      const [distRes, formRes] = await Promise.all([
+        safeFetchJson('/api/distributions'),
+        safeFetchJson('/api/forms?status=published'),
+      ])
+
+      if (!(distRes.ok && distRes.data && Array.isArray(distRes.data.distributions))) {
+        throw new Error(distRes.error || 'Gagal memuat daftar distribusi.')
+      }
+
+      let formsList = formRes.ok && formRes.data && Array.isArray(formRes.data.forms) ? formRes.data.forms : []
+      const isGlobal = ['super_admin', 'super_admin', 'super_admin'].includes(userRole || '')
+
+      const permittedForms = formsList.filter((f: any) => {
+        const isPublished = f.status === 'published' || f.metadata?.status === 'published'
+        if (!isPublished) return false
+        if (isGlobal) return true
+        return f.allowCadreDistribution === true || f.metadata?.allowCadreDistribution === true
+      })
+
+      return { distributions: distRes.data.distributions, publishedForms: permittedForms as FormAggregateDoc[] }
+    },
+  })
+
+  const distributions = distributionsQuery.data?.distributions ?? []
+  const publishedForms = distributionsQuery.data?.publishedForms ?? []
+  const isLoading = distributionsQuery.isLoading
+  const error = distributionsQuery.error ? (distributionsQuery.error as Error).message : null
+  const loadData = () => distributionsQuery.refetch()
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('')
@@ -231,52 +260,17 @@ export default function DistributionsDashboardPage() {
   }
 
   // Cost Control & Pagination States
-  const [lastFetchedAt, setLastFetchedAt] = useState<string | null>(null)
   const [pageSize, setPageSize] = useState<number>(10)
   const [currentPage, setCurrentPage] = useState<number>(1)
 
-  // Load Distributions & Published Forms from API
-  const loadData = async () => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      const [distRes, formRes] = await Promise.all([
-        safeFetchJson('/api/distributions'),
-        safeFetchJson('/api/forms?status=published'),
-      ])
-
-      if (distRes.ok && distRes.data && Array.isArray(distRes.data.distributions)) {
-        setDistributions(distRes.data.distributions)
-        setLastFetchedAt(new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }))
-      } else {
-        setError(distRes.error || 'Gagal memuat daftar distribusi.')
-      }
-
-      let formsList = formRes.ok && formRes.data && Array.isArray(formRes.data.forms) ? formRes.data.forms : []
-      const isGlobal = ['super_admin', 'super_admin', 'super_admin'].includes(userRole || '')
-      
-      const permittedForms = formsList.filter((f: any) => {
-        const isPublished = f.status === 'published' || f.metadata?.status === 'published'
-        if (!isPublished) return false
-        if (isGlobal) return true
-        return f.allowCadreDistribution === true || f.metadata?.allowCadreDistribution === true
-      })
-
-      setPublishedForms(permittedForms)
-      if (permittedForms.length > 0) {
-        setSelectedFormId(permittedForms[0].formId)
-        fetchFormVersions(permittedForms[0].formId)
-      }
-    } catch (err: any) {
-      setError(err?.message || 'Terjadi kesalahan sistem saat memuat data.')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
+  // Preserve loadData side-effect: reset selectedFormId + fetch its versions
+  // whenever published forms (re)load.
   useEffect(() => {
-    loadData()
-  }, [])
+    if (publishedForms.length > 0) {
+      setSelectedFormId(publishedForms[0].formId)
+      fetchFormVersions(publishedForms[0].formId)
+    }
+  }, [publishedForms])
 
   // Filtered List Client-Side
   const filteredDistributions = useMemo(() => {
