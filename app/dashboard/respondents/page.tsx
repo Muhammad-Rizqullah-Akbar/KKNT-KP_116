@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
@@ -85,10 +86,6 @@ export default function RespondentsPage() {
   }, [authLoading, userRole, userData, router])
 
   // ---------- STATE ----------
-  const [respondents, setRespondents] = useState<Respondent[]>([])
-  const [forms, setForms] = useState<FormData[]>([])
-  const [groups, setGroups] = useState<FormGroup[]>([])
-  const [loading, setLoading] = useState(true)
   const [selectedGroups, setSelectedGroups] = useState<string[]>([])
   const [selectedForms, setSelectedForms] = useState<string[]>([])
   const [currentPage, setCurrentPage] = useState(1)
@@ -104,6 +101,8 @@ export default function RespondentsPage() {
     setToast({ message, type })
     setTimeout(() => setToast(null), 3000)
   }
+
+  const queryClient = useQueryClient()
 
   // Helper: 4-Tier Deterministic Form Matcher for responses
   const findMatchingForm = (response: any, formsList: FormData[]): FormData | null => {
@@ -179,18 +178,15 @@ export default function RespondentsPage() {
     return null
   }
 
-  // ============ LOAD DATA ============
-  const loadData = async () => {
-    setLoading(true)
-    try {
+  // ============ LOAD DATA (TanStack Query) ============
+  const { data: respondentsData, isLoading: loading } = useQuery({
+    queryKey: ['dashboard', 'respondents'],
+    queryFn: async () => {
       const [responsesData, formsData, groupsData] = await Promise.all([
         getAllResponses(),
         getForms(),
         getFormGroups(),
       ])
-
-      setForms(formsData)
-      setGroups(groupsData)
 
       const transformedRespondents: Respondent[] = await Promise.all(
         responsesData.map(async (response: FormResponse) => {
@@ -254,18 +250,13 @@ export default function RespondentsPage() {
         })
       )
 
-      setRespondents(transformedRespondents)
-    } catch (error) {
-      console.error('Error loading data:', error)
-      showToast('Gagal memuat data responden', 'error')
-    } finally {
-      setLoading(false)
-    }
-  }
+      return { respondents: transformedRespondents, forms: formsData, groups: groupsData }
+    },
+  })
 
-  useEffect(() => {
-    loadData()
-  }, [])
+  const respondents = respondentsData?.respondents ?? []
+  const forms = respondentsData?.forms ?? []
+  const groups = respondentsData?.groups ?? []
 
   // ============ MAPPING JAWABAN: TEKS PERTANYAAN → ID (KHUSUS SCORING) ============
   const mapAnswersToQuestionIds = (
@@ -659,7 +650,10 @@ export default function RespondentsPage() {
     if (respondentToDelete) {
       try {
         await deleteResponse(respondentToDelete)
-        setRespondents(prev => prev.filter(r => r.id !== respondentToDelete))
+        queryClient.setQueryData(['dashboard', 'respondents'], (old: any) => {
+          if (!old) return old
+          return { ...old, respondents: old.respondents.filter((r: Respondent) => r.id !== respondentToDelete) }
+        })
         showToast('Data responden berhasil dihapus', 'success')
       } catch (error) {
         console.error('Error deleting response:', error)
