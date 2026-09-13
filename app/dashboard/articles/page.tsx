@@ -19,7 +19,7 @@ import { storage } from '@/lib/firebaseClient'
 import { uploadOptimizedArticleImage } from '@/lib/infra/storage'
 import { ref, uploadBytes, getDownloadURL, listAll } from 'firebase/storage'
 import { SmartUploadArticleModal } from '@/components/dashboard/articles/SmartUploadArticleModal'
-import { exportArticleToJson } from '@/lib/cms/smartArticleParser'
+import { exportArticleToJson } from '@/lib/domain/articles/smart-article-parser'
 
 // ============ TIPE DATA & KONSTANTA ============
 type GalleryImage = { id: string; url?: string; caption: string; gradient: string }

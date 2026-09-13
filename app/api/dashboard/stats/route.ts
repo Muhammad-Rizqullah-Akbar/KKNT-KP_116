@@ -7,7 +7,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getDashboardStats } from '@/lib/dashboard/stats.service'
+import { getDashboardStats } from '@/lib/domain/analytics/stats.service'
 import { getAuthorizationContext } from '@/lib/domain/auth/authorization'
 
 export async function GET(request: NextRequest) {

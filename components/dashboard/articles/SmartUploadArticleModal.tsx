@@ -8,7 +8,7 @@ import {
   cleanAndRepairJson,
   exportArticleToJson,
   type ParsedArticle,
-} from '@/lib/cms/smartArticleParser'
+} from '@/lib/domain/articles/smart-article-parser'
 import { storage } from '@/lib/firebaseClient'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 
