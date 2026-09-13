@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { safeFetchJson } from '@/lib/infra/safe-fetch'
@@ -69,12 +70,6 @@ export default function MonitoringDomainPage() {
 
   const [activeTab, setActiveTab] = useState<'overview' | 'cadres' | 'mitra' | 'alerts'>('overview')
 
-  const [users, setUsers] = useState<UserProfile[]>([])
-  const [distributions, setDistributions] = useState<DistributionSummary[]>([])
-  const [responses, setResponses] = useState<ResponseSummary[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
   // Filters & Search
   const [searchTerm, setSearchTerm] = useState('')
   const [mitraFilter, setMitraFilter] = useState<string>('all')
@@ -90,36 +85,36 @@ export default function MonitoringDomainPage() {
   // Inspection Modal State
   const [selectedCadreForInspect, setSelectedCadreForInspect] = useState<UserProfile | null>(null)
 
-  // Fetch all Monitoring Data
-  const loadMonitoringData = async () => {
-    setIsLoading(true)
-    setError(null)
-    try {
+  // Fetch all Monitoring Data via TanStack Query
+  const { data: monitoringData, isLoading } = useQuery({
+    queryKey: ['dashboard', 'monitoring'],
+    queryFn: async () => {
       const [usersRes, distRes, respRes] = await Promise.all([
         safeFetchJson('/api/auth/users'),
         safeFetchJson('/api/distributions'),
         safeFetchJson('/api/responses'),
       ])
 
-      if (usersRes.ok && usersRes.data && Array.isArray(usersRes.data.users)) {
-        setUsers(usersRes.data.users)
+      return {
+        users:
+          usersRes.ok && usersRes.data && Array.isArray(usersRes.data.users)
+            ? (usersRes.data.users as UserProfile[])
+            : [],
+        distributions:
+          distRes.ok && distRes.data && Array.isArray(distRes.data.distributions)
+            ? (distRes.data.distributions as DistributionSummary[])
+            : [],
+        responses:
+          respRes.ok && respRes.data && Array.isArray(respRes.data.responses)
+            ? (respRes.data.responses as ResponseSummary[])
+            : [],
       }
-      if (distRes.ok && distRes.data && Array.isArray(distRes.data.distributions)) {
-        setDistributions(distRes.data.distributions)
-      }
-      if (respRes.ok && respRes.data && Array.isArray(respRes.data.responses)) {
-        setResponses(respRes.data.responses)
-      }
-    } catch (err: any) {
-      setError(err.message || 'Gagal memuat data monitoring.')
-    } finally {
-      setIsLoading(false)
-    }
-  }
+    },
+  })
 
-  useEffect(() => {
-    loadMonitoringData()
-  }, [])
+  const users = monitoringData?.users ?? []
+  const distributions = monitoringData?.distributions ?? []
+  const responses = monitoringData?.responses ?? []
 
   // 1. GRANULAR PER-CADRE CONTRIBUTION METRICS
   const cadreMetrics = useMemo(() => {
