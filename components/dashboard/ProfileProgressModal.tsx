@@ -81,7 +81,7 @@ export function ProfileProgressModal({ isOpen, onClose, userOverride }: ProfileP
 
       // 2. Fetch Distributions (STRICT OWNERSHIP ONLY)
       let myDists: any[] = []
-      const distRes = await safeFetchJson('/api/v1_5/distributions')
+      const distRes = await safeFetchJson('/api/distributions')
       const targetUid = userOverride?.uid || user?.uid || authUser?.uid
       const targetEmail = String(userOverride?.email || userData?.email || authUser?.email || '').toLowerCase().trim()
       const targetDisplayName = String(userOverride?.displayName || userData?.displayName || authUserData?.displayName || '').toLowerCase().trim()
@@ -111,7 +111,7 @@ export function ProfileProgressModal({ isOpen, onClose, userOverride }: ProfileP
       if ((userData as any)?.cadreCode) myCodesSet.add(String((userData as any).cadreCode).toLowerCase().trim())
 
       // 3. Fetch Responses (STRICT OWNERSHIP ONLY)
-      const respRes = await safeFetchJson('/api/v1_5/responses')
+      const respRes = await safeFetchJson('/api/responses')
       let filteredMyResponsesCount = 0
       let totalSysCount = 0
 

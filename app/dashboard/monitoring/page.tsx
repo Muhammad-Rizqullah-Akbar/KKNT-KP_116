@@ -97,8 +97,8 @@ export default function MonitoringDomainPage() {
     try {
       const [usersRes, distRes, respRes] = await Promise.all([
         safeFetchJson('/api/auth/users'),
-        safeFetchJson('/api/v1_5/distributions'),
-        safeFetchJson('/api/v1_5/responses'),
+        safeFetchJson('/api/distributions'),
+        safeFetchJson('/api/responses'),
       ])
 
       if (usersRes.ok && usersRes.data && Array.isArray(usersRes.data.users)) {

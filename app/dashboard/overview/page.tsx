@@ -32,8 +32,8 @@ function CadreOverviewDashboard() {
       setLoading(true)
       try {
         const [distRes, respRes, artData] = await Promise.all([
-          safeFetchJson('/api/v1_5/distributions'),
-          safeFetchJson('/api/v1_5/responses'),
+          safeFetchJson('/api/distributions'),
+          safeFetchJson('/api/responses'),
           getArticles().catch(() => []),
         ])
 
@@ -205,7 +205,7 @@ function AdminOverviewDashboard() {
         const [responsesData, formsData, v15RespRes] = await Promise.all([
           getAllResponses().catch(() => []),
           getForms().catch(() => []),
-          safeFetchJson('/api/v1_5/responses'),
+          safeFetchJson('/api/responses'),
         ])
 
         const cleanString = (str: string) => str.toLowerCase().replace(/[^a-z0-9]/g, '').trim()

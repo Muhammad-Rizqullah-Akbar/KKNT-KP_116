@@ -32,7 +32,7 @@ export function GradeThresholdConfigurator({
     async function fetchArticles() {
       setLoadingArticles(true)
       try {
-        const res = await fetch('/api/v1_5/articles/published')
+        const res = await fetch('/api/articles/published')
         const data = await res.json()
         if (data.success && Array.isArray(data.articles)) {
           setPublishedArticles(data.articles)

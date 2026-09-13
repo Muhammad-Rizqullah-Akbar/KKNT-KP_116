@@ -126,7 +126,7 @@ export default function V15FormsDashboardPage() {
     if (!editingTitleForm || !editTitleInput.trim()) return
     setIsUpdatingTitle(true)
     try {
-      const res = await safeFetchJson(`/api/v1_5/forms/${editingTitleForm.formId}`, {
+      const res = await safeFetchJson(`/api/forms/${editingTitleForm.formId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -180,7 +180,7 @@ export default function V15FormsDashboardPage() {
     if (!formToDelete) return
     setIsDeletingForm(true)
     try {
-      const res = await safeFetchJson(`/api/v1_5/forms/${formToDelete.formId}`, {
+      const res = await safeFetchJson(`/api/forms/${formToDelete.formId}`, {
         method: 'DELETE',
       })
       if (res.ok && res.data?.success) {
@@ -203,7 +203,7 @@ export default function V15FormsDashboardPage() {
     setIsDeletingForm(true)
     try {
       const deletePromises = selectedFormIds.map((id) =>
-        safeFetchJson(`/api/v1_5/forms/${id}`, { method: 'DELETE' })
+        safeFetchJson(`/api/forms/${id}`, { method: 'DELETE' })
       )
       await Promise.all(deletePromises)
       showToast(`${selectedFormIds.length} formulir terpilih berhasil dihapus secara massal!`)
@@ -236,9 +236,9 @@ export default function V15FormsDashboardPage() {
     setError(null)
     try {
       const [formsRes, distRes, respRes] = await Promise.all([
-        safeFetchJson('/api/v1_5/forms'),
-        safeFetchJson('/api/v1_5/distributions'),
-        safeFetchJson('/api/v1_5/responses'),
+        safeFetchJson('/api/forms'),
+        safeFetchJson('/api/distributions'),
+        safeFetchJson('/api/responses'),
       ])
 
       if (formsRes.ok && formsRes.data && Array.isArray(formsRes.data.forms)) {
@@ -387,7 +387,7 @@ export default function V15FormsDashboardPage() {
 
     setIsCreating(true)
     try {
-      const res = await fetch('/api/v1_5/forms', {
+      const res = await fetch('/api/forms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -424,7 +424,7 @@ export default function V15FormsDashboardPage() {
     const newVal = !currentVal
     setIsTogglingCadrePerm(true)
     try {
-      const res = await safeFetchJson(`/api/v1_5/forms/${form.formId}/permission`, {
+      const res = await safeFetchJson(`/api/forms/${form.formId}/permission`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ allowCadreDistribution: newVal }),
@@ -462,7 +462,7 @@ export default function V15FormsDashboardPage() {
     const formId = editConfirmForm.formId
     setIsCreatingNewVersion(true)
     try {
-      const res = await safeFetchJson(`/api/v1_5/forms/${formId}/new-version`, { method: 'POST' })
+      const res = await safeFetchJson(`/api/forms/${formId}/new-version`, { method: 'POST' })
       if (res.ok && res.data?.success) {
         showToast(`Draft versi baru (${res.data.form?.activeVersionNumber || 2}.0) berhasil dibuat! Membuka Form Builder...`)
         setEditConfirmForm(null)
@@ -481,7 +481,7 @@ export default function V15FormsDashboardPage() {
     setDuplicatingFormId(formId)
     setActiveMenuFormId(null)
     try {
-      const res = await fetch(`/api/v1_5/forms/${formId}/duplicate`, { method: 'POST' })
+      const res = await fetch(`/api/forms/${formId}/duplicate`, { method: 'POST' })
       const data = await res.json()
       if (!res.ok || !data.success) {
         throw new Error(data.message || 'Gagal menduplikat formulir.')
@@ -500,7 +500,7 @@ export default function V15FormsDashboardPage() {
     if (!confirm(`Apakah Anda yakin ingin mengarsipkan formulir "${formId}"?`)) return
 
     try {
-      const res = await fetch(`/api/v1_5/forms/${formId}/archive`, { method: 'POST' })
+      const res = await fetch(`/api/forms/${formId}/archive`, { method: 'POST' })
       const data = await res.json()
       if (!res.ok || !data.success) throw new Error(data.message || 'Gagal mengarsipkan formulir.')
 
@@ -514,7 +514,7 @@ export default function V15FormsDashboardPage() {
   const handleRestoreForm = async (formId: string) => {
     setActiveMenuFormId(null)
     try {
-      const res = await fetch(`/api/v1_5/forms/${formId}/restore`, { method: 'POST' })
+      const res = await fetch(`/api/forms/${formId}/restore`, { method: 'POST' })
       const data = await res.json()
       if (!res.ok || !data.success) throw new Error(data.message || 'Gagal memulihkan formulir.')
 

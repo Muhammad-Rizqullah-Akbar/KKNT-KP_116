@@ -28,7 +28,7 @@ export default function DistributionDetailPage({ params }: PageProps) {
     setIsLoading(true)
     setError(null)
     try {
-      const res = await fetch(`/api/v1_5/distributions/${distributionId}`)
+      const res = await fetch(`/api/distributions/${distributionId}`)
       const data = await res.json()
       if (data.success && data.distribution) {
         setDistribution(data.distribution)
@@ -49,7 +49,7 @@ export default function DistributionDetailPage({ params }: PageProps) {
   const handleTogglePause = async () => {
     if (!distribution) return
     try {
-      const res = await fetch(`/api/v1_5/distributions/${distributionId}/pause`, {
+      const res = await fetch(`/api/distributions/${distributionId}/pause`, {
         method: 'POST',
       })
       const data = await res.json()
@@ -66,7 +66,7 @@ export default function DistributionDetailPage({ params }: PageProps) {
   const handleArchive = async () => {
     if (!confirm('Apakah Anda yakin ingin mengarsipkan kode distribusi ini?')) return
     try {
-      const res = await fetch(`/api/v1_5/distributions/${distributionId}/archive`, {
+      const res = await fetch(`/api/distributions/${distributionId}/archive`, {
         method: 'POST',
       })
       const data = await res.json()

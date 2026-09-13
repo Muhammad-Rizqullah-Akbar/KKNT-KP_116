@@ -49,7 +49,7 @@ export default function PublicDistributionPage({ params }: PageProps) {
     setIsLoading(true)
     setError(null)
     try {
-      const res = await fetch(`/api/v1_5/public/distributions/${code}`)
+      const res = await fetch(`/api/public/distributions/${code}`)
       const data = await res.json()
 
       if (!res.ok || !data.success) {
@@ -106,7 +106,7 @@ export default function PublicDistributionPage({ params }: PageProps) {
     setIsStartingSession(true)
     setError(null)
     try {
-      const res = await fetch('/api/v1_5/responses/start', {
+      const res = await fetch('/api/responses/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ distributionCode: code }),
@@ -237,7 +237,7 @@ export default function PublicDistributionPage({ params }: PageProps) {
     setValidationError(null)
 
     try {
-      const res = await fetch(`/api/v1_5/responses/${sessionData.responseId}/submit`, {
+      const res = await fetch(`/api/responses/${sessionData.responseId}/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

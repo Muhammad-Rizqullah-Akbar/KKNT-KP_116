@@ -20,12 +20,12 @@ export default function FormIdBuilderPage({ params }: PageProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // 1 FIRESTORE READ via GET /api/v1_5/forms/[formId]
+  // 1 FIRESTORE READ via GET /api/forms/[formId]
   const loadFormAggregate = async () => {
     setIsLoading(true)
     setError(null)
     try {
-      const res = await fetch(`/api/v1_5/forms/${formId}`)
+      const res = await fetch(`/api/forms/${formId}`)
       const data = await res.json()
 
       if (!res.ok || !data.success) {
@@ -51,7 +51,7 @@ export default function FormIdBuilderPage({ params }: PageProps) {
 
   // Save Draft to Server
   const handleSaveDraftToServer = async (state: BuilderState) => {
-    const res = await fetch(`/api/v1_5/forms/${formId}`, {
+    const res = await fetch(`/api/forms/${formId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ state }),
@@ -66,7 +66,7 @@ export default function FormIdBuilderPage({ params }: PageProps) {
 
   // Publish Atomic Version Snapshot
   const handlePublishVersion = async () => {
-    const res = await fetch(`/api/v1_5/forms/${formId}/publish`, {
+    const res = await fetch(`/api/forms/${formId}/publish`, {
       method: 'POST',
     })
     const data = await res.json()
@@ -79,7 +79,7 @@ export default function FormIdBuilderPage({ params }: PageProps) {
 
   // Create New Version
   const handleCreateNewVersion = async () => {
-    const res = await fetch(`/api/v1_5/forms/${formId}/new-version`, {
+    const res = await fetch(`/api/forms/${formId}/new-version`, {
       method: 'POST',
     })
     const data = await res.json()

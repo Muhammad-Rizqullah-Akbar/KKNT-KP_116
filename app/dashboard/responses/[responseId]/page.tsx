@@ -27,7 +27,7 @@ export default function ResponseDetailPage({ params }: PageProps) {
     setIsLoading(true)
     setError(null)
     try {
-      const res = await fetch(`/api/v1_5/responses/${responseId}`)
+      const res = await fetch(`/api/responses/${responseId}`)
       const data = await res.json()
 
       if (data.success && data.response) {
@@ -36,7 +36,7 @@ export default function ResponseDetailPage({ params }: PageProps) {
 
         if (resp.formId) {
           try {
-            const formRes = await fetch(`/api/v1_5/forms/${resp.formId}`)
+            const formRes = await fetch(`/api/forms/${resp.formId}`)
             const formData = await formRes.json()
             if (formData.success && formData.form) {
               setFormDoc(formData.form)

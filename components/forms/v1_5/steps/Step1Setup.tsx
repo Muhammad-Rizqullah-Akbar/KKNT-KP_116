@@ -28,7 +28,7 @@ export function Step1Setup({ state, onChange, onContinue }: Step1SetupProps) {
   React.useEffect(() => {
     async function fetchRegistry() {
       try {
-        const res = await fetch('/api/v1_5/forms/registry')
+        const res = await fetch('/api/forms/registry')
         const data = await res.json()
         if (data.success) {
           if (Array.isArray(data.categories)) {

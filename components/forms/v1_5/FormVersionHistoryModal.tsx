@@ -30,7 +30,7 @@ export function FormVersionHistoryModal({
       setIsLoading(true)
       setError(null)
       try {
-        const res = await fetch(`/api/v1_5/forms/${formId}/versions`)
+        const res = await fetch(`/api/forms/${formId}/versions`)
         const data = await res.json()
         if (data.success && Array.isArray(data.versions)) {
           setVersions(data.versions)

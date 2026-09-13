@@ -142,9 +142,9 @@ export default function WidgetsPage() {
         getAllResponses().catch(() => []),
         getForms().catch(() => []),
         getFormGroups().catch(() => []),
-        safeFetchJson('/api/v1_5/forms'),
+        safeFetchJson('/api/forms'),
         safeFetchJson('/api/auth/users'),
-        safeFetchJson('/api/v1_5/responses'),
+        safeFetchJson('/api/responses'),
       ])
 
       const cleanString = (str: string) => str.toLowerCase().replace(/[^a-z0-9]/g, '').trim()

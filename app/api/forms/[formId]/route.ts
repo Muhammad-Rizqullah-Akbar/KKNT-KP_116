@@ -1,0 +1,130 @@
+import { NextResponse } from 'next/server'
+import { getAuthorizationContext, requireRole } from '@/lib/domain/auth/authorization'
+import { getFormAggregateFromDb } from '@/lib/repositories/form-versions.repo'
+import { saveDraftWorkflow, updateFormMetadataWorkflow } from '@/lib/domain/forms/form-management.service'
+import { deleteForm } from '@/lib/repositories/forms.repo'
+
+/**
+ * PATCH /api/forms/[formId]
+ * Update form title / metadata without changing version number.
+ */
+export async function PATCH(request: Request, { params }: RouteParams) {
+  try {
+    const { formId } = await params
+    const authContext = await getAuthorizationContext()
+    if (!authContext) {
+      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
+    }
+    const body = await request.json()
+
+    const metadataUpdate = body.metadata || {
+      title: body.title,
+      description: body.description,
+      category: body.category,
+      target: body.target,
+    }
+
+    if (!metadataUpdate.title && !body.title) {
+      return NextResponse.json(
+        { success: false, message: 'Judul formulir wajib disertakan.' },
+        { status: 400 }
+      )
+    }
+
+    const updated = await updateFormMetadataWorkflow(formId, metadataUpdate, authContext.uid)
+
+    return NextResponse.json({
+      success: true,
+      message: 'Nama formulir berhasil diperbarui tanpa mengubah versi.',
+      form: updated,
+    })
+  } catch (error: any) {
+    const status = error.status || 500
+    return NextResponse.json(
+      { success: false, message: error.message || 'Gagal memperbarui nama formulir.' },
+      { status }
+    )
+  }
+}
+import { toPublicFormProjection } from '@/lib/domain/forms/legacy-adapter'
+
+interface RouteParams {
+  params: Promise<{ formId: string }>
+}
+
+/**
+ * GET /api/forms/[formId]
+ * 1 FIRESTORE READ: Loads current form aggregate document.
+ */
+export async function GET(_request: Request, { params }: RouteParams) {
+  try {
+    const { formId } = await params
+    const formDoc = await getFormAggregateFromDb(formId)
+
+    if (!formDoc) {
+      return NextResponse.json(
+        { success: false, message: `Formulir "${formId}" tidak ditemukan.` },
+        { status: 404 }
+      )
+    }
+
+    return NextResponse.json({ success: true, form: formDoc })
+  } catch (error: any) {
+    return NextResponse.json(
+      { success: false, message: error.message || 'Gagal memuat formulir.' },
+      { status: 500 }
+    )
+  }
+}
+
+/**
+ * PUT /api/forms/[formId]
+ * Save draft form aggregate.
+ */
+export async function PUT(request: Request, { params }: RouteParams) {
+  try {
+    const { formId } = await params
+    const authContext = await getAuthorizationContext()
+    if (!authContext) {
+      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
+    }
+    const body = await request.json()
+
+    if (!body.state) {
+      return NextResponse.json(
+        { success: false, message: 'Data builder state formulir wajib disertakan.' },
+        { status: 400 }
+      )
+    }
+
+    const updated = await saveDraftWorkflow(formId, body.state, authContext.uid)
+    return NextResponse.json({ success: true, form: updated })
+  } catch (error: any) {
+    const status = error.status || 500
+    return NextResponse.json(
+      { success: false, message: error.message || 'Gagal menyimpan draft formulir.' },
+      { status }
+    )
+  }
+}
+
+/**
+ * DELETE /api/forms/[formId]
+ * Delete a form permanently from Firestore.
+ */
+export async function DELETE(_request: Request, { params }: RouteParams) {
+  try {
+    const { formId } = await params
+    await deleteForm(formId)
+
+    return NextResponse.json({
+      success: true,
+      message: `Formulir "${formId}" berhasil dihapus secara permanen.`,
+    })
+  } catch (error: any) {
+    return NextResponse.json(
+      { success: false, message: error.message || 'Gagal menghapus formulir.' },
+      { status: 500 }
+    )
+  }
+}

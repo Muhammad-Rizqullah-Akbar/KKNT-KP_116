@@ -51,7 +51,7 @@ export function MitraProgressModal({ mitra, isOpen, onClose }: MitraProgressModa
       }
 
       // 2. Fetch Distributions created by this Mitra or its Cadres
-      const distRes = await safeFetchJson('/api/v1_5/distributions')
+      const distRes = await safeFetchJson('/api/distributions')
       let myDists: any[] = []
       if (distRes.ok && distRes.data && Array.isArray(distRes.data.distributions)) {
         const cadreUids = new Set(myCadres.map((c) => c.uid))
@@ -93,7 +93,7 @@ export function MitraProgressModal({ mitra, isOpen, onClose }: MitraProgressModa
       }
 
       // 4. Fetch Responses count gathered through specific distribution codes
-      const respRes = await safeFetchJson('/api/v1_5/responses')
+      const respRes = await safeFetchJson('/api/responses')
       if (respRes.ok && respRes.data && Array.isArray(respRes.data.responses)) {
         const allResponses = respRes.data.responses
 

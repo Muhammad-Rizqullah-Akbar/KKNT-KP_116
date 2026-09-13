@@ -198,7 +198,7 @@ export default function ResponsesDashboardPage() {
     if (!selectedResponse?.responseId) return
     setIsDeleting(true)
     try {
-      const res = await safeFetchJson(`/api/v1_5/responses?id=${selectedResponse.responseId}`, {
+      const res = await safeFetchJson(`/api/responses?id=${selectedResponse.responseId}`, {
         method: 'DELETE',
       })
       if (!res.ok) throw new Error(res.error || 'Gagal menghapus tanggapan.')
@@ -218,7 +218,7 @@ export default function ResponsesDashboardPage() {
     if (selectedResponseIds.length === 0) return
     setIsBulkDeleting(true)
     try {
-      const res = await safeFetchJson('/api/v1_5/responses', {
+      const res = await safeFetchJson('/api/responses', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ids: selectedResponseIds }),
@@ -258,7 +258,7 @@ export default function ResponsesDashboardPage() {
     setError(null)
     try {
       const [respRes, userRes] = await Promise.all([
-        safeFetchJson('/api/v1_5/responses?status=submitted'),
+        safeFetchJson('/api/responses?status=submitted'),
         safeFetchJson('/api/auth/users'),
       ])
 

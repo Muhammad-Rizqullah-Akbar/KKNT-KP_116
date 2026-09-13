@@ -39,7 +39,7 @@ export function Step3Review({
   React.useEffect(() => {
     async function loadArticles() {
       try {
-        const res = await fetch('/api/v1_5/articles/published')
+        const res = await fetch('/api/articles/published')
         const data = await res.json()
         if (data.success && Array.isArray(data.articles)) {
           const map: Record<string, any> = {}

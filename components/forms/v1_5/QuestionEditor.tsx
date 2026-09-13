@@ -321,7 +321,7 @@ export function QuestionEditor({ question, aspects = [], onUpdate }: QuestionEdi
                         try {
                           const formData = new FormData()
                           formData.append('file', file)
-                          const res = await fetch('/api/v1_5/upload', { method: 'POST', body: formData })
+                          const res = await fetch('/api/upload', { method: 'POST', body: formData })
                           const data = await res.json()
                           if (data.success && data.url) {
                             onUpdate({

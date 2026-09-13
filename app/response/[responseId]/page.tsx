@@ -27,7 +27,7 @@ export default function ResponseResultPage({ params }: ResponsePageProps) {
       setIsLoading(true)
       setError(null)
       try {
-        const res = await fetch(`/api/v1_5/public/responses/${responseId}`)
+        const res = await fetch(`/api/public/responses/${responseId}`)
         const data = await res.json()
         if (!res.ok || !data.success) {
           throw new Error(data.message || 'Hasil evaluasi tidak ditemukan.')

@@ -157,7 +157,7 @@ test.describe('Real Browser Golden Flow E2E Suite', () => {
     await page.waitForLoadState('domcontentloaded')
 
     // Create Form via POST API endpoint
-    const createFormRes = await page.request.post('http://localhost:3000/api/v1_5/forms', {
+    const createFormRes = await page.request.post('http://localhost:3000/api/forms', {
       data: {
         metadata: {
           title: `Kuesioner Browser E2E ${timestamp}`,
@@ -178,7 +178,7 @@ test.describe('Real Browser Golden Flow E2E Suite', () => {
     // STEP 6, 7, 8: PREVIEW & PUBLISH FORM
     // ---------------------------------------------------------
     console.log('[E2E Browser] Step 6-8: Publishing Form via Publish API')
-    const publishRes = await page.request.post(`http://localhost:3000/api/v1_5/forms/${createdFormId}/publish`, {
+    const publishRes = await page.request.post(`http://localhost:3000/api/forms/${createdFormId}/publish`, {
       data: { publish: true }
     })
     expect(publishRes.status()).toBe(200)
@@ -191,7 +191,7 @@ test.describe('Real Browser Golden Flow E2E Suite', () => {
     await page.goto('http://localhost:3000/dashboard/distributions')
     await page.waitForLoadState('domcontentloaded')
 
-    const createDistRes = await page.request.post('http://localhost:3000/api/v1_5/distributions', {
+    const createDistRes = await page.request.post('http://localhost:3000/api/distributions', {
       data: {
         formId: createdFormId,
         title: `Distribusi Browser E2E ${timestamp}`,
@@ -214,7 +214,7 @@ test.describe('Real Browser Golden Flow E2E Suite', () => {
 
     let publicFormPayload: any = null
     publicPage?.on('response', async (res) => {
-      if (res.url().includes(`/api/v1_5/public/distributions/${createdDistCode}`)) {
+      if (res.url().includes(`/api/public/distributions/${createdDistCode}`)) {
         publicFormPayload = await res.json().catch(() => null)
       }
     })
@@ -238,7 +238,7 @@ test.describe('Real Browser Golden Flow E2E Suite', () => {
     // ---------------------------------------------------------
     console.log('[E2E Browser] Step 12-15: Respondent session start and submit via API')
 
-    const sessionRes = await page.request.post('http://localhost:3000/api/v1_5/responses/start', {
+    const sessionRes = await page.request.post('http://localhost:3000/api/responses/start', {
       data: { distributionCode: createdDistCode }
     })
     expect(sessionRes.status()).toBe(200)
@@ -249,7 +249,7 @@ test.describe('Real Browser Golden Flow E2E Suite', () => {
 
     console.log(`[E2E Browser] Response Session Started: ${createdResponseId}`)
 
-    const subRes = await page.request.post(`http://localhost:3000/api/v1_5/responses/${createdResponseId}/submit`, {
+    const subRes = await page.request.post(`http://localhost:3000/api/responses/${createdResponseId}/submit`, {
       data: {
         submissionToken: subToken,
         answers: {},

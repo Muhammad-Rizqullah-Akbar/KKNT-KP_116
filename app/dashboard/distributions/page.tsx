@@ -88,8 +88,8 @@ export default function DistributionsDashboardPage() {
     setIsLoadingPermissionVersions(true)
     try {
       const [formRes, verRes] = await Promise.all([
-        safeFetchJson(`/api/v1_5/forms/${formId}`),
-        safeFetchJson(`/api/v1_5/forms/${formId}/versions`),
+        safeFetchJson(`/api/forms/${formId}`),
+        safeFetchJson(`/api/forms/${formId}/versions`),
       ])
 
       if (formRes.ok && formRes.data && formRes.data.form) {
@@ -114,7 +114,7 @@ export default function DistributionsDashboardPage() {
     if (!permissionFormId) return
     setIsSavingPermission(true)
     try {
-      const res = await safeFetchJson(`/api/v1_5/forms/${permissionFormId}/permission`, {
+      const res = await safeFetchJson(`/api/forms/${permissionFormId}/permission`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -150,7 +150,7 @@ export default function DistributionsDashboardPage() {
     setIsDetailOpen(true)
     setSelectedDetail(null)
     try {
-      const res = await safeFetchJson(`/api/v1_5/distributions/${distId}`)
+      const res = await safeFetchJson(`/api/distributions/${distId}`)
       if (res.ok && res.data && res.data.distribution) {
         setSelectedDetail({
           distribution: res.data.distribution,
@@ -193,7 +193,7 @@ export default function DistributionsDashboardPage() {
         pinnedVersionId: editVersionMode === 'pinned' ? editPinnedVersionId : '',
         expiresAt: editExpiresAt || '',
       }
-      const res = await safeFetchJson(`/api/v1_5/distributions/${editingDoc.distributionId}`, {
+      const res = await safeFetchJson(`/api/distributions/${editingDoc.distributionId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -218,7 +218,7 @@ export default function DistributionsDashboardPage() {
   const fetchFormVersions = async (formId: string) => {
     if (!formId) return
     try {
-      const res = await safeFetchJson(`/api/v1_5/forms/${formId}/versions`)
+      const res = await safeFetchJson(`/api/forms/${formId}/versions`)
       if (res.ok && res.data && Array.isArray(res.data.versions)) {
         setAvailableVersions(res.data.versions)
         if (res.data.versions.length > 0) {
@@ -241,8 +241,8 @@ export default function DistributionsDashboardPage() {
     setError(null)
     try {
       const [distRes, formRes] = await Promise.all([
-        safeFetchJson('/api/v1_5/distributions'),
-        safeFetchJson('/api/v1_5/forms?status=published'),
+        safeFetchJson('/api/distributions'),
+        safeFetchJson('/api/forms?status=published'),
       ])
 
       if (distRes.ok && distRes.data && Array.isArray(distRes.data.distributions)) {
@@ -339,7 +339,7 @@ export default function DistributionsDashboardPage() {
     try {
       const resolvedOwnerType = userRole === 'cadre' ? 'cadre' : userRole === 'partnership' ? 'partnership' : ownerType
 
-      const res = await fetch('/api/v1_5/distributions', {
+      const res = await fetch('/api/distributions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -375,7 +375,7 @@ export default function DistributionsDashboardPage() {
   // Toggle Pause/Resume Handler
   const handleTogglePause = async (distId: string) => {
     try {
-      const res = await safeFetchJson(`/api/v1_5/distributions/${distId}/pause`, {
+      const res = await safeFetchJson(`/api/distributions/${distId}/pause`, {
         method: 'POST',
       })
       if (res.ok && res.data) {
@@ -411,13 +411,13 @@ export default function DistributionsDashboardPage() {
         const idsToDelete = [...selectedDistIds]
         await Promise.all(
           idsToDelete.map((id) =>
-            safeFetchJson(`/api/v1_5/distributions/${id}`, { method: 'DELETE' })
+            safeFetchJson(`/api/distributions/${id}`, { method: 'DELETE' })
           )
         )
         showToast(`${idsToDelete.length} kode distribusi berhasil dihapus secara masal!`)
         setSelectedDistIds([])
       } else {
-        const res = await safeFetchJson(`/api/v1_5/distributions/${deleteTargetDoc.id}`, {
+        const res = await safeFetchJson(`/api/distributions/${deleteTargetDoc.id}`, {
           method: 'DELETE',
         })
         if (res.ok && res.data) {

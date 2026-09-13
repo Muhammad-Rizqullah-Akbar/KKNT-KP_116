@@ -10,8 +10,8 @@ export default function FormBuilderV15TestPage() {
   const [createdFormId, setCreatedFormId] = useState<string | null>(null)
 
   const handleSaveInitialDraft = async (state: BuilderState) => {
-    // If not yet created in Firestore, call POST /api/v1_5/forms
-    const res = await fetch('/api/v1_5/forms', {
+    // If not yet created in Firestore, call POST /api/forms
+    const res = await fetch('/api/forms', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ metadata: state.metadata }),
@@ -23,8 +23,8 @@ export default function FormBuilderV15TestPage() {
 
     const newFormId = data.form.formId
 
-    // Then save full initial state via PUT /api/v1_5/forms/[newFormId]
-    const updateRes = await fetch(`/api/v1_5/forms/${newFormId}`, {
+    // Then save full initial state via PUT /api/forms/[newFormId]
+    const updateRes = await fetch(`/api/forms/${newFormId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ state }),

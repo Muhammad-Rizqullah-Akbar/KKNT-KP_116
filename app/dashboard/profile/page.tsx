@@ -63,7 +63,7 @@ export default function UserProfileProgressPage() {
       }
 
       // 2. Fetch Distributions (strictly personal or partner organization)
-      const distRes = await safeFetchJson('/api/v1_5/distributions')
+      const distRes = await safeFetchJson('/api/distributions')
       let myDistCodes: string[] = []
       if (distRes.ok && distRes.data && Array.isArray(distRes.data.distributions)) {
         const myDists = distRes.data.distributions.filter(
@@ -77,7 +77,7 @@ export default function UserProfileProgressPage() {
       }
 
       // 3. Fetch Responses Count & Mitra Cadre Team Stats
-      const respRes = await safeFetchJson('/api/v1_5/responses')
+      const respRes = await safeFetchJson('/api/responses')
       const usersRes = await safeFetchJson('/api/auth/users')
 
       if (respRes.ok && respRes.data && Array.isArray(respRes.data.responses)) {

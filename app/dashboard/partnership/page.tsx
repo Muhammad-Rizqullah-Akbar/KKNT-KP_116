@@ -105,8 +105,8 @@ export default function PartnershipDomainPage() {
     try {
       const [usersRes, distRes, respRes, articlesData] = await Promise.all([
         safeFetchJson('/api/auth/users'),
-        safeFetchJson('/api/v1_5/distributions'),
-        safeFetchJson('/api/v1_5/responses'),
+        safeFetchJson('/api/distributions'),
+        safeFetchJson('/api/responses'),
         getArticles().catch(() => []),
       ])
 

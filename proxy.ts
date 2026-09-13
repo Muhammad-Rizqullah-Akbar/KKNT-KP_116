@@ -94,7 +94,7 @@ const SECURITY_HEADERS = {
 const SENSITIVE_PATHS = [
   '/api/auth/login',
   '/api/auth/register',
-  '/api/v1_5/responses/start',
+  '/api/responses/start',
 ]
 
 /**
