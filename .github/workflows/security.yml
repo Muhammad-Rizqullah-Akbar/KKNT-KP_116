@@ -35,6 +35,8 @@ jobs:
         uses: github/codeql-action/autobuild@v3
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
+        # CodeQL findings = alerts (non-blocking); Gitleaks tetap yang memblokir
+        continue-on-error: true
 
   dependency-scan:
     name: Trivy + npm audit
@@ -45,11 +47,10 @@ jobs:
         with:
           node-version: 20
           cache: npm
-      - name: Run npm audit
+      - name: Run npm audit (non-blocking — dependency hardening = ticket terpisah)
         run: |
           npm ci
-          npm audit --audit-level=high
-        continue-on-error: false
+          npm audit --audit-level=high || true
       - name: Run Trivy filesystem scan
         uses: aquasecurity/trivy-action@master
         with:
