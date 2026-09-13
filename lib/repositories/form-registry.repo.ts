@@ -1,6 +1,6 @@
 import { adminFirestore } from '@/lib/infra/firebase-admin'
 
-const REGISTRY_COLLECTION = 'form_registry_metadata'
+const REGISTRY_COLLECTION = 'form_registry'
 
 /**
  * Fetch dynamic form categories strictly from Firestore database.

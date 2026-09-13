@@ -1,7 +1,7 @@
 import { safeGetDoc, safeGetCollectionDocs, safeSetDoc } from './safe-firestore'
 import type { FormAccessDoc } from '@/lib/domain/distributions/distribution-types'
 
-const FORM_ACCESS_COLLECTION = 'formAccess'
+const FORM_ACCESS_COLLECTION = 'form_access'
 
 /**
  * Grants form access to a Cadre or Partnership subject.
