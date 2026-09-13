@@ -27,20 +27,6 @@ export const ROLE_OPTIONS: { id: UserRole; label: string; icon: IconName; colorC
     desc: 'Akses penuh tanpa batas seluruh fitur, manajemen user, dan pengaturan sistem.',
   },
   {
-    id: 'super_admin',
-    label: 'Admin Systems',
-    icon: 'shieldCheck',
-    colorClass: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/30',
-    desc: 'Akses membuat kuesioner V1.5, Form Builder, distribusi kode, dan rekap nasional.',
-  },
-  {
-    id: 'super_admin',
-    label: 'Internal BPOM',
-    icon: 'award',
-    colorClass: 'text-blue-400 bg-blue-500/10 border-blue-500/30',
-    desc: 'Evaluator & Pengawas Resmi BPOM untuk verifikasi instrumen & laporan evaluasi.',
-  },
-  {
     id: 'partnership',
     label: 'Mitra / Partnership',
     icon: 'briefcase',
@@ -97,18 +83,14 @@ export function filterAndSortUsers(users: User[], searchTerm: string, filterRole
     return matched
   }
 
-  // 2. Group into buckets
+  // 2. Group into buckets (role merge: admin + internal_bpom → super_admin)
   const superAdmins = matched.filter((u) => u.role === 'super_admin')
-  const admins = matched.filter((u) => u.role === 'super_admin')
-  const internalBpoms = matched.filter((u) => u.role === 'super_admin')
   const partnerships = matched.filter((u) => u.role === 'partnership')
   const cadres = matched.filter((u) => u.role === 'cadre' || !u.role)
 
   const attachedCadreUids = new Set<string>()
   const sortedResult: User[] = [
     ...superAdmins,
-    ...admins,
-    ...internalBpoms,
   ]
 
   // 3. Place each Partnership followed immediately by its owned Cadres

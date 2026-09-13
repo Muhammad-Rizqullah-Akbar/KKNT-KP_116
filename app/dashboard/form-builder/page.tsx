@@ -14,7 +14,6 @@ import { PreviewModal } from '@/features/form-builder/components/preview/Preview
 import { FormSettingsModal } from '@/features/form-builder/components/shared/FormSettingsModal'
 import { Icon } from '@/components/ui/Icons'
 import { useFormBuilder } from './use-form-builder'
-import GroupModal from './group-modal'
 
 export default function FormBuilderPage() {
   const { userData, userRole, loading } = useAuth()
@@ -101,48 +100,6 @@ export default function FormBuilderPage() {
             </div>
           </div>
         )}
-
-        {/* Group Selector */}
-        <div className="mb-4 p-4 rounded-xl bg-[#080812] border border-white/[0.05]">
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="flex items-center gap-2">
-              <Icon name="folder" className="w-4 h-4 text-cyan-400" />
-              <span className="text-sm text-white/60">Group Formulir:</span>
-            </div>
-            <select
-              value={fb.selectedGroup}
-              onChange={(e) => {
-                const value = e.target.value
-                if (value === 'new') {
-                  fb.setIsNewGroup(true)
-                  fb.setIsGroupModalOpen(true)
-                } else {
-                  fb.setIsNewGroup(false)
-                  fb.setSelectedGroup(value)
-                }
-              }}
-              className="px-4 py-2 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-white/70 focus:outline-none focus:border-cyan-400/40 transition-all cursor-pointer min-w-[200px]"
-            >
-              <option value="" className="bg-[#080812]">— Mandiri (Tanpa Group) —</option>
-              {fb.groups.map((group) => (
-                <option key={group.id} value={group.id} className="bg-[#080812]">
-                  {group.title} ({group.formCount || 0} form)
-                </option>
-              ))}
-              <option value="new" className="bg-[#080812] text-cyan-400">+ Buat Group Baru</option>
-            </select>
-            {fb.selectedGroup && !fb.isNewGroup && (
-              <span className="text-xs text-emerald-400/70 bg-emerald-500/10 px-2 py-1 rounded-full">
-                ✓ Tergabung dalam group
-              </span>
-            )}
-            {fb.isNewGroup && (
-              <span className="text-xs text-cyan-400/70 bg-cyan-500/10 px-2 py-1 rounded-full">
-                + Group baru akan dibuat saat save
-              </span>
-            )}
-          </div>
-        </div>
 
         {/* Canvas */}
         <div
@@ -234,27 +191,6 @@ export default function FormBuilderPage() {
         onAutoBalance={fb.handleAutoBalance}
         onStageScoringToggle={fb.handleStageScoringToggle}
       />
-
-      {/* Group Creation Modal */}
-      {fb.isGroupModalOpen && (
-        <GroupModal
-          newGroupData={fb.newGroupData}
-          setNewGroupData={fb.setNewGroupData}
-          onClose={() => {
-            fb.resetGroupForm()
-            fb.setIsGroupModalOpen(false)
-          }}
-          onConfirm={() => {
-            if (!fb.newGroupData.title.trim() || !fb.newGroupData.target.trim()) {
-              alert('Nama group dan target harus diisi!')
-              return
-            }
-            fb.setIsNewGroup(true)
-            fb.setSelectedGroup('new')
-            fb.setIsGroupModalOpen(false)
-          }}
-        />
-      )}
     </div>
   )
 }

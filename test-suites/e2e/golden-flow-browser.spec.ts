@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { initializeApp, getApps, getApp, cert } from 'firebase-admin/app'
+import { initializeApp, getApps, getApp } from 'firebase-admin/app'
 import { getAuth } from 'firebase-admin/auth'
 import { getFirestore } from 'firebase-admin/firestore'
 import fs from 'node:fs'
@@ -36,16 +36,15 @@ function getAdmin() {
     const app = getApp()
     return { adminAuth: getAuth(app), adminFirestore: getFirestore(app) }
   }
-  const projectId = process.env.FIREBASE_PROJECT_ID?.trim() || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID?.trim() || 'desa-sehat-2026'
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL?.trim()
-  let privateKey = process.env.FIREBASE_PRIVATE_KEY?.trim()
-  if (privateKey) {
-    if (privateKey.startsWith('"') && privateKey.endsWith('"')) privateKey = privateKey.slice(1, -1)
-    privateKey = privateKey.replace(/\\n/g, '\n')
-  }
-  const app = initializeApp({ credential: cert({ projectId, clientEmail, privateKey }) })
+  // Emulator mode: no credentials needed, point to localhost
+  const projectId = process.env.FIREBASE_PROJECT_ID?.trim() || 'desa-sehat-2026'
+  const app = initializeApp({ projectId })
   const db = getFirestore(app)
-  try { db.settings({ ignoreUndefinedProperties: true }) } catch {}
+  if (process.env.FIRESTORE_EMULATOR_HOST || process.env.FIREBASE_AUTH_EMULATOR_HOST) {
+    try {
+      db.settings({ host: 'localhost:8090', ssl: false, ignoreUndefinedProperties: true })
+    } catch {}
+  }
   return { adminAuth: getAuth(app), adminFirestore: db }
 }
 

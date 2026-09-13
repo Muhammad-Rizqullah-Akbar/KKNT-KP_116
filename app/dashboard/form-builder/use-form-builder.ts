@@ -16,10 +16,7 @@ import {
   createForm,
   updateForm,
   getFormById,
-  getFormGroups,
-  createFormGroup,
   type FormData,
-  type FormGroup,
 } from '@/lib/repositories/forms.repo'
 import {
   generateId,
@@ -30,13 +27,6 @@ import {
   ensureStageScoring,
 } from './form-builder-utils'
 import { saveForm } from './form-builder-save'
-
-export type NewGroupData = {
-  title: string
-  description: string
-  target: string
-  color: string
-}
 
 export function useFormBuilder() {
   const { user } = useAuth()
@@ -68,31 +58,6 @@ export function useFormBuilder() {
   // Penilaian
   const [scoring, setScoring] = useState<FormScoring>(DEFAULT_SCORING)
 
-  // ============ GROUPS ============
-  const [groups, setGroups] = useState<FormGroup[]>([])
-  const [selectedGroup, setSelectedGroup] = useState<string>('')
-  const [isNewGroup, setIsNewGroup] = useState(false)
-  const [newGroupData, setNewGroupData] = useState<NewGroupData>({
-    title: '',
-    description: '',
-    target: '',
-    color: 'cyan',
-  })
-  const [isGroupModalOpen, setIsGroupModalOpen] = useState(false)
-
-  // ============ LOAD GROUPS ============
-  useEffect(() => {
-    const loadGroups = async () => {
-      try {
-        const groupsData = await getFormGroups()
-        setGroups(groupsData)
-      } catch (error) {
-        console.error('Error loading groups:', error)
-      }
-    }
-    loadGroups()
-  }, [])
-
   // ============ LOAD FORM BY ID ============
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search)
@@ -123,10 +88,6 @@ export function useFormBuilder() {
             }
 
             setElements(convertQuestionsToElements(form))
-
-            if (form.groupId) {
-              setSelectedGroup(form.groupId)
-            }
           }
         } catch (error) {
           console.error('Error loading form:', error)
@@ -388,28 +349,11 @@ export function useFormBuilder() {
     setScoring(newScoring)
   }, [])
 
-  // ============ RESET GROUP FORM ============
-  const resetGroupForm = useCallback(() => {
-    setNewGroupData({
-      title: '',
-      description: '',
-      target: '',
-      color: 'cyan',
-    })
-    setIsNewGroup(false)
-    setSelectedGroup('')
-    setIsGroupModalOpen(false)
-  }, [])
-
   // ============ SAVE HANDLER ============
   const handleSave = useCallback(async () => {
     await saveForm({
       formTitle,
       elements,
-      selectedGroup,
-      isNewGroup,
-      newGroupData,
-      groups,
       formId,
       userUid: user?.uid || '',
       generatedCode,
@@ -418,14 +362,10 @@ export function useFormBuilder() {
       scoring,
       setIsSaving,
       setFormId,
-      setGroups,
-      setSelectedGroup,
-      setIsNewGroup,
-      resetGroupForm,
       setGeneratedCode,
       showToast,
     })
-  }, [formTitle, elements, selectedGroup, isNewGroup, newGroupData, groups, formId, user, generatedCode, validation, stages, scoring, resetGroupForm, showToast])
+  }, [formTitle, elements, formId, user, generatedCode, validation, stages, scoring, showToast])
 
   const selectedElement = elements.find(el => el.id === selectedId) || null
 
@@ -455,15 +395,6 @@ export function useFormBuilder() {
     stageMode,
     setStageMode,
     scoring,
-    groups,
-    selectedGroup,
-    setSelectedGroup,
-    isNewGroup,
-    setIsNewGroup,
-    newGroupData,
-    setNewGroupData,
-    isGroupModalOpen,
-    setIsGroupModalOpen,
     selectedElement,
     handleAddElement,
     handleDropFromToolbar,
@@ -483,6 +414,5 @@ export function useFormBuilder() {
     handleScoringChange,
     handleAutoBalance,
     handleSave,
-    resetGroupForm,
   }
 }
