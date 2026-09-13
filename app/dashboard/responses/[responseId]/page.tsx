@@ -10,6 +10,7 @@ import type { ResponseDoc } from '@/lib/domain/responses/response-types'
 import { isBiodataAspect } from '@/lib/domain/scoring/scoring-engine'
 import { extractRespondentName, extractRespondentEmail } from '@/lib/domain/responses/respondent-utils'
 import { queryKeys } from '@/lib/query-keys'
+import { resolveAnswerDisplay } from './answer-display'
 
 interface PageProps {
   params: Promise<{ responseId: string }>
@@ -92,67 +93,6 @@ export default function ResponseDetailPage({ params }: PageProps) {
 
   const { answers, result } = responseDoc
   const answerEntries = Object.entries(answers || {})
-
-  // Helper to map raw question ID & option ID to human-readable text
-  const resolveQuestionMeta = (key: string) => {
-    if (!formDoc?.questions) return { prompt: key, options: null }
-    const strKey = String(key).trim()
-    const cleanKey = strKey.toLowerCase().replace(/[^a-z0-9]/g, '')
-    const q = formDoc.questions.find(
-      (item: any) =>
-        item.questionId === strKey ||
-        item.id === strKey ||
-        item.prompt === strKey ||
-        item.title === strKey ||
-        item.question === strKey ||
-        item.label === strKey ||
-        (cleanKey && cleanKey === (item.prompt || item.title || item.question || item.label || '').toLowerCase().replace(/[^a-z0-9]/g, ''))
-    )
-    if (q) {
-      return {
-        prompt: q.prompt || q.title || q.question || q.label || key,
-        options: q.options || q.presentation?.options || q.config?.options || null,
-      }
-    }
-    return { prompt: key, options: null }
-  }
-
-  const resolveAnswerDisplay = (key: string, val: any) => {
-    const meta = resolveQuestionMeta(key)
-    let displayVal = val
-    if (meta.options && Array.isArray(meta.options)) {
-      if (typeof val === 'string' || typeof val === 'number') {
-        const strVal = String(val).trim()
-        const cleanVal = strVal.toLowerCase().replace(/[^a-z0-9]/g, '')
-        const opt = meta.options.find((o: any) => {
-          if (typeof o === 'string') return o === strVal || (cleanVal && o.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanVal)
-          if (o && typeof o === 'object') {
-            const oId = String(o.optionId || o.id || o.value || o.val || '')
-            const oLbl = String(o.label || o.text || o.title || '')
-            return oId === strVal || oLbl === strVal || (cleanVal && (oId.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanVal || oLbl.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanVal))
-          }
-          return false
-        })
-        if (opt) displayVal = typeof opt === 'object' ? (opt.label || opt.text || opt.title || val) : opt
-      } else if (Array.isArray(val)) {
-        displayVal = val.map((vItem) => {
-          const strVal = String(vItem).trim()
-          const cleanVal = strVal.toLowerCase().replace(/[^a-z0-9]/g, '')
-          const opt = meta.options.find((o: any) => {
-            if (typeof o === 'string') return o === strVal || (cleanVal && o.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanVal)
-            if (o && typeof o === 'object') {
-              const oId = String(o.optionId || o.id || o.value || o.val || '')
-              const oLbl = String(o.label || o.text || o.title || '')
-              return oId === strVal || oLbl === strVal || (cleanVal && (oId.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanVal || oLbl.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanVal))
-            }
-            return false
-          })
-          return opt ? (typeof opt === 'object' ? (opt.label || opt.text || vItem) : opt) : vItem
-        }).join(', ')
-      }
-    }
-    return { prompt: meta.prompt, displayVal }
-  }
 
   // Low score indicators
   const lowScoreQuestions = result?.questions?.filter((q: any) => q.includedInTotal && q.percentage < 60) || []
@@ -456,7 +396,7 @@ export default function ResponseDetailPage({ params }: PageProps) {
           ) : (
             <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1 print:max-h-none print:overflow-visible">
               {answerEntries.map(([key, val], idx) => {
-                const { prompt, displayVal } = resolveAnswerDisplay(key, val)
+                const { prompt, displayVal } = resolveAnswerDisplay(formDoc, key, val)
                 const isTableObj = typeof displayVal === 'object' && displayVal !== null && !Array.isArray(displayVal)
                 const isArrayVal = Array.isArray(displayVal)
 
