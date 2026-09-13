@@ -22,6 +22,8 @@ import DeleteConfirmModal from './delete-confirm-modal'
 import PermissionModal from './permission-modal'
 import ToastNotification from './toast-notification'
 import type { DistributionDetail, VersionItem, DeleteTarget } from './types'
+import { usePermissionModal } from './use-permission-modal'
+import { useDistributionSelection } from './use-distribution-selection'
 
 export default function DistributionsDashboardPage() {
   const router = useRouter()
@@ -99,24 +101,27 @@ export default function DistributionsDashboardPage() {
   const [editPinnedVersionId, setEditPinnedVersionId] = useState('')
   const [editExpiresAt, setEditExpiresAt] = useState('')
 
-  // Checkbox Multi-Selection State for Bulk Delete
-  const [selectedDistIds, setSelectedDistIds] = useState<string[]>([])
-
-  // Custom Delete Confirmation Modal State
-  const [deleteTargetDoc, setDeleteTargetDoc] = useState<DeleteTarget | null>(null)
-  const [isExecutingDelete, setIsExecutingDelete] = useState(false)
-
-  // Distribution Access Permission & Active Version Snapshot Modal State
-  const [isPermissionModalOpen, setIsPermissionModalOpen] = useState(false)
-  const [permissionFormId, setPermissionFormId] = useState('')
-  const [permissionAllowCadre, setPermissionAllowCadre] = useState(true)
-  const [permissionVersions, setPermissionVersions] = useState<VersionItem[]>([])
-  const [permissionActiveVersionId, setPermissionActiveVersionId] = useState('')
-  const [isSavingPermission, setIsSavingPermission] = useState(false)
-  const [isLoadingPermissionVersions, setIsLoadingPermissionVersions] = useState(false)
-
   // Versions State
   const [availableVersions, setAvailableVersions] = useState<VersionItem[]>([])
+
+  // Permission Modal state & logic (extracted hook)
+  const permissionModal = usePermissionModal({ publishedForms, toast, loadData })
+  const {
+    isPermissionModalOpen,
+    setIsPermissionModalOpen,
+    setPermissionFormId,
+    permissionFormId,
+    permissionAllowCadre,
+    setPermissionAllowCadre,
+    permissionVersions,
+    permissionActiveVersionId,
+    setPermissionActiveVersionId,
+    isLoadingPermissionVersions,
+    isSavingPermission,
+    openPermissionModal,
+    loadPermissionFormDetails,
+    handleSavePermission,
+  } = permissionModal
 
   const fetchFormVersions = async (formId: string) => {
     if (!formId) return
@@ -130,69 +135,6 @@ export default function DistributionsDashboardPage() {
       }
     } catch (e) {
       console.warn('Failed to fetch versions for form:', formId)
-    }
-  }
-
-  const openPermissionModal = async (formIdToSelect?: string) => {
-    setIsPermissionModalOpen(true)
-    const targetId = formIdToSelect || (publishedForms.length > 0 ? publishedForms[0].formId : '')
-    setPermissionFormId(targetId)
-    if (targetId) {
-      await loadPermissionFormDetails(targetId)
-    }
-  }
-
-  const loadPermissionFormDetails = async (formId: string) => {
-    if (!formId) return
-    setIsLoadingPermissionVersions(true)
-    try {
-      const [formRes, verRes] = await Promise.all([
-        safeFetchJson(`/api/forms/${formId}`),
-        safeFetchJson(`/api/forms/${formId}/versions`),
-      ])
-
-      if (formRes.ok && formRes.data && formRes.data.form) {
-        const formDetail = formRes.data.form
-        setPermissionAllowCadre(formDetail.allowCadreDistribution !== false)
-        setPermissionActiveVersionId(formDetail.activeVersionId || '')
-      }
-
-      if (verRes.ok && verRes.data && Array.isArray(verRes.data.versions)) {
-        setPermissionVersions(verRes.data.versions)
-      } else {
-        setPermissionVersions([])
-      }
-    } catch (err) {
-      toast.show('Gagal memuat detail versi formulir.')
-    } finally {
-      setIsLoadingPermissionVersions(false)
-    }
-  }
-
-  const handleSavePermission = async () => {
-    if (!permissionFormId) return
-    setIsSavingPermission(true)
-    try {
-      const res = await safeFetchJson(`/api/forms/${permissionFormId}/permission`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          allowCadreDistribution: permissionAllowCadre,
-          activeVersionId: permissionActiveVersionId,
-        }),
-      })
-
-      if (res.ok && res.data?.success) {
-        toast.show('Izin & versi aktif distribusi berhasil diperbarui!')
-        setIsPermissionModalOpen(false)
-        loadData()
-      } else {
-        toast.show(res.error || 'Gagal memperbarui izin & versi.')
-      }
-    } catch (err) {
-      toast.show('Gagal menyimpan ke server.')
-    } finally {
-      setIsSavingPermission(false)
     }
   }
 
@@ -310,20 +252,20 @@ export default function DistributionsDashboardPage() {
     return { total, active, paused, expired }
   }, [distributions])
 
-  // Checkbox Multi-Selection Toggles
-  const toggleSelectDist = (distId: string) => {
-    setSelectedDistIds((prev) =>
-      prev.includes(distId) ? prev.filter((id) => id !== distId) : [...prev, distId]
-    )
-  }
-
-  const toggleSelectAll = () => {
-    if (selectedDistIds.length === filteredDistributions.length) {
-      setSelectedDistIds([])
-    } else {
-      setSelectedDistIds(filteredDistributions.map((distribution) => distribution.distributionId))
-    }
-  }
+  // Checkbox Multi-Selection & Delete handlers (extracted hook)
+  const selection = useDistributionSelection({ filteredDistributions, toast, loadData })
+  const {
+    selectedDistIds,
+    setSelectedDistIds,
+    deleteTargetDoc,
+    setDeleteTargetDoc,
+    isExecutingDelete,
+    toggleSelectDist,
+    toggleSelectAll,
+    handleDeleteClick,
+    handleBulkDeleteClick,
+    confirmDeleteDistribution,
+  } = selection
 
   // Create Distribution Handler
   const handleCreateDistribution = async (e: React.FormEvent) => {
@@ -384,53 +326,6 @@ export default function DistributionsDashboardPage() {
       }
     } catch (err: any) {
       toast.show(`Error: ${err.message}`)
-    }
-  }
-
-  // Delete Distribution Handlers
-  const handleDeleteClick = (distId: string, code: string, title: string) => {
-    setDeleteTargetDoc({ id: distId, code, title })
-  }
-
-  const handleBulkDeleteClick = () => {
-    if (selectedDistIds.length === 0) return
-    setDeleteTargetDoc({
-      id: 'bulk',
-      code: `${selectedDistIds.length} Kode Distribusi`,
-      title: `${selectedDistIds.length} item yang dipilih`,
-    })
-  }
-
-  const confirmDeleteDistribution = async () => {
-    if (!deleteTargetDoc) return
-    setIsExecutingDelete(true)
-    try {
-      if (deleteTargetDoc.id === 'bulk') {
-        const idsToDelete = [...selectedDistIds]
-        await Promise.all(
-          idsToDelete.map((id) =>
-            safeFetchJson(`/api/distributions/${id}`, { method: 'DELETE' })
-          )
-        )
-        toast.show(`${idsToDelete.length} kode distribusi berhasil dihapus secara masal!`)
-        setSelectedDistIds([])
-      } else {
-        const res = await safeFetchJson(`/api/distributions/${deleteTargetDoc.id}`, {
-          method: 'DELETE',
-        })
-        if (res.ok && res.data) {
-          toast.show(`Kode distribusi "${deleteTargetDoc.code}" berhasil dihapus.`)
-          setSelectedDistIds((prev) => prev.filter((id) => id !== deleteTargetDoc.id))
-        } else {
-          toast.show(res.error || 'Gagal menghapus kode distribusi.')
-        }
-      }
-      setDeleteTargetDoc(null)
-      loadData()
-    } catch (err: any) {
-      toast.show(`Error: ${err.message}`)
-    } finally {
-      setIsExecutingDelete(false)
     }
   }
 
