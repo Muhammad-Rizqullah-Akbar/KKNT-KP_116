@@ -3,6 +3,9 @@
 import { Dispatch, SetStateAction } from 'react'
 import { Icon } from '@/components/ui/Icons'
 import type { Article, ArticleFormData, AvailableForm } from './articles-types'
+import ArticlesFormModalInfoTab from './articles-form-modal-info-tab'
+import ArticlesFormModalBlocksTab from './articles-form-modal-blocks-tab'
+import ArticlesFormModalGalleryTab from './articles-form-modal-gallery-tab'
 
 type ArticlesFormModalProps = {
   isOpen: boolean
@@ -86,7 +89,7 @@ export default function ArticlesFormModal({
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-8 pb-8 px-4 overflow-y-auto" style={{ backgroundColor: 'rgba(0, 0, 0, 0.85)' }} onClick={handleAttemptCloseModal}>
       <div className="relative w-full max-w-4xl bg-[#0e0e1a] border border-white/[0.1] rounded-3xl shadow-2xl animate-slideUp my-auto overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
-        
+
         {/* Modal Header & Title */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.08] bg-slate-950/60">
           <div className="flex items-center gap-3">
@@ -150,424 +153,47 @@ export default function ArticlesFormModal({
 
         {/* Modal Body Container */}
         <div className="p-6 space-y-6 max-h-[65vh] overflow-y-auto custom-scrollbar">
-
-          {/* TAB 1: INFO UTAMA & BANNER */}
           {modalTab === 'info' && (
-            <div className="space-y-5 animate-in fade-in duration-200">
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-white/70 uppercase tracking-wider">Judul Artikel <span className="text-rose-400">*</span></label>
-                <input
-                  type="text"
-                  value={formData.title}
-                  onChange={e => setFormData({...formData, title: e.target.value})}
-                  className="w-full px-4 py-3 rounded-xl bg-white/[0.03] border border-white/[0.08] text-white focus:outline-none focus:border-cyan-400 text-sm font-semibold"
-                  placeholder="Masukkan judul artikel edukasi..."
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-white/70 uppercase tracking-wider">Subtitle / Ringkasan Excerpt</label>
-                <textarea
-                  value={formData.excerpt}
-                  onChange={e => setFormData({...formData, excerpt: e.target.value})}
-                  rows={2}
-                  placeholder="Tulis ringkasan singkat artikel yang akan tampil pada kartu publik..."
-                  className="w-full px-4 py-3 rounded-xl bg-white/[0.03] border border-white/[0.08] text-white focus:outline-none focus:border-cyan-400 text-xs leading-relaxed resize-none"
-                />
-              </div>
-
-              {/* FEATURED IMAGE UPLOADER */}
-              <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/[0.06] space-y-3">
-                <label className="text-xs font-bold text-cyan-300 uppercase tracking-wider flex items-center justify-between">
-                  <span>Foto Utama / Banner Artikel</span>
-                  <span className="text-[10px] text-white/40 font-normal">Resolusi tinggi terkompresi otomatis</span>
-                </label>
-
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                  <input 
-                    type="text" 
-                    value={formData.featuredImage} 
-                    onChange={e => setFormData({...formData, featuredImage: e.target.value})} 
-                    placeholder="URL foto / klik tombol upload di kanan..." 
-                    className="flex-1 px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.08] text-white text-xs focus:outline-none focus:border-cyan-400" 
-                  />
-
-                  <div className="flex items-center gap-2 shrink-0">
-                    {/* Direct Upload Button */}
-                    <label className="px-3.5 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold cursor-pointer transition-all flex items-center gap-1.5 shadow-md">
-                      <Icon name="uploadCloud" className="w-4 h-4" />
-                      <span>{uploadingImage ? 'Mengunggah...' : 'Upload Baru'}</span>
-                      <input 
-                        type="file" 
-                        accept="image/*" 
-                        className="hidden" 
-                        disabled={uploadingImage}
-                        onChange={async (e) => {
-                          const file = e.target.files?.[0]
-                          if (file) {
-                            const url = await handleFileUpload(file)
-                            if (url) setFormData(prev => ({ ...prev, featuredImage: url }))
-                          }
-                        }} 
-                      />
-                    </label>
-
-                    {/* Select from Storage */}
-                    <button
-                      type="button"
-                      onClick={() => openMediaLibrary((url) => setFormData(prev => ({ ...prev, featuredImage: url })))}
-                      className="px-3.5 py-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.1] text-xs font-semibold text-white/80 transition-all flex items-center gap-1.5"
-                    >
-                      <Icon name="image" className="w-4 h-4 text-cyan-400" />
-                      <span>Pilih dari Storage</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Banner Preview */}
-                {formData.featuredImage && (
-                  <div className="relative h-40 w-full rounded-xl overflow-hidden border border-white/10 bg-slate-950 mt-2">
-                    <img src={formData.featuredImage} alt="Banner Preview" className="w-full h-full object-cover" />
-                    <span className="absolute bottom-2 left-2 text-[10px] bg-black/60 px-2 py-0.5 rounded text-cyan-300 font-mono">Preview Banner Utama</span>
-                  </div>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-xs font-bold text-white/70 uppercase tracking-wider block">Kategori</label>
-                    <button
-                      type="button"
-                      onClick={() => setIsAddCategoryOpen(!isAddCategoryOpen)}
-                      className="text-[10px] text-cyan-400 hover:text-cyan-300 font-bold font-mono flex items-center gap-1"
-                    >
-                      <Icon name="plus" className="w-3 h-3" />
-                      <span>+ Kategori Baru</span>
-                    </button>
-                  </div>
-
-                  {isAddCategoryOpen && (
-                    <div className="flex items-center gap-1.5 mb-2 animate-fadeIn">
-                      <input
-                        type="text"
-                        value={newCatName}
-                        onChange={(e) => setNewCatName(e.target.value)}
-                        placeholder="Nama Kategori Baru..."
-                        className="flex-1 px-3 py-1.5 rounded-xl bg-slate-950 border border-cyan-500/40 text-cyan-200 text-xs focus:outline-none font-mono"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleCreateNewCategory}
-                        className="px-3 py-1.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs font-mono"
-                      >
-                        Simpan
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setIsAddCategoryOpen(false)}
-                        className="p-1.5 text-slate-400 hover:text-white"
-                      >
-                        <Icon name="x" className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  )}
-
-                  <select
-                    value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.08] text-xs text-white/80 focus:outline-none focus:border-cyan-400 cursor-pointer"
-                  >
-                    {dbCategories.map((catName) => (
-                      <option key={catName} value={catName} className="bg-[#0e0e1a]">
-                        {catName}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold text-white/70 uppercase tracking-wider block mb-1.5">Status Publikasi</label>
-                  <select
-                    value={formData.status}
-                    onChange={e => setFormData({...formData, status: e.target.value as 'Draft'|'Published'})}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.08] text-xs text-white/80 focus:outline-none focus:border-cyan-400"
-                  >
-                    <option value="Draft" className="bg-[#0e0e1a]">Draft (Belum Publik)</option>
-                    <option value="Published" className="bg-[#0e0e1a]">Published (Tampil Publik)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold text-white/70 uppercase tracking-wider block mb-1.5">Waktu Baca (Menit)</label>
-                  <input
-                    type="number"
-                    value={formData.readTime}
-                    onChange={e => setFormData({...formData, readTime: parseInt(e.target.value) || 1})}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.08] text-xs text-white focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-bold text-white/70 uppercase tracking-wider block mb-1.5">Nama Penulis</label>
-                  <input
-                    type="text"
-                    value={formData.author}
-                    onChange={e => setFormData({...formData, author: e.target.value})}
-                    placeholder="Contoh: Dr. Ir. Ahmad Sudirman..."
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.08] text-xs text-white focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold text-white/70 uppercase tracking-wider block mb-1.5">Tags (Pisahkan Koma)</label>
-                  <input
-                    type="text"
-                    value={formData.tags}
-                    onChange={e => setFormData({...formData, tags: e.target.value})}
-                    placeholder="Contoh: #FoodSafety, #BPOM, #KKN"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.08] text-xs text-white focus:outline-none"
-                  />
-                </div>
-              </div>
-            </div>
+            <ArticlesFormModalInfoTab
+              formData={formData}
+              setFormData={setFormData}
+              uploadingImage={uploadingImage}
+              handleFileUpload={handleFileUpload}
+              openMediaLibrary={openMediaLibrary}
+              dbCategories={dbCategories}
+              isAddCategoryOpen={isAddCategoryOpen}
+              setIsAddCategoryOpen={setIsAddCategoryOpen}
+              newCatName={newCatName}
+              setNewCatName={setNewCatName}
+              handleCreateNewCategory={handleCreateNewCategory}
+            />
           )}
 
-          {/* TAB 2: EDITOR BLOK KONTEN */}
           {modalTab === 'blocks' && (
-            <div className="space-y-4 animate-in fade-in duration-200">
-              {/* Quick Add Block Toolbar */}
-              <div className="p-3 rounded-2xl bg-slate-950 border border-white/[0.08] flex items-center gap-2 flex-wrap justify-between">
-                <span className="text-xs font-bold text-cyan-300">Tambah Elemen Konten:</span>
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <button type="button" onClick={() => addBlock('p')} className="px-3 py-1.5 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] text-xs text-white font-medium flex items-center gap-1">
-                    + Paragraf
-                  </button>
-                  <button type="button" onClick={() => addBlock('h2')} className="px-3 py-1.5 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 text-xs text-cyan-300 font-bold flex items-center gap-1">
-                    + Sub-Judul H2
-                  </button>
-                  <button type="button" onClick={() => addBlock('quote')} className="px-3 py-1.5 rounded-lg bg-violet-500/10 hover:bg-violet-500/20 text-xs text-violet-300 font-medium flex items-center gap-1">
-                    + Kutipan Quote
-                  </button>
-                  <button type="button" onClick={() => addBlock('image')} className="px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-xs text-amber-300 font-bold flex items-center gap-1">
-                    + Gambar Infografis
-                  </button>
-                  <button type="button" onClick={() => addBlock('list')} className="px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-xs text-emerald-300 font-medium flex items-center gap-1">
-                    + List Poin
-                  </button>
-                </div>
-              </div>
-
-              {/* List of Blocks */}
-              <div className="space-y-3">
-                {formData.blocks.map((block, idx) => (
-                  <div key={block.id} className="p-4 rounded-2xl bg-white/[0.02] border border-white/[0.06] space-y-3 relative group">
-                    <div className="flex items-center justify-between border-b border-white/[0.04] pb-2">
-                      <span className="text-xs font-bold font-mono text-cyan-400 uppercase">
-                        #{idx + 1} Blok: {block.type.toUpperCase()}
-                      </span>
-
-                      <div className="flex items-center gap-1">
-                        <button type="button" onClick={() => moveBlock(block.id, 'up')} disabled={idx === 0} className="p-1 text-white/40 hover:text-white disabled:opacity-20">
-                          <Icon name="chevronUp" className="w-4 h-4" />
-                        </button>
-                        <button type="button" onClick={() => moveBlock(block.id, 'down')} disabled={idx === formData.blocks.length - 1} className="p-1 text-white/40 hover:text-white disabled:opacity-20">
-                          <Icon name="chevronDown" className="w-4 h-4" />
-                        </button>
-                        <button type="button" onClick={() => removeBlock(block.id)} className="p-1 text-rose-400/60 hover:text-rose-400">
-                          <Icon name="trash" className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Render Block Type Edit Input */}
-                    {block.type === 'h2' ? (
-                      <input
-                        type="text"
-                        value={block.value}
-                        onChange={e => updateBlockValue(block.id, e.target.value)}
-                        placeholder="Judul bagian (H2)..."
-                        className="w-full px-3.5 py-2 rounded-xl bg-cyan-950/40 border border-cyan-500/30 text-cyan-200 font-bold text-sm focus:outline-none"
-                      />
-                    ) : block.type === 'quote' ? (
-                      <div className="space-y-2">
-                        <textarea
-                          value={block.value}
-                          onChange={e => updateBlockValue(block.id, e.target.value)}
-                          placeholder="Kutipan/quote penting..."
-                          rows={2}
-                          className="w-full px-3.5 py-2 rounded-xl bg-violet-950/30 border border-violet-500/30 text-violet-200 text-xs italic focus:outline-none"
-                        />
-                        <input
-                          type="text"
-                          value={block.quoteAuthor || ''}
-                          onChange={e => updateBlockAuthor(block.id, e.target.value)}
-                          placeholder="Nama sumber quote..."
-                          className="w-full px-3.5 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.06] text-xs text-white/70"
-                        />
-                      </div>
-                    ) : block.type === 'image' ? (
-                      <div className="space-y-3">
-                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                          <input
-                            type="text"
-                            value={block.imageUrl || ''}
-                            onChange={e => {
-                              const val = e.target.value
-                              setFormData(prev => ({
-                                ...prev,
-                                blocks: prev.blocks.map(item => item.id === block.id ? { ...item, imageUrl: val } : item)
-                              }))
-                            }}
-                            placeholder="URL gambar..."
-                            className="flex-1 px-3.5 py-2 rounded-xl bg-white/[0.03] border border-white/[0.08] text-xs text-white"
-                          />
-
-                          <div className="flex items-center gap-2">
-                            <label className="px-3 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-xs font-bold text-white cursor-pointer flex items-center gap-1">
-                              <Icon name="uploadCloud" className="w-3.5 h-3.5" />
-                              <span>Upload</span>
-                              <input
-                                type="file"
-                                accept="image/*"
-                                className="hidden"
-                                onChange={async (e) => {
-                                  const file = e.target.files?.[0]
-                                  if (file) {
-                                    const url = await handleFileUpload(file)
-                                    if (url) {
-                                      setFormData(prev => ({
-                                        ...prev,
-                                        blocks: prev.blocks.map(item => item.id === block.id ? { ...item, imageUrl: url } : item)
-                                      }))
-                                    }
-                                  }
-                                }}
-                              />
-                            </label>
-
-                            <button
-                              type="button"
-                              onClick={() => openMediaLibrary((url) => {
-                                setFormData(prev => ({
-                                  ...prev,
-                                  blocks: prev.blocks.map(item => item.id === block.id ? { ...item, imageUrl: url } : item)
-                                }))
-                              })}
-                              className="px-3 py-1.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] text-xs font-semibold text-white/80"
-                            >
-                              Pilih Storage
-                            </button>
-                          </div>
-                        </div>
-
-                        <input
-                          type="text"
-                          value={block.imageCaption || ''}
-                          onChange={e => updateBlockImageCaption(block.id, e.target.value)}
-                          placeholder="Keterangan gambar/figcaption..."
-                          className="w-full px-3.5 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.06] text-xs text-white/70 italic"
-                        />
-
-                        {block.imageUrl && (
-                          <img src={block.imageUrl} alt="Block Image Preview" className="h-32 rounded-xl object-cover border border-white/10" />
-                        )}
-                      </div>
-                    ) : (
-                      <textarea
-                        value={block.value}
-                        onChange={e => updateBlockValue(block.id, e.target.value)}
-                        placeholder="Isi paragraf..."
-                        rows={3}
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-xs text-white/90 leading-relaxed focus:outline-none"
-                      />
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
+            <ArticlesFormModalBlocksTab
+              formData={formData}
+              setFormData={setFormData}
+              handleFileUpload={handleFileUpload}
+              openMediaLibrary={openMediaLibrary}
+              addBlock={addBlock}
+              updateBlockValue={updateBlockValue}
+              updateBlockAuthor={updateBlockAuthor}
+              updateBlockImageCaption={updateBlockImageCaption}
+              removeBlock={removeBlock}
+              moveBlock={moveBlock}
+            />
           )}
 
-          {/* TAB 3: GALERI DOKUMENTASI */}
           {modalTab === 'gallery' && (
-            <div className="space-y-4 animate-in fade-in duration-200">
-              <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
-                <div>
-                  <h4 className="text-sm font-bold text-white">Galeri Foto Dokumentasi</h4>
-                  <p className="text-xs text-white/40">Kumpulan foto pendukung kegiatan atau survei lapangan</p>
-                </div>
-                <button type="button" onClick={addGallerySlot} className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-xs font-bold text-white flex items-center gap-1.5 shadow-md">
-                  <Icon name="plus" className="w-4 h-4" />
-                  <span>Tambah Foto Galeri</span>
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {formData.gallery.map(img => (
-                  <div key={img.id} className="p-3 rounded-2xl bg-white/[0.02] border border-white/[0.06] space-y-3 relative group">
-                    <button 
-                      type="button"
-                      onClick={() => removeGalleryImage(img.id)}
-                      className="absolute top-3 right-3 z-10 p-1.5 bg-rose-600 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <Icon name="trash" className="w-3.5 h-3.5" />
-                    </button>
-
-                    <div className="relative aspect-video w-full rounded-xl overflow-hidden bg-slate-950 border border-white/10 flex items-center justify-center">
-                      {img.url ? (
-                        <img src={img.url} alt={img.caption} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="text-center text-xs text-white/40">Belum Ada Foto</div>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        value={img.url || ''}
-                        onChange={e => updateGalleryUrl(img.id, e.target.value)}
-                        placeholder="URL foto..."
-                        className="flex-1 px-3 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.06] text-xs text-white"
-                      />
-
-                      <label className="px-2.5 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-[11px] font-bold text-white cursor-pointer shrink-0">
-                        Upload
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={async (e) => {
-                            const file = e.target.files?.[0]
-                            if (file) {
-                              const url = await handleFileUpload(file)
-                              if (url) updateGalleryUrl(img.id, url)
-                            }
-                          }}
-                        />
-                      </label>
-
-                      <button
-                        type="button"
-                        onClick={() => openMediaLibrary((url) => updateGalleryUrl(img.id, url))}
-                        className="px-2.5 py-1.5 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] text-[11px] font-semibold text-white/80 shrink-0"
-                      >
-                        Storage
-                      </button>
-                    </div>
-
-                    <input
-                      type="text"
-                      value={img.caption}
-                      onChange={e => updateGalleryCaption(img.id, e.target.value)}
-                      placeholder="Keterangan foto..."
-                      className="w-full bg-white/[0.03] border border-white/[0.06] px-3 py-1.5 rounded-lg text-xs text-white"
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
+            <ArticlesFormModalGalleryTab
+              formData={formData}
+              handleFileUpload={handleFileUpload}
+              openMediaLibrary={openMediaLibrary}
+              addGallerySlot={addGallerySlot}
+              updateGalleryUrl={updateGalleryUrl}
+              updateGalleryCaption={updateGalleryCaption}
+              removeGalleryImage={removeGalleryImage}
+            />
           )}
         </div>
 
