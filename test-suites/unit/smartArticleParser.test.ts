@@ -6,7 +6,7 @@ import {
   exportArticleToJson,
   inferCategoryFromContent,
   getSampleDraftText,
-} from '../../lib/cms/smartArticleParser'
+} from '../../lib/domain/articles/smart-article-parser'
 
 describe('Smart Article Parser (Zero-AI Deterministic Engine)', () => {
 
