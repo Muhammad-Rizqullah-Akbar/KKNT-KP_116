@@ -11,6 +11,7 @@ import { extractRespondentName, extractRespondentEmail } from '@/lib/domain/resp
 import { useAuth } from '@/context/AuthContext'
 import { safeFetchJson } from '@/lib/infra/safe-fetch'
 import { queryKeys } from '@/lib/query-keys'
+import { useToast } from '@/lib/hooks'
 
 // ============================================================================
 // CONSTANTS & COLOR PALETTES
@@ -217,7 +218,7 @@ async function fetchWidgetData(): Promise<WidgetCmsData> {
   // DEDUPLICATE BY UNIQUE RESPONSE ID TO PREVENT 2X OVERCOUNTING
   const responseMap = new Map<string, any>()
   rawCombined.forEach((r) => {
-    const id = r.responseId || r.id || (r as any).docId
+    const id = r.responseId || r.id || r.docId
     if (id && !responseMap.has(id)) {
       responseMap.set(id, r)
     } else if (!id) {
@@ -247,7 +248,7 @@ async function fetchWidgetData(): Promise<WidgetCmsData> {
         const validation = form.validation || { mode: 'all_required', exceptions: [], allowOverride: true }
         const stages = form.stages && form.stages.length > 0 ? form.stages : [{ id: 'default', name: 'Semua Pertanyaan', order: 0, questionIds: form.questions.map((q: any) => q.id), includeInScoring: true }]
 
-        const engine = new ScoringEngine(questionsWithScoring, scoring as any, validation as any, stages as any)
+        const engine = new ScoringEngine(questionsWithScoring, scoring, validation, stages)
         const result = engine.calculateScore(mappedAnswers)
         if (result && typeof result.percentage === 'number' && !isNaN(result.percentage)) {
           calculatedScore = Math.round(result.percentage)
@@ -268,8 +269,8 @@ async function fetchWidgetData(): Promise<WidgetCmsData> {
 
     const respondentName = extractRespondentName(r, form)
     const respondentEmail = extractRespondentEmail(r, form)
-    const resolvedFormTitle = form?.title || (form as any)?.metadata?.title || r.formTitle || 'Formulir Tanpa Judul'
-    const formCode = r.formCode || (form as any)?.code || r.distributionCode || ''
+    const resolvedFormTitle = form?.title || form?.metadata?.title || r.formTitle || 'Formulir Tanpa Judul'
+    const formCode = r.formCode || form?.code || r.distributionCode || ''
 
     return {
       ...r,
@@ -431,12 +432,7 @@ export default function WidgetsPage() {
   })
 
   // Toast Notification
-  const [toastMessage, setToastMessage] = useState<string | null>(null)
-
-  const showToast = (msg: string) => {
-    setToastMessage(msg)
-    setTimeout(() => setToastMessage(null), 3500)
-  }
+  const { visible, message, show } = useToast()
 
   // Load All Forms, Responses, & Users Dynamically From Database via useQuery
   const {
@@ -492,7 +488,7 @@ export default function WidgetsPage() {
       localStorage.setItem('dashboard_widgets_config', JSON.stringify(updatedList))
       localStorage.setItem('dashboard_accounting_stack_v5', JSON.stringify(updatedStacks))
     }
-    showToast('Pengaturan accounting & widget grafik berhasil disimpan ke Dashboard Utama!')
+    show('Pengaturan accounting & widget grafik berhasil disimpan ke Dashboard Utama!')
   }
 
   // Add A New Stackable Comparison Card
@@ -514,7 +510,7 @@ export default function WidgetsPage() {
   // Remove A Stackable Comparison Card
   const handleRemoveAccountingStack = (stackId: string) => {
     if (accountingStacks.length <= 1) {
-      showToast('Minimal 1 perbandingan assessment harus tersedia.')
+      show('Minimal 1 perbandingan assessment harus tersedia.')
       return
     }
     const nextStacks = accountingStacks.filter((s) => s.id !== stackId)
@@ -1528,9 +1524,9 @@ export default function WidgetsPage() {
 
   // DYNAMIC RESPONDENT ANSWER DISTRIBUTION BREAKDOWN FOR ACTIVE STACK IN STEP 2 (ACCOUNTING)
   const respondentAnswerDistribution = useMemo(() => {
-    const matchedList = (activeAccountingResult as any).matchedResponses || [
-      ...((activeAccountingResult as any).preResponses || []),
-      ...((activeAccountingResult as any).postResponses || []),
+    const matchedList = activeAccountingResult.matchedResponses || [
+      ...(activeAccountingResult.preResponses || []),
+      ...(activeAccountingResult.postResponses || []),
     ]
     const listToEvaluate = matchedList.length > 0 ? matchedList : responses
 
@@ -1579,7 +1575,7 @@ export default function WidgetsPage() {
       const stackResCount = res.totalRespondents
       const sharePct = globalTotal > 0 ? Math.round((stackResCount / globalTotal) * 100) : 0
 
-      const matchedList = (res as any).matchedResponses || [...(res.preResponses || []), ...(res.postResponses || [])]
+      const matchedList = res.matchedResponses || [...(res.preResponses || []), ...(res.postResponses || [])]
       let highCount = 0
       let midCount = 0
       let lowCount = 0
@@ -1952,10 +1948,10 @@ export default function WidgetsPage() {
       />
 
       {/* Toast Notification */}
-      {toastMessage && (
+      {visible && (
         <div className="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl bg-cyan-950 border border-cyan-500/50 text-cyan-200 text-xs font-bold font-mono shadow-2xl flex items-center gap-2 animate-bounce">
           <Icon name="checkCircle" className="w-4 h-4 text-cyan-400" />
-          {toastMessage}
+          {message}
         </div>
       )}
 
@@ -2144,7 +2140,7 @@ export default function WidgetsPage() {
                           onClick={() => {
                             const activeStack = accountingStacks.find((s) => s.id === activeStackId) || accountingStacks[0]
                             handleUpdateStackItem(activeStack.id, { pretestFormId: item.id })
-                            showToast(`Form '${item.title}' (${item.respondentCount} Responden) diset ke Pretest Stacking!`)
+                            show(`Form '${item.title}' (${item.respondentCount} Responden) diset ke Pretest Stacking!`)
                           }}
                           className="text-cyan-400 hover:text-cyan-300 font-bold text-[11px] underline cursor-pointer"
                         >
