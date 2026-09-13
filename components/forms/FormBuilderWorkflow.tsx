@@ -180,7 +180,7 @@ export function FormBuilderWorkflow({
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => router.push('/dashboard/forms/v1-5-list')}
+              onClick={() => router.push('/dashboard/forms/list')}
               className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-semibold border border-slate-800 flex items-center gap-1.5 transition-colors"
             >
               <Icon name="arrowLeft" className="w-3.5 h-3.5 text-cyan-400" />

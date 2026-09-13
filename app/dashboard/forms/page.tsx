@@ -197,7 +197,7 @@ export default function LegacyFormsPage() {
             </Link>
 
             <Link
-              href="/dashboard/forms/v1-5-list"
+              href="/dashboard/forms/list"
               className="px-4 py-2.5 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-xs font-bold flex items-center gap-2 transition-all"
             >
               <Icon name="sparkles" className="w-4 h-4" />
