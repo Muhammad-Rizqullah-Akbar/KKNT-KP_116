@@ -9,10 +9,9 @@ const CACHE_TTL_MS = 15000 // 15 seconds TTL
 
 export async function GET(request: NextRequest) {
   try {
-    const authContext = (await getAuthorizationContext()) || {
-      uid: 'super_admin_dev',
-      role: 'super_admin' as const,
-      token: {} as any,
+    const authContext = await getAuthorizationContext()
+    if (!authContext) {
+      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
     }
     const { searchParams } = new URL(request.url)
     const partnershipOnly = searchParams.get('partnershipOnly') === 'true'
@@ -81,10 +80,9 @@ export async function GET(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const authContext = (await getAuthorizationContext()) || {
-      uid: 'super_admin_dev',
-      role: 'super_admin' as const,
-      token: {} as any,
+    const authContext = await getAuthorizationContext()
+    if (!authContext) {
+      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
     }
 
     if (authContext.role !== 'super_admin') {
@@ -151,8 +149,20 @@ export async function DELETE(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
+    // FIX (CRITICAL): sebelumnya TIDAK ada auth sama sekali -> privilege escalation.
+    const authContext = await getAuthorizationContext()
+    if (!authContext) {
+      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
+    }
+    if (authContext.role !== 'super_admin') {
+      return NextResponse.json(
+        { success: false, message: 'Hanya Super Admin yang berhak mengubah role pengguna.' },
+        { status: 403 }
+      )
+    }
+
     const { uid, role, organization, phone } = await request.json()
-    const VALID_ROLES = ['super_admin', 'super_admin', 'super_admin', 'cadre', 'partnership', null]
+    const VALID_ROLES = ['super_admin', 'cadre', 'partnership', null]
     if (!uid || !VALID_ROLES.includes(role)) {
       return NextResponse.json({ success: false, message: 'UID atau role tidak valid' }, { status: 400 })
     }
