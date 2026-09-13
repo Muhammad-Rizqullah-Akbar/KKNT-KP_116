@@ -31,7 +31,7 @@ export const LazyFormBuilderV2 = dynamic(
  * Lazy load PreviewModal - used only when preview button clicked
  */
 export const LazyPreviewModal = dynamic(
-  () => import('@/components/form-builder/PreviewModal').then(mod => mod.default),
+  () => import('@/components/form-builder/PreviewModal').then(mod => mod.PreviewModal),
   {
     loading: () => (
       <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
@@ -48,7 +48,7 @@ export const LazyPreviewModal = dynamic(
  * Lazy load SmartUploadArticleModal
  */
 export const LazySmartUploadArticleModal = dynamic(
-  () => import('@/components/dashboard/articles/SmartUploadArticleModal').then(mod => mod.default),
+  () => import('@/components/dashboard/articles/SmartUploadArticleModal').then(mod => mod.SmartUploadArticleModal),
   {
     loading: () => (
       <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
@@ -63,7 +63,7 @@ export const LazySmartUploadArticleModal = dynamic(
  * Lazy load MitraProgressModal
  */
 export const LazyMitraProgressModal = dynamic(
-  () => import('@/components/dashboard/MitraProgressModal').then(mod => mod.default),
+  () => import('@/components/dashboard/MitraProgressModal').then(mod => mod.MitraProgressModal),
   {
     loading: () => (
       <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
