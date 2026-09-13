@@ -3,7 +3,7 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import { onAuthStateChanged, type User } from 'firebase/auth'
-import { auth } from '@/lib/firebaseClient'
+import { auth } from '@/lib/infra/firebase-client'
 import { 
   loginWithEmail, 
   logout, 
@@ -11,7 +11,7 @@ import {
   type UserRole, 
   type UserData, 
   type LoginResult, 
-} from '@/lib/auth.repo'
+} from '@/lib/domain/auth/auth-client.service'
 
 // ============ TYPES ============
 interface AuthContextType {

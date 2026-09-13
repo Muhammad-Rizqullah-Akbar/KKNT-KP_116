@@ -12,7 +12,7 @@ import {
   type StorageReference,
   type UploadTaskSnapshot,
 } from 'firebase/storage'
-import { storage } from '@/lib/firebaseClient'
+import { storage } from '@/lib/infra/firebase-client'
 
 // ============ TYPES ============
 export interface UploadProgress {

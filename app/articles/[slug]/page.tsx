@@ -13,7 +13,7 @@ import {
   getCategoryStyle,
   type ArticleData 
 } from '@/lib/repositories/articles.repo'
-import { auth, storage } from '@/lib/firebaseClient'
+import { auth, storage } from '@/lib/infra/firebase-client'
 import { uploadOptimizedArticleImage } from '@/lib/infra/storage'
 import { onAuthStateChanged } from 'firebase/auth'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'

@@ -1,4 +1,4 @@
-import { adminFirestore } from '@/lib/firebaseAdmin'
+import { adminFirestore } from '@/lib/infra/firebase-admin'
 import { recursivelyOffloadBase64Media } from '@/lib/infra/media-offloader'
 import type { FormMetadata, ScoringConfig, ValidationConfig, CanonicalForm } from '@/lib/domain/forms/types'
 import type {

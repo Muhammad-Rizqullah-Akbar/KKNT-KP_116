@@ -4,7 +4,7 @@ import fs from 'fs'
 import path from 'path'
 import crypto from 'crypto'
 import { getStorage } from 'firebase-admin/storage'
-import { adminApp } from '@/lib/firebaseAdmin'
+import { adminApp } from '@/lib/infra/firebase-admin'
 
 /**
  * Saves a base64 Data URL (data:image/...;base64,...) to Firebase Storage or local disk public/uploads.

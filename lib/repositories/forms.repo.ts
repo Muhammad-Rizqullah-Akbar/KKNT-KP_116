@@ -2,7 +2,7 @@
 
 import { 
   firestore,
-} from '@/lib/firebaseClient'
+} from '@/lib/infra/firebase-client'
 import {
   collection,
   doc,

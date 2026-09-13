@@ -15,7 +15,7 @@ import {
   type ArticleData 
 } from '@/lib/repositories/articles.repo'
 import { getForms } from '@/lib/repositories/forms.repo'
-import { storage } from '@/lib/firebaseClient'
+import { storage } from '@/lib/infra/firebase-client'
 import { uploadOptimizedArticleImage } from '@/lib/infra/storage'
 import { ref, uploadBytes, getDownloadURL, listAll } from 'firebase/storage'
 import { SmartUploadArticleModal } from '@/components/dashboard/articles/SmartUploadArticleModal'

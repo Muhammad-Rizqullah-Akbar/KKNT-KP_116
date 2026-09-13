@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { adminAuth, adminFirestore } from '@/lib/firebaseAdmin'
+import { adminAuth, adminFirestore } from '@/lib/infra/firebase-admin'
 import { getAuthorizationContext } from '@/lib/domain/auth/authorization'
 import { safeSetDoc } from '@/lib/repositories/safe-firestore'
 
@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
         }
       } else {
         console.warn('adminAuth createUser failed, trying REST API fallback:', adminErr?.message || adminErr)
-        const { restSignUpWithEmail } = await import('@/lib/firebaseRestAuth')
+        const { restSignUpWithEmail } = await import('@/lib/infra/firebase-rest-auth')
         const restResult = await restSignUpWithEmail(email, password, displayName || email.split('@')[0])
         if (restResult?.uid) {
           createdUid = restResult.uid

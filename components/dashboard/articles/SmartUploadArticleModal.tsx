@@ -9,7 +9,7 @@ import {
   exportArticleToJson,
   type ParsedArticle,
 } from '@/lib/domain/articles/smart-article-parser'
-import { storage } from '@/lib/firebaseClient'
+import { storage } from '@/lib/infra/firebase-client'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 
 interface SmartUploadArticleModalProps {

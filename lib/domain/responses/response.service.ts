@@ -1,6 +1,6 @@
 import 'server-only'
 
-import { adminFirestore } from '@/lib/firebaseAdmin'
+import { adminFirestore } from '@/lib/infra/firebase-admin'
 import {
   createResponseDoc,
   getResponseDoc,

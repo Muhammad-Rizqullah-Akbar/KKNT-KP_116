@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { adminAuth } from '@/lib/firebaseAdmin'
+import { adminAuth } from '@/lib/infra/firebase-admin'
 import { getAuthorizationContext } from '@/lib/domain/auth/authorization'
 import { safeGetCollectionDocs } from '@/lib/repositories/safe-firestore'
 

@@ -1,6 +1,6 @@
 // lib/firebase/repositories/settings.repo.ts
 
-import { firestore as db } from '@/lib/firebaseClient'
+import { firestore as db } from '@/lib/infra/firebase-client'
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
 
 const COLLECTION_NAME = 'settings'

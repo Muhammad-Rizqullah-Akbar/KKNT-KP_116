@@ -1,4 +1,4 @@
-import { adminFirestore } from '@/lib/firebaseAdmin'
+import { adminFirestore } from '@/lib/infra/firebase-admin'
 
 const REGISTRY_COLLECTION = 'form_registry_metadata'
 

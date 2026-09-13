@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test, describe, after } from 'node:test'
-import { adminFirestore, adminAuth } from '../lib/firebaseAdmin'
+import { adminFirestore, adminAuth } from '../lib/infra/firebase-admin'
 import { createFormWorkflow, createNewVersionWorkflow, publishFormWorkflow } from '../lib/domain/forms/form-management.service'
 import { createDistributionWorkflow, resolveDistributionWorkflow } from '../lib/domain/distributions/distribution.service'
 import { startResponseWorkflow, submitResponseWorkflow } from '../lib/domain/responses/response.service'

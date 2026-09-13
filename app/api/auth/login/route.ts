@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { adminAuth, adminFirestore } from '@/lib/firebaseAdmin'
+import { adminAuth, adminFirestore } from '@/lib/infra/firebase-admin'
 import { SESSION_COOKIE_NAME } from '@/lib/domain/auth/authorization'
 import { safeGetCollectionDocs } from '@/lib/repositories/safe-firestore'
 
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
         console.warn('Password sync warning:', e)
       }
     } else {
-      const { restSignInWithEmail } = await import('@/lib/firebaseRestAuth')
+      const { restSignInWithEmail } = await import('@/lib/infra/firebase-rest-auth')
       const restSignIn = await restSignInWithEmail(cleanEmail, password)
       if (restSignIn?.uid) {
         uid = restSignIn.uid

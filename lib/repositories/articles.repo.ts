@@ -1,4 +1,4 @@
-import { firestore as db } from '@/lib/firebaseClient'
+import { firestore as db } from '@/lib/infra/firebase-client'
 import { 
   collection, 
   getDocs, 

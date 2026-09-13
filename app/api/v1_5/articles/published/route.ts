@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { adminFirestore } from '@/lib/firebaseAdmin'
+import { adminFirestore } from '@/lib/infra/firebase-admin'
 
 /**
  * GET /api/v1_5/articles/published

@@ -3,7 +3,7 @@
 import { 
   auth, 
   firestore,
-} from '@/lib/firebaseClient'
+} from '@/lib/infra/firebase-client'
 import {
   signInWithEmailAndPassword,
   signInWithCustomToken,
@@ -188,7 +188,7 @@ export const loginWithEmail = async (
         }
 
         if (!user) {
-          const { restSignInWithEmail } = await import('@/lib/firebaseRestAuth')
+          const { restSignInWithEmail } = await import('@/lib/infra/firebase-rest-auth')
           const restRes = await restSignInWithEmail(email, password)
           if (restRes?.uid) {
             try {

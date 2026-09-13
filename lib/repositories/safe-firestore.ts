@@ -1,7 +1,7 @@
 import 'server-only'
 
-import { adminFirestore } from '@/lib/firebaseAdmin'
-import { firestore } from '@/lib/firebaseClient'
+import { adminFirestore } from '@/lib/infra/firebase-admin'
+import { firestore } from '@/lib/infra/firebase-client'
 import { collection, getDocs, doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore'
 
 /**

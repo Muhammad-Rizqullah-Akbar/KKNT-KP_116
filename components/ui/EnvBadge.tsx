@@ -2,7 +2,7 @@
 
 'use client'
 
-import { ENV, getEnvName, getEnvColor } from '@/lib/env'
+import { ENV, getEnvName, getEnvColor } from '@/lib/infra/env'
 
 export function EnvBadge() {
   // Tidak tampil di production
