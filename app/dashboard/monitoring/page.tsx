@@ -120,12 +120,12 @@ export default function MonitoringDomainPage() {
   // 1. GRANULAR PER-CADRE CONTRIBUTION METRICS
   const cadreMetrics = useMemo(() => {
     const myOrg = (userData?.organization || userData?.displayName || '').toLowerCase().trim()
-    const cadresList = users.filter((u) => {
-      if (u.role !== 'cadre') return false
+    const cadresList = users.filter((cadUser) => {
+      if (cadUser.role !== 'cadre') return false
       if (isPartnershipRole) {
-        const isMatchId = u.partnershipId === user?.uid
-        const isMatchOrg = myOrg && u.organization && u.organization.toLowerCase().trim() === myOrg
-        const isMatchPartName = myOrg && u.partnershipName && u.partnershipName.toLowerCase().trim() === myOrg
+        const isMatchId = cadUser.partnershipId === user?.uid
+        const isMatchOrg = myOrg && cadUser.organization && cadUser.organization.toLowerCase().trim() === myOrg
+        const isMatchPartName = myOrg && cadUser.partnershipName && cadUser.partnershipName.toLowerCase().trim() === myOrg
         return isMatchId || isMatchOrg || isMatchPartName
       }
       return true
@@ -133,30 +133,30 @@ export default function MonitoringDomainPage() {
 
     return cadresList.map((cadre) => {
       const cadreDists = distributions.filter(
-        (d) => d.createdBy === cadre.uid || d.cadreId === cadre.uid
+        (dist) => dist.createdBy === cadre.uid || dist.cadreId === cadre.uid
       )
 
       const distCodesSet = new Set<string>()
-      cadreDists.forEach((d) => {
-        if (d.code) distCodesSet.add(String(d.code).toLowerCase().trim())
-        if (d.distributionCode) distCodesSet.add(String(d.distributionCode).toLowerCase().trim())
-        if (d.distributionId) distCodesSet.add(String(d.distributionId).toLowerCase().trim())
+      cadreDists.forEach((dist) => {
+        if (dist.code) distCodesSet.add(String(dist.code).toLowerCase().trim())
+        if (dist.distributionCode) distCodesSet.add(String(dist.distributionCode).toLowerCase().trim())
+        if (dist.distributionId) distCodesSet.add(String(dist.distributionId).toLowerCase().trim())
       })
 
-      const cadreResponses = responses.filter((r) => {
-        const code = String(r.distributionCode || '').toLowerCase().trim()
-        return (code !== '' && distCodesSet.has(code)) || r.createdBy === cadre.uid || r.cadreId === cadre.uid
+      const cadreResponses = responses.filter((resp) => {
+        const code = String(resp.distributionCode || '').toLowerCase().trim()
+        return (code !== '' && distCodesSet.has(code)) || resp.createdBy === cadre.uid || resp.cadreId === cadre.uid
       })
 
       const scores = cadreResponses
-        .map((r) => r.result?.percentage)
-        .filter((s): s is number => typeof s === 'number')
+        .map((resp) => resp.result?.percentage)
+        .filter((score): score is number => typeof score === 'number')
 
-      const avgScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0
+      const avgScore = scores.length > 0 ? Math.round(scores.reduce((acc, score) => acc + score, 0) / scores.length) : 0
       const passRate =
         cadreResponses.length > 0
           ? Math.round(
-              (cadreResponses.filter((r) => r.result?.percentage && r.result.percentage >= 75).length /
+              (cadreResponses.filter((resp) => resp.result?.percentage && resp.result.percentage >= 75).length /
                 cadreResponses.length) *
                 100
             )
@@ -188,51 +188,51 @@ export default function MonitoringDomainPage() {
   // 2. GRANULAR PER-MITRA CONTRIBUTION METRICS (CAPPED AT MAX 5 REPRESENTATIVE CADRES)
   const mitraMetrics = useMemo(() => {
     const partnersList = isPartnershipRole
-      ? users.filter((u) => u.uid === user?.uid || u.role === 'partnership')
-      : users.filter((u) => u.role === 'partnership')
+      ? users.filter((userItem) => userItem.uid === user?.uid || userItem.role === 'partnership')
+      : users.filter((userItem) => userItem.role === 'partnership')
 
     return partnersList.map((mitra) => {
       const linkedCadres = users.filter(
-        (u) =>
-          u.role === 'cadre' &&
-          (u.partnershipId === mitra.uid ||
-            (u.organization && u.organization.toLowerCase() === (mitra.organization || mitra.displayName).toLowerCase()))
+        (linkedUser) =>
+          linkedUser.role === 'cadre' &&
+          (linkedUser.partnershipId === mitra.uid ||
+            (linkedUser.organization && linkedUser.organization.toLowerCase() === (mitra.organization || mitra.displayName).toLowerCase()))
       )
 
       const topRepresentativeCadres = linkedCadres
-        .map((c) => {
-          const m = cadreMetrics.find((cm) => cm.cadre.uid === c.uid)
-          return m || { cadre: c, distCount: 0, respCount: 0, avgScore: 0, passRate: 0, status: 'attention' as const, contributionPct: 0, organizationName: mitra.displayName }
+        .map((cadreRef) => {
+          const matchedMetric = cadreMetrics.find((candidateMetric) => candidateMetric.cadre.uid === cadreRef.uid)
+          return matchedMetric || { cadre: cadreRef, distCount: 0, respCount: 0, avgScore: 0, passRate: 0, status: 'attention' as const, contributionPct: 0, organizationName: mitra.displayName }
         })
-        .sort((a, b) => b.respCount - a.respCount || b.avgScore - a.avgScore)
+        .sort((metricA, metricB) => metricB.respCount - metricA.respCount || metricB.avgScore - metricA.avgScore)
         .slice(0, 5)
 
-      const cadreUids = new Set(linkedCadres.map((c) => c.uid))
+      const cadreUids = new Set(linkedCadres.map((cadreRef) => cadreRef.uid))
 
       const mitraDists = distributions.filter(
-        (d) => (d.createdBy && cadreUids.has(d.createdBy)) || (d.cadreId && cadreUids.has(d.cadreId))
+        (dist) => (dist.createdBy && cadreUids.has(dist.createdBy)) || (dist.cadreId && cadreUids.has(dist.cadreId))
       )
 
       const mitraDistCodes = new Set<string>()
-      mitraDists.forEach((d) => {
-        if (d.code) mitraDistCodes.add(String(d.code).toLowerCase().trim())
-        if (d.distributionCode) mitraDistCodes.add(String(d.distributionCode).toLowerCase().trim())
+      mitraDists.forEach((dist) => {
+        if (dist.code) mitraDistCodes.add(String(dist.code).toLowerCase().trim())
+        if (dist.distributionCode) mitraDistCodes.add(String(dist.distributionCode).toLowerCase().trim())
       })
 
-      const mitraResponses = responses.filter((r) => {
-        const code = String(r.distributionCode || '').toLowerCase().trim()
+      const mitraResponses = responses.filter((resp) => {
+        const code = String(resp.distributionCode || '').toLowerCase().trim()
         return (
           (code !== '' && mitraDistCodes.has(code)) ||
-          (r.createdBy && cadreUids.has(r.createdBy)) ||
-          (r.cadreId && cadreUids.has(r.cadreId))
+          (resp.createdBy && cadreUids.has(resp.createdBy)) ||
+          (resp.cadreId && cadreUids.has(resp.cadreId))
         )
       })
 
       const scores = mitraResponses
-        .map((r) => r.result?.percentage)
-        .filter((s): s is number => typeof s === 'number')
+        .map((resp) => resp.result?.percentage)
+        .filter((score): score is number => typeof score === 'number')
 
-      const avgScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0
+      const avgScore = scores.length > 0 ? Math.round(scores.reduce((acc, score) => acc + score, 0) / scores.length) : 0
 
       return {
         mitra,
@@ -248,27 +248,27 @@ export default function MonitoringDomainPage() {
 
   // 3. EXECUTIVE KPI OVERVIEW METRICS
   const stats = useMemo(() => {
-    const totalMitra = isPartnershipRole ? 1 : users.filter((u) => u.role === 'partnership').length
+    const totalMitra = isPartnershipRole ? 1 : users.filter((userItem) => userItem.role === 'partnership').length
     const totalCadres = cadreMetrics.length
     const totalDists = isPartnershipRole
-      ? cadreMetrics.reduce((sum, c) => sum + c.distCount, 0)
+      ? cadreMetrics.reduce((sum, cadMetric) => sum + cadMetric.distCount, 0)
       : distributions.length
     const totalResponses = isPartnershipRole
-      ? cadreMetrics.reduce((sum, c) => sum + c.respCount, 0)
+      ? cadreMetrics.reduce((sum, cadMetric) => sum + cadMetric.respCount, 0)
       : responses.length
 
-    const activeCadresCount = cadreMetrics.filter((c) => c.respCount > 0).length
-    const highPerfCadresCount = cadreMetrics.filter((c) => c.status === 'high').length
+    const activeCadresCount = cadreMetrics.filter((cadMetric) => cadMetric.respCount > 0).length
+    const highPerfCadresCount = cadreMetrics.filter((cadMetric) => cadMetric.status === 'high').length
 
-    const scores = responses.map((r) => r.result?.percentage).filter((s): s is number => typeof s === 'number')
-    const avgScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0
+    const scores = responses.map((resp) => resp.result?.percentage).filter((score): score is number => typeof score === 'number')
+    const avgScore = scores.length > 0 ? Math.round(scores.reduce((acc, score) => acc + score, 0) / scores.length) : 0
 
     return { totalMitra, totalCadres, totalDists, totalResponses, activeCadresCount, highPerfCadresCount, avgScore }
   }, [users, distributions, responses, cadreMetrics, isPartnershipRole])
 
   // 4. TOP CONTRIBUTORS GROUPED BY MITRA (For Admin & Super Admin)
   const topContributorsByMitra = useMemo(() => {
-    const partnersList = users.filter((u) => u.role === 'partnership')
+    const partnersList = users.filter((userItem) => userItem.role === 'partnership')
 
     const mitraGroups: {
       mitra: UserProfile
@@ -284,7 +284,7 @@ export default function MonitoringDomainPage() {
       })
 
       const sortedTop = cadresForThisMitra
-        .sort((a, b) => b.respCount - a.respCount || b.avgScore - a.avgScore)
+        .sort((metricA, metricB) => metricB.respCount - metricA.respCount || metricB.avgScore - metricA.avgScore)
         .slice(0, 3)
 
       if (sortedTop.length > 0) {
@@ -296,11 +296,11 @@ export default function MonitoringDomainPage() {
     })
 
     const attachedUidSet = new Set<string>()
-    mitraGroups.forEach((g) => g.topCadres.forEach((c) => attachedUidSet.add(c.cadre.uid)))
+    mitraGroups.forEach((group) => group.topCadres.forEach((cadMetric) => attachedUidSet.add(cadMetric.cadre.uid)))
 
     const topIndependent = cadreMetrics
-      .filter((c) => !attachedUidSet.has(c.cadre.uid) && c.respCount > 0)
-      .sort((a, b) => b.respCount - a.respCount || b.avgScore - a.avgScore)
+      .filter((cadMetric) => !attachedUidSet.has(cadMetric.cadre.uid) && cadMetric.respCount > 0)
+      .sort((metricA, metricB) => metricB.respCount - metricA.respCount || metricB.avgScore - metricA.avgScore)
       .slice(0, 3)
 
     return { mitraGroups, topIndependent }
@@ -312,64 +312,64 @@ export default function MonitoringDomainPage() {
 
     // 1. Danger: Low score cadres (< 60%)
     cadreMetrics
-      .filter((c) => c.respCount > 0 && c.avgScore < 60)
-      .forEach((c) => {
+      .filter((cadMetric) => cadMetric.respCount > 0 && cadMetric.avgScore < 60)
+      .forEach((cadMetric) => {
         cards.push({
-          id: `low_score_${c.cadre.uid}`,
+          id: `low_score_${cadMetric.cadre.uid}`,
           type: 'danger',
           categoryTitle: 'Peringatan Kritis Nilai Evaluasi (<60%)',
-          mitraName: c.organizationName,
-          title: `Evaluasi Pangan Rendah (${c.avgScore}%): ${c.cadre.displayName}`,
-          desc: `Tingkat pemenuhan syarat evaluasi responden kader ${c.cadre.displayName} di bawah 60%. Perlu pembinaan & penyuluhan ulang.`,
-          cadre: c.cadre,
+          mitraName: cadMetric.organizationName,
+          title: `Evaluasi Pangan Rendah (${cadMetric.avgScore}%): ${cadMetric.cadre.displayName}`,
+          desc: `Tingkat pemenuhan syarat evaluasi responden kader ${cadMetric.cadre.displayName} di bawah 60%. Perlu pembinaan & penyuluhan ulang.`,
+          cadre: cadMetric.cadre,
           actionLabel: 'Inspeksi Progress',
         })
       })
 
     // 2. Warning: Zero response cadres
     cadreMetrics
-      .filter((c) => c.respCount === 0)
-      .forEach((c) => {
+      .filter((cadMetric) => cadMetric.respCount === 0)
+      .forEach((cadMetric) => {
         cards.push({
-          id: `zero_resp_${c.cadre.uid}`,
+          id: `zero_resp_${cadMetric.cadre.uid}`,
           type: 'warning',
           categoryTitle: 'Kader Belum Mengumpulkan Respon Lapangan',
-          mitraName: c.organizationName,
-          title: `Kader Belum Beraktivitas: ${c.cadre.displayName}`,
-          desc: `Kader di bawah instansi ${c.organizationName} belum mengumpulkan tanggapan kuesioner evaluasi di lapangan.`,
-          cadre: c.cadre,
+          mitraName: cadMetric.organizationName,
+          title: `Kader Belum Beraktivitas: ${cadMetric.cadre.displayName}`,
+          desc: `Kader di bawah instansi ${cadMetric.organizationName} belum mengumpulkan tanggapan kuesioner evaluasi di lapangan.`,
+          cadre: cadMetric.cadre,
           actionLabel: 'Inspeksi Kader',
         })
       })
 
     // 3. Warning: Empty Mitras
     mitraMetrics
-      .filter((m) => m.cadreCount === 0)
-      .forEach((m) => {
+      .filter((mitraMetric) => mitraMetric.cadreCount === 0)
+      .forEach((mitraMetric) => {
         cards.push({
-          id: `empty_mitra_${m.mitra.uid}`,
+          id: `empty_mitra_${mitraMetric.mitra.uid}`,
           type: 'warning',
           categoryTitle: 'Instansi Mitra Belum Memiliki Kader',
-          mitraName: m.mitra.displayName,
-          mitraUid: m.mitra.uid,
-          title: `Mitra Tanpa Kader: ${m.mitra.displayName}`,
-          desc: `Instansi ${m.mitra.displayName} (${m.mitra.partnershipType || 'Sekolah'}) belum mendaftarkan kader lapangan.`,
+          mitraName: mitraMetric.mitra.displayName,
+          mitraUid: mitraMetric.mitra.uid,
+          title: `Mitra Tanpa Kader: ${mitraMetric.mitra.displayName}`,
+          desc: `Instansi ${mitraMetric.mitra.displayName} (${mitraMetric.mitra.partnershipType || 'Sekolah'}) belum mendaftarkan kader lapangan.`,
           actionLabel: 'Tugaskan Kader',
         })
       })
 
     // 4. Success: High performer cadres (Pass Rate >= 80%)
     cadreMetrics
-      .filter((c) => c.respCount >= 3 && c.avgScore >= 80)
-      .forEach((c) => {
+      .filter((cadMetric) => cadMetric.respCount >= 3 && cadMetric.avgScore >= 80)
+      .forEach((cadMetric) => {
         cards.push({
-          id: `high_score_${c.cadre.uid}`,
+          id: `high_score_${cadMetric.cadre.uid}`,
           type: 'success',
           categoryTitle: 'Apresiasi Performa High Performer (≥80%)',
-          mitraName: c.organizationName,
-          title: `Apresiasi High Performer: ${c.cadre.displayName}`,
-          desc: `Kader ${c.cadre.displayName} mencatatkan nilai evaluasi ${c.avgScore}% dengan Pass Rate ${c.passRate}%.`,
-          cadre: c.cadre,
+          mitraName: cadMetric.organizationName,
+          title: `Apresiasi High Performer: ${cadMetric.cadre.displayName}`,
+          desc: `Kader ${cadMetric.cadre.displayName} mencatatkan nilai evaluasi ${cadMetric.avgScore}% dengan Pass Rate ${cadMetric.passRate}%.`,
+          cadre: cadMetric.cadre,
           actionLabel: 'Inspeksi Performa',
         })
       })
@@ -385,9 +385,9 @@ export default function MonitoringDomainPage() {
       const key = card.mitraName || 'Independen'
       if (!map.has(key)) {
         const foundMitra = users.find(
-          (u) =>
-            u.role === 'partnership' &&
-            (u.displayName === key || u.organization === key || u.uid === card.mitraUid)
+          (userItem) =>
+            userItem.role === 'partnership' &&
+            (userItem.displayName === key || userItem.organization === key || userItem.uid === card.mitraUid)
         )
         map.set(key, { mitra: foundMitra, cards: [] })
       }
@@ -428,7 +428,7 @@ export default function MonitoringDomainPage() {
     })
 
     // Sort strictly by Leaderboard score & response count
-    return filtered.sort((a, b) => b.respCount - a.respCount || b.avgScore - a.avgScore)
+    return filtered.sort((metricA, metricB) => metricB.respCount - metricA.respCount || metricB.avgScore - metricA.avgScore)
   }, [cadreMetrics, searchTerm, mitraFilter, statusFilter])
 
   // Cadre Leaderboard Pagination Math (Max 20 cadres per page)
@@ -447,15 +447,15 @@ export default function MonitoringDomainPage() {
   // VIEW 1: CADRE PERSONALIZED DASHBOARD VIEW
   // =========================================================================
   if (isCadre) {
-    const myMetric = cadreMetrics.find((c) => c.cadre.uid === user?.uid) || {
-      cadre: { displayName: user?.displayName || user?.email || 'Kader Lapangan', email: user?.email || '', organization: (userData as any)?.organization },
-      distCount: distributions.filter((d) => d.createdBy === user?.uid || d.cadreId === user?.uid).length,
-      respCount: responses.filter((r) => r.createdBy === user?.uid || r.cadreId === user?.uid).length,
+    const myMetric = cadreMetrics.find((cadMetric) => cadMetric.cadre.uid === user?.uid) || {
+      cadre: { displayName: user?.displayName || user?.email || 'Kader Lapangan', email: user?.email || '', organization: userData?.organization },
+      distCount: distributions.filter((dist) => dist.createdBy === user?.uid || dist.cadreId === user?.uid).length,
+      respCount: responses.filter((resp) => resp.createdBy === user?.uid || resp.cadreId === user?.uid).length,
       avgScore: 0,
       passRate: 0,
       contributionPct: 0,
       status: 'active' as const,
-      organizationName: (userData as any)?.organization || 'Mandiri',
+      organizationName: userData?.organization || 'Mandiri',
     }
 
     return (
@@ -471,7 +471,7 @@ export default function MonitoringDomainPage() {
                   <Icon name="checkCircle" className="w-3 h-3 text-emerald-400" />
                   KADER LAPANGAN AKTIF
                 </span>
-                <span className="text-xs font-mono text-slate-400">{(userData as any)?.organization || 'Kemitraan BPOM'}</span>
+                <span className="text-xs font-mono text-slate-400">{userData?.organization || 'Kemitraan BPOM'}</span>
               </div>
               <h1 className="text-xl font-bold font-display text-white">{user?.displayName || 'Kader Lapangan'}</h1>
               <p className="text-xs text-slate-400">Pantau performa distribusi kode dan kualitas evaluasi pangan responden Anda.</p>
@@ -586,7 +586,7 @@ export default function MonitoringDomainPage() {
                   </span>
                 </div>
                 <p className="text-xs text-slate-400 font-mono">
-                  Email Login: {user?.email} • Kontak HP/WA: <span className="text-cyan-300 font-bold">{(userData as any)?.phone || '-'}</span>
+                  Email Login: {user?.email} • Kontak HP/WA: <span className="text-cyan-300 font-bold">{userData?.phone || '-'}</span>
                 </p>
               </div>
             </div>
@@ -638,7 +638,7 @@ export default function MonitoringDomainPage() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {cadreMetrics
-                  .sort((a, b) => b.respCount - a.respCount || b.avgScore - a.avgScore)
+                  .sort((metricA, metricB) => metricB.respCount - metricA.respCount || metricB.avgScore - metricA.avgScore)
                   .slice(0, 3)
                   .map((item, idx) => (
                     <div key={item.cadre.uid} className="p-4 rounded-2xl bg-slate-950 border border-purple-500/30 space-y-3">
@@ -855,9 +855,9 @@ export default function MonitoringDomainPage() {
                     className="bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-300 px-3 py-2 focus:outline-none focus:border-violet-500/50"
                   >
                     <option value="all">Semua Mitra Instansi</option>
-                    {mitraMetrics.map((m) => (
-                      <option key={m.mitra.uid} value={m.mitra.displayName}>
-                        {m.mitra.displayName}
+                    {mitraMetrics.map((mitraMetric) => (
+                      <option key={mitraMetric.mitra.uid} value={mitraMetric.mitra.displayName}>
+                        {mitraMetric.mitra.displayName}
                       </option>
                     ))}
                   </select>
@@ -1250,16 +1250,16 @@ export default function MonitoringDomainPage() {
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-800/60">
-                            {item.topRepresentativeCadres.map((c) => (
-                              <tr key={c.cadre.uid} className="hover:bg-slate-900/60 transition-colors">
-                                <td className="p-3 font-bold text-slate-100">{c.cadre.displayName}</td>
-                                <td className="p-3 text-slate-400">{c.cadre.email}</td>
-                                <td className="p-3 text-center font-bold text-slate-300">{c.distCount} Kode</td>
-                                <td className="p-3 text-center font-bold text-cyan-300">{c.respCount} Respon</td>
-                                <td className="p-3 text-center font-bold text-emerald-400">{c.respCount > 0 ? `${c.avgScore}%` : '-'}</td>
+                            {item.topRepresentativeCadres.map((cadMetric) => (
+                              <tr key={cadMetric.cadre.uid} className="hover:bg-slate-900/60 transition-colors">
+                                <td className="p-3 font-bold text-slate-100">{cadMetric.cadre.displayName}</td>
+                                <td className="p-3 text-slate-400">{cadMetric.cadre.email}</td>
+                                <td className="p-3 text-center font-bold text-slate-300">{cadMetric.distCount} Kode</td>
+                                <td className="p-3 text-center font-bold text-cyan-300">{cadMetric.respCount} Respon</td>
+                                <td className="p-3 text-center font-bold text-emerald-400">{cadMetric.respCount > 0 ? `${cadMetric.avgScore}%` : '-'}</td>
                                 <td className="p-3 text-right">
                                   <button
-                                    onClick={() => setSelectedCadreForInspect(c.cadre)}
+                                    onClick={() => setSelectedCadreForInspect(cadMetric.cadre)}
                                     className="px-2.5 py-1 rounded bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-bold"
                                   >
                                     Inspeksi
