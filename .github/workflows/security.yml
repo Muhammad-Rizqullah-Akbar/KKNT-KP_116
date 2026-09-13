@@ -63,3 +63,5 @@ jobs:
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: trivy-results.sarif
+        # Upload SARIF non-blocking (dashboard code scanning; butuh security-events write)
+        continue-on-error: true
