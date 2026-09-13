@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useEffect, useState, useMemo } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import Link from 'next/link'
 import { Topbar } from '@/features/dashboard/components/layout/Topbar'
 import { Icon } from '@/components/ui/Icons'
@@ -173,11 +174,7 @@ const formatAnswerValue = (value: any): { type: 'text' | 'signature' | 'table' |
 
 export default function ResponsesDashboardPage() {
   const { user } = useAuth()
-  const [responses, setResponses] = useState<ResponseDoc[]>([])
-  const [dbForms, setDbForms] = useState<FormMetaItem[]>([])
-  const [dbDistributions, setDbDistributions] = useState<DistMetaItem[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const queryClient = useQueryClient()
 
   // Respondent Preview Modal State
   const [selectedRespondent, setSelectedRespondent] = useState<ResponseDoc | null>(null)
@@ -203,7 +200,10 @@ export default function ResponsesDashboardPage() {
       })
       if (!res.ok) throw new Error(res.error || 'Gagal menghapus tanggapan.')
 
-      setResponses((prev) => prev.filter((r) => r.responseId !== selectedResponse.responseId))
+      queryClient.setQueryData(['dashboard', 'responses'], (old: any) => {
+        if (!old) return old
+        return { ...old, responses: old.responses.filter((r: ResponseDoc) => r.responseId !== selectedResponse.responseId) }
+      })
       setSelectedResponseIds((prev) => prev.filter((id) => id !== selectedResponse.responseId))
       setIsDeleteModalOpen(false)
       setSelectedResponse(null)
@@ -225,7 +225,10 @@ export default function ResponsesDashboardPage() {
       })
       if (!res.ok) throw new Error(res.error || 'Gagal menghapus tanggapan terpilih.')
 
-      setResponses((prev) => prev.filter((r) => !selectedResponseIds.includes(r.responseId)))
+      queryClient.setQueryData(['dashboard', 'responses'], (old: any) => {
+        if (!old) return old
+        return { ...old, responses: old.responses.filter((r: ResponseDoc) => !selectedResponseIds.includes(r.responseId)) }
+      })
       setSelectedResponseIds([])
       setIsBulkDeleteModalOpen(false)
     } catch (err: any) {
@@ -253,30 +256,37 @@ export default function ResponsesDashboardPage() {
   const [selectedFormId, setSelectedFormId] = useState<string>('all')
   const [selectedAuthorCode, setSelectedAuthorCode] = useState<string>('all')
 
-  const loadResponses = async () => {
-    setIsLoading(true)
-    setError(null)
-    try {
+  const {
+    data: responsesData,
+    isLoading,
+    error: queryError,
+    refetch,
+  } = useQuery({
+    queryKey: ['dashboard', 'responses'],
+    queryFn: async () => {
       const [respRes, userRes] = await Promise.all([
         safeFetchJson('/api/responses?status=submitted'),
         safeFetchJson('/api/auth/users'),
       ])
 
       let combinedDistributions: DistMetaItem[] = []
+      let responses: ResponseDoc[] = []
+      let dbForms: FormMetaItem[] = []
+      let error: string | null = null
 
       if (respRes.ok && respRes.data) {
         if (Array.isArray(respRes.data.responses)) {
           const submittedOnly = respRes.data.responses.filter((r: ResponseDoc) => r.status === 'submitted')
-          setResponses(submittedOnly)
+          responses = submittedOnly
         }
         if (Array.isArray(respRes.data.availableForms)) {
-          setDbForms(respRes.data.availableForms)
+          dbForms = respRes.data.availableForms
         }
         if (Array.isArray(respRes.data.availableDistributions)) {
           combinedDistributions = [...respRes.data.availableDistributions]
         }
       } else {
-        setError(respRes.error || 'Gagal memuat daftar hasil penilaian.')
+        error = respRes.error || 'Gagal memuat daftar hasil penilaian.'
       }
 
       if (userRes.ok && userRes.data && Array.isArray(userRes.data.users)) {
@@ -290,17 +300,14 @@ export default function ResponsesDashboardPage() {
         combinedDistributions = [...combinedDistributions, ...userDistItems]
       }
 
-      setDbDistributions(combinedDistributions)
-    } catch (err: any) {
-      setError(err.message || 'Terjadi kesalahan saat terhubung ke server.')
-    } finally {
-      setIsLoading(false)
-    }
-  }
+      return { responses, dbForms, dbDistributions: combinedDistributions, error }
+    },
+  })
 
-  useEffect(() => {
-    loadResponses()
-  }, [])
+  const responses = responsesData?.responses ?? []
+  const dbForms = responsesData?.dbForms ?? []
+  const dbDistributions = responsesData?.dbDistributions ?? []
+  const error = responsesData?.error ?? (queryError ? queryError.message || 'Terjadi kesalahan saat terhubung ke server.' : null)
 
   // 1. KIRI: Dynamic Form options list from Firestore
   const mergedFormOptions = useMemo(() => {
@@ -844,7 +851,7 @@ export default function ResponsesDashboardPage() {
 
             <button
               type="button"
-              onClick={loadResponses}
+              onClick={() => refetch()}
               className="px-3.5 py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold flex items-center gap-2 transition-colors"
             >
               <Icon name="rotateCcw" className="w-4 h-4 text-cyan-400" />
@@ -867,7 +874,7 @@ export default function ResponsesDashboardPage() {
         ) : error ? (
           <div className="p-8 text-center text-xs text-rose-300 space-y-2 rounded-3xl bg-slate-900 border border-slate-800">
             <p className="font-semibold">{error}</p>
-            <button onClick={loadResponses} className="px-4 py-2 rounded-xl bg-rose-950 border border-rose-500/40 text-rose-200 font-bold">
+            <button onClick={() => refetch()} className="px-4 py-2 rounded-xl bg-rose-950 border border-rose-500/40 text-rose-200 font-bold">
               Coba Ulang
             </button>
           </div>
