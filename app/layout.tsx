@@ -4,6 +4,7 @@ import type { Metadata } from 'next'
 import { Inter, Space_Grotesk } from 'next/font/google'
 import './globals.css'
 import { AuthProvider } from '@/context/AuthContext'
+import { QueryProvider } from '@/providers/query-provider'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -30,9 +31,11 @@ export default function RootLayout({
   return (
     <html lang="id" className={`${inter.variable} ${spaceGrotesk.variable} overflow-x-hidden w-full max-w-full`}>
       <body className="overflow-x-hidden w-full max-w-full relative">
-        <AuthProvider>
-          {children}
-        </AuthProvider>
+        <QueryProvider>
+          <AuthProvider>
+            {children}
+          </AuthProvider>
+        </QueryProvider>
       </body>
     </html>
   )
