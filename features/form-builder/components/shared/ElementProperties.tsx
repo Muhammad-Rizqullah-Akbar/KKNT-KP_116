@@ -5,6 +5,13 @@
 import { useState, useEffect } from 'react'
 import { Icon } from '@/components/ui/Icons'
 import { CanvasElement } from '././ElementTypes'
+import { TextFields } from '././fields/TextFields'
+import { ChoiceFields } from '././fields/ChoiceFields'
+import { TableBinaryFields } from '././fields/TableBinaryFields'
+import { LikertFields } from '././fields/LikertFields'
+import { ImageFields } from '././fields/ImageFields'
+import { SectionHeaderFields } from '././fields/SectionHeaderFields'
+import { DefaultFields } from '././fields/DefaultFields'
 
 interface ElementPropertiesProps {
   element: CanvasElement | null
@@ -55,370 +62,28 @@ export function ElementProperties({
       case 'phone':
       case 'number':
       case 'date':
-        return (
-          <>
-            <div className="space-y-1.5">
-              <label className="text-xs text-white/50 uppercase tracking-wider">Pertanyaan</label>
-              <input
-                type="text"
-                value={localElement.question}
-                onChange={(e) => setLocalElement({ ...localElement, question: e.target.value })}
-                className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-white placeholder-white/20 focus:outline-none focus:border-cyan-400/40 transition-all"
-                placeholder="Masukkan pertanyaan..."
-              />
-            </div>
-
-            {(localElement.type === 'short-text' || localElement.type === 'text' || localElement.type === 'long-text' || localElement.type === 'textarea') && (
-              <div className="space-y-1.5">
-                <label className="text-xs text-white/50 uppercase tracking-wider">Placeholder</label>
-                <input
-                  type="text"
-                  value={localElement.defaultProps?.placeholder || ''}
-                  onChange={(e) => setLocalElement({
-                    ...localElement,
-                    defaultProps: { ...localElement.defaultProps, placeholder: e.target.value }
-                  })}
-                  className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-white placeholder-white/20 focus:outline-none focus:border-cyan-400/40 transition-all"
-                  placeholder="Placeholder..."
-                />
-              </div>
-            )}
-
-            {localElement.type === 'number' && (
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="text-xs text-white/50 uppercase tracking-wider">Min</label>
-                  <input
-                    type="number"
-                    value={localElement.validation?.min || 0}
-                    onChange={(e) => setLocalElement({
-                      ...localElement,
-                      validation: { ...localElement.validation, min: parseInt(e.target.value) || 0 }
-                    })}
-                    className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-white placeholder-white/20 focus:outline-none focus:border-cyan-400/40 transition-all"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs text-white/50 uppercase tracking-wider">Max</label>
-                  <input
-                    type="number"
-                    value={localElement.validation?.max || 100}
-                    onChange={(e) => setLocalElement({
-                      ...localElement,
-                      validation: { ...localElement.validation, max: parseInt(e.target.value) || 100 }
-                    })}
-                    className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-white placeholder-white/20 focus:outline-none focus:border-cyan-400/40 transition-all"
-                  />
-                </div>
-              </div>
-            )}
-          </>
-        )
+        return <TextFields element={localElement} setElement={setLocalElement} />
 
       case 'single-choice':
       case 'multiple-choice':
       case 'dropdown':
       case 'multiselect':
-        return (
-          <>
-            <div className="space-y-1.5">
-              <label className="text-xs text-white/50 uppercase tracking-wider">Pertanyaan</label>
-              <input
-                type="text"
-                value={localElement.question}
-                onChange={(e) => setLocalElement({ ...localElement, question: e.target.value })}
-                className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-white placeholder-white/20 focus:outline-none focus:border-cyan-400/40 transition-all"
-                placeholder="Masukkan pertanyaan..."
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs text-white/50 uppercase tracking-wider">Opsi Jawaban</label>
-              <div className="space-y-2">
-                {(localElement.options || ['']).map((opt: any, index: number) => (
-                  <div key={index} className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={opt}
-                      onChange={(e) => {
-                        const newOptions = [...(localElement.options || [])]
-                        newOptions[index] = e.target.value
-                        setLocalElement({ ...localElement, options: newOptions })
-                      }}
-                      className="flex-1 px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-white placeholder-white/20 focus:outline-none focus:border-cyan-400/40 transition-all"
-                      placeholder={`Opsi ${index + 1}`}
-                    />
-                    <button
-                      onClick={() => {
-                        const newOptions = (localElement.options || []).filter((_: any, i: number) => i !== index)
-                        setLocalElement({ ...localElement, options: newOptions })
-                      }}
-                      className="p-2 rounded-lg hover:bg-red-500/10 transition-colors"
-                    >
-                      <Icon name="trash" className="w-4 h-4 text-white/30 hover:text-red-400" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-              <button
-                onClick={() => {
-                  const newOptions = [...(localElement.options || []), '']
-                  setLocalElement({ ...localElement, options: newOptions })
-                }}
-                className="text-sm text-cyan-400 hover:text-cyan-300 transition-colors flex items-center gap-1"
-              >
-                <Icon name="plus" className="w-3 h-3" /> Tambah Opsi
-              </button>
-            </div>
-
-            {localElement.type === 'single-choice' && (
-              <div className="space-y-1.5">
-                <label className="text-xs text-white/50 uppercase tracking-wider">Jawaban Benar (untuk scoring)</label>
-                <select
-                  value={localElement.correctAnswer as string || ''}
-                  onChange={(e) => setLocalElement({ ...localElement, correctAnswer: e.target.value })}
-                  className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-white/70 focus:outline-none focus:border-cyan-400/40 transition-all"
-                >
-                  <option value="" className="bg-[#0e0e1a]">Tidak ada (tidak dinilai)</option>
-                  {(localElement.options || []).map((opt: any, i: number) => (
-                    <option key={i} value={opt} className="bg-[#0e0e1a]">{opt}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-          </>
-        )
+        return <ChoiceFields element={localElement} setElement={setLocalElement} />
 
       case 'table-binary':
-        return (
-          <>
-            <div className="space-y-1.5">
-              <label className="text-xs text-white/50 uppercase tracking-wider">Pertanyaan</label>
-              <input
-                type="text"
-                value={localElement.question}
-                onChange={(e) => setLocalElement({ ...localElement, question: e.target.value })}
-                className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-white placeholder-white/20 focus:outline-none focus:border-cyan-400/40 transition-all"
-                placeholder="Masukkan pertanyaan..."
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs text-white/50 uppercase tracking-wider">Baris / Indikator</label>
-              <div className="space-y-2">
-                {(localElement.rows || []).map((row: any, index: number) => (
-                  <div key={row.id} className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={row.label}
-                      onChange={(e) => {
-                        const newRows = [...(localElement.rows || [])]
-                        newRows[index] = { ...row, label: e.target.value }
-                        setLocalElement({ ...localElement, rows: newRows })
-                      }}
-                      className="flex-1 px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-white placeholder-white/20 focus:outline-none focus:border-cyan-400/40 transition-all"
-                      placeholder={`Indikator ${index + 1}`}
-                    />
-                    <button
-                      onClick={() => {
-                        const newRows = (localElement.rows || []).filter((_: any, i: number) => i !== index)
-                        setLocalElement({ ...localElement, rows: newRows })
-                      }}
-                      className="p-2 rounded-lg hover:bg-red-500/10 transition-colors"
-                    >
-                      <Icon name="trash" className="w-4 h-4 text-white/30 hover:text-red-400" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-              <button
-                onClick={() => {
-                  const newRows = [...(localElement.rows || []), { id: `row-${Date.now()}`, label: `Indikator ${(localElement.rows || []).length + 1}` }]
-                  setLocalElement({ ...localElement, rows: newRows })
-                }}
-                className="text-sm text-cyan-400 hover:text-cyan-300 transition-colors flex items-center gap-1"
-              >
-                <Icon name="plus" className="w-3 h-3" /> Tambah Baris
-              </button>
-            </div>
-          </>
-        )
+        return <TableBinaryFields element={localElement} setElement={setLocalElement} />
 
       case 'likert':
-        return (
-          <>
-            <div className="space-y-1.5">
-              <label className="text-xs text-white/50 uppercase tracking-wider">Pertanyaan</label>
-              <input
-                type="text"
-                value={localElement.question}
-                onChange={(e) => setLocalElement({ ...localElement, question: e.target.value })}
-                className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-white placeholder-white/20 focus:outline-none focus:border-cyan-400/40 transition-all"
-                placeholder="Masukkan pertanyaan..."
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs text-white/50 uppercase tracking-wider">Pernyataan</label>
-              <div className="space-y-2">
-                {(localElement.options || ['']).map((opt: any, index: number) => (
-                  <div key={index} className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={opt}
-                      onChange={(e) => {
-                        const newOptions = [...(localElement.options || [])]
-                        newOptions[index] = e.target.value
-                        setLocalElement({ ...localElement, options: newOptions })
-                      }}
-                      className="flex-1 px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-white placeholder-white/20 focus:outline-none focus:border-cyan-400/40 transition-all"
-                      placeholder={`Pernyataan ${index + 1}`}
-                    />
-                    <button
-                      onClick={() => {
-                        const newOptions = (localElement.options || []).filter((_: any, i: number) => i !== index)
-                        setLocalElement({ ...localElement, options: newOptions })
-                      }}
-                      className="p-2 rounded-lg hover:bg-red-500/10 transition-colors"
-                    >
-                      <Icon name="trash" className="w-4 h-4 text-white/30 hover:text-red-400" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-              <button
-                onClick={() => {
-                  const newOptions = [...(localElement.options || []), '']
-                  setLocalElement({ ...localElement, options: newOptions })
-                }}
-                className="text-sm text-cyan-400 hover:text-cyan-300 transition-colors flex items-center gap-1"
-              >
-                <Icon name="plus" className="w-3 h-3" /> Tambah Pernyataan
-              </button>
-            </div>
-          </>
-        )
+        return <LikertFields element={localElement} setElement={setLocalElement} />
 
       case 'image':
-        return (
-          <>
-            <div className="space-y-1.5">
-              <label className="text-xs text-white/50 uppercase tracking-wider">Pertanyaan</label>
-              <input
-                type="text"
-                value={localElement.question}
-                onChange={(e) => setLocalElement({ ...localElement, question: e.target.value })}
-                className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-white placeholder-white/20 focus:outline-none focus:border-cyan-400/40 transition-all"
-                placeholder="Masukkan pertanyaan..."
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs text-white/50 uppercase tracking-wider">URL Gambar</label>
-              <div className="flex gap-3">
-                <input
-                  type="text"
-                  value={localElement.imageUrl || ''}
-                  onChange={(e) => setLocalElement({ ...localElement, imageUrl: e.target.value })}
-                  placeholder="https://..."
-                  className="flex-1 px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-white placeholder-white/20 focus:outline-none focus:border-cyan-400/40 transition-all"
-                />
-                <button className="px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-white/50 hover:text-white hover:border-cyan-400/20 transition-all">
-                  Upload
-                </button>
-              </div>
-              <div className="w-full h-32 rounded-xl bg-gradient-to-br from-cyan-700/30 to-emerald-800/30 border border-white/[0.05] flex items-center justify-center mt-2 overflow-hidden">
-                {localElement.imageUrl ? (
-                  <img src={localElement.imageUrl} alt="Preview" className="w-full h-full object-cover" />
-                ) : (
-                  <Icon name="image" className="w-8 h-8 text-white/20" />
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs text-white/50 uppercase tracking-wider">Opsi Jawaban</label>
-              <div className="space-y-2">
-                {(localElement.options || ['']).map((opt: any, index: number) => (
-                  <div key={index} className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={opt}
-                      onChange={(e) => {
-                        const newOptions = [...(localElement.options || [])]
-                        newOptions[index] = e.target.value
-                        setLocalElement({ ...localElement, options: newOptions })
-                      }}
-                      className="flex-1 px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-white placeholder-white/20 focus:outline-none focus:border-cyan-400/40 transition-all"
-                      placeholder={`Opsi ${index + 1}`}
-                    />
-                    <button
-                      onClick={() => {
-                        const newOptions = (localElement.options || []).filter((_: any, i: number) => i !== index)
-                        setLocalElement({ ...localElement, options: newOptions })
-                      }}
-                      className="p-2 rounded-lg hover:bg-red-500/10 transition-colors"
-                    >
-                      <Icon name="trash" className="w-4 h-4 text-white/30 hover:text-red-400" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-              <button
-                onClick={() => {
-                  const newOptions = [...(localElement.options || []), '']
-                  setLocalElement({ ...localElement, options: newOptions })
-                }}
-                className="text-sm text-cyan-400 hover:text-cyan-300 transition-colors flex items-center gap-1"
-              >
-                <Icon name="plus" className="w-3 h-3" /> Tambah Opsi
-              </button>
-            </div>
-          </>
-        )
+        return <ImageFields element={localElement} setElement={setLocalElement} />
 
       case 'section-header':
-        return (
-          <>
-            <div className="space-y-1.5">
-              <label className="text-xs text-white/50 uppercase tracking-wider">Judul Section</label>
-              <input
-                type="text"
-                value={localElement.question}
-                onChange={(e) => setLocalElement({ ...localElement, question: e.target.value })}
-                className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-white placeholder-white/20 focus:outline-none focus:border-cyan-400/40 transition-all"
-                placeholder="Masukkan judul section..."
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs text-white/50 uppercase tracking-wider">Deskripsi (opsional)</label>
-              <input
-                type="text"
-                value={localElement.defaultProps?.description || ''}
-                onChange={(e) => setLocalElement({
-                  ...localElement,
-                  defaultProps: { ...localElement.defaultProps, description: e.target.value }
-                })}
-                className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-white placeholder-white/20 focus:outline-none focus:border-cyan-400/40 transition-all"
-                placeholder="Deskripsi section..."
-              />
-            </div>
-          </>
-        )
+        return <SectionHeaderFields element={localElement} setElement={setLocalElement} />
 
       default:
-        return (
-          <div className="space-y-1.5">
-            <label className="text-xs text-white/50 uppercase tracking-wider">Pertanyaan</label>
-            <input
-              type="text"
-              value={localElement.question}
-              onChange={(e) => setLocalElement({ ...localElement, question: e.target.value })}
-              className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-white placeholder-white/20 focus:outline-none focus:border-cyan-400/40 transition-all"
-              placeholder="Masukkan pertanyaan..."
-            />
-          </div>
-        )
+        return <DefaultFields element={localElement} setElement={setLocalElement} />
     }
   }
 
