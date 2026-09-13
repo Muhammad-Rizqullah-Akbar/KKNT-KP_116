@@ -14,7 +14,6 @@ import {
 
 // Nama koleksi di Firestore
 const COLLECTION_NAME = 'articles'
-const CATEGORY_COLLECTION = 'article_categories'
 
 // Tipe data artikel untuk Repository & UI
 export interface ArticleData {
@@ -45,14 +44,6 @@ export interface ArticleData {
   updatedAt?: any
 }
 
-export interface ArticleCategory {
-  id?: string
-  name: string
-  description?: string
-  color?: string
-  createdAt?: any
-}
-
 /**
  * Mengambil semua artikel dari Firestore
  * Diurutkan berdasarkan waktu pembuatan (terbaru di atas)
@@ -75,66 +66,6 @@ export const getArticles = async (): Promise<ArticleData[]> => {
   } catch (error) {
     console.error('Error fetching articles from Firestore:', error)
     throw new Error('Gagal mengambil data artikel')
-  }
-}
-
-/**
- * Mengambil daftar kategori artikel secara dinamis dari Firestore
- */
-export const getArticleCategories = async (): Promise<ArticleCategory[]> => {
-  try {
-    const snap = await getDocs(collection(db, CATEGORY_COLLECTION))
-    const list: ArticleCategory[] = []
-    snap.forEach((doc) => {
-      list.push({ id: doc.id, ...doc.data() } as ArticleCategory)
-    })
-
-    if (list.length === 0) {
-      const defaults = [
-        { name: 'Keamanan Pangan', description: 'Edukasi standar higiene & sampel pangan' },
-        { name: 'Edukasi', description: 'Materi sosialisasi & penyuluhan lapangan' },
-        { name: 'Regulasi', description: 'Aturan & perundang-undangan kesehatan' },
-        { name: 'Tips & Trik', description: 'Panduan praktis pengolahan pangan' },
-      ]
-      for (const d of defaults) {
-        const added = await addDoc(collection(db, CATEGORY_COLLECTION), {
-          ...d,
-          createdAt: serverTimestamp(),
-        })
-        list.push({ id: added.id, ...d })
-      }
-    }
-
-    return list
-  } catch (error) {
-    console.error('Error fetching article categories from Firestore:', error)
-    return [
-      { name: 'Keamanan Pangan' },
-      { name: 'Edukasi' },
-      { name: 'Regulasi' },
-      { name: 'Tips & Trik' },
-    ]
-  }
-}
-
-/**
- * Menambahkan kategori artikel baru ke Firestore secara dinamis
- */
-export const createArticleCategory = async (name: string, description: string = ''): Promise<ArticleCategory> => {
-  try {
-    const trimmedName = name.trim()
-    if (!trimmedName) throw new Error('Nama kategori tidak boleh kosong')
-
-    const docRef = await addDoc(collection(db, CATEGORY_COLLECTION), {
-      name: trimmedName,
-      description: description.trim(),
-      createdAt: serverTimestamp(),
-    })
-
-    return { id: docRef.id, name: trimmedName, description }
-  } catch (error) {
-    console.error('Error creating article category:', error)
-    throw new Error('Gagal menambahkan kategori baru')
   }
 }
 

@@ -10,10 +10,9 @@ import {
   createArticle, 
   updateArticle, 
   deleteArticle, 
-  getArticleCategories,
-  createArticleCategory,
   type ArticleData 
 } from '@/lib/repositories/articles.repo'
+import { getArticleCategories, createArticleCategory } from '@/lib/repositories/article-categories.repo'
 import { getForms } from '@/lib/repositories/forms.repo'
 import { storage } from '@/lib/infra/firebase-client'
 import { uploadOptimizedArticleImage } from '@/lib/infra/storage'

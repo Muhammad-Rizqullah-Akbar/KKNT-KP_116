@@ -8,9 +8,9 @@ import { Icon } from '@/components/ui/Icons'
 // Import Firestore Repository & Types
 import { 
   getArticles, 
-  getArticleCategories,
   type ArticleData 
 } from '@/lib/repositories/articles.repo'
+import { getArticleCategories } from '@/lib/repositories/article-categories.repo'
 import { FuturisticArticleCard } from '@/components/articles/FuturisticArticleCard'
 
 // ============ KONSTANTA LOGO ============
