@@ -23,6 +23,8 @@ import {
 import { Icon } from '@/components/ui/Icons'
 import { FlexibleQuestion, FormStage, ANSWER_TYPES } from './../shared/ElementTypes'
 import { SortableFlexibleElement } from './../config-panels/SortableFlexibleElement'
+import { StageHeader } from './StageHeader'
+import { DragOverlayPreview } from './DragOverlayPreview'
 
 interface CanvasProps {
   elements: FlexibleQuestion[]
@@ -278,47 +280,17 @@ export function Canvas({
   const renderStageHeader = (stage: FormStage, stageIndex: number) => {
     const stageQuestions = getQuestionsByStage(stage.id)
     const isDragOver = dragOverStageId === stage.id
-    
+
     return (
-      <div 
+      <StageHeader
         key={stage.id}
-        className={`stage-header transition-all duration-200 ${
-          isDragOver ? 'ring-2 ring-cyan-400/60 rounded-xl scale-[1.01]' : ''
-        }`}
-        data-stage-id={stage.id}
-        id={`stage-header-${stage.id}`}
-      >
-        <div className={`flex items-center gap-3 px-4 py-2.5 rounded-xl border transition-all duration-200 ${
-          isDragOver 
-            ? 'bg-cyan-500/15 border-cyan-500/40 shadow-lg shadow-cyan-500/10' 
-            : 'bg-white/[0.03] border-white/[0.05]'
-        } mb-3`}>
-          <div className="flex items-center gap-2">
-            <Icon name={isDragOver ? "arrowRight" : "list"} className={`w-4 h-4 transition-all ${isDragOver ? 'text-cyan-400 animate-pulse' : 'text-cyan-400'}`} />
-            <span className={`text-sm font-medium transition-all ${isDragOver ? 'text-white' : 'text-white'}`}>
-              {stage.name}
-            </span>
-            <span className="text-xs text-white/30">({stageQuestions.length} pertanyaan)</span>
-          </div>
-          {stageQuestions.length === 0 && (
-            <span className={`text-xs ml-2 transition-all ${isDragOver ? 'text-cyan-400/80' : 'text-white/20'}`}>
-              {isDragOver ? '⬇ Lepaskan di sini' : 'Kosong - seret pertanyaan ke sini'}
-            </span>
-          )}
-          {isDragOver && (
-            <span className="ml-auto text-xs text-cyan-400 font-medium animate-pulse">
-              ⬇ Lepaskan
-            </span>
-          )}
-          {stageMode === 'multi' && stages.length > 1 && !isDragOver && (
-            <div className="ml-auto flex items-center gap-2">
-              <span className="text-xs text-white/20">
-                {stageIndex + 1} / {stages.length}
-              </span>
-            </div>
-          )}
-        </div>
-      </div>
+        stage={stage}
+        stageIndex={stageIndex}
+        questionCount={stageQuestions.length}
+        isDragOver={isDragOver}
+        stageMode={stageMode}
+        totalStages={stages.length}
+      />
     )
   }
 
@@ -399,17 +371,11 @@ export function Canvas({
           
           <DragOverlay>
             {activeElement ? (
-              <div className="p-4 rounded-xl border-2 border-cyan-500/50 bg-[#0e0e1a] shadow-2xl shadow-cyan-500/20 w-[300px] cursor-grabbing">
-                <div className="flex items-center gap-3 mb-2">
-                  <span className="text-xs font-medium text-white/20 w-6 flex-shrink-0">
-                    {elements.findIndex(el => el.id === activeElement.id) + 1}.
-                  </span>
-                  <p className="text-sm text-white/80 truncate">{activeElement.question}</p>
-                </div>
-                <div className="text-xs text-white/30">
-                  {ANSWER_TYPES.find(t => t.value === activeElement.answerType)?.label || activeElement.answerType}
-                </div>
-              </div>
+              <DragOverlayPreview
+                activeElement={activeElement}
+                index={elements.findIndex(el => el.id === activeElement.id) + 1}
+                answerTypeLabel={ANSWER_TYPES.find(t => t.value === activeElement.answerType)?.label || activeElement.answerType}
+              />
             ) : null}
           </DragOverlay>
         </DndContext>
@@ -507,25 +473,13 @@ export function Canvas({
         
         <DragOverlay>
           {activeElement ? (
-            <div className="p-4 rounded-xl border-2 border-cyan-500/50 bg-[#0e0e1a] shadow-2xl shadow-cyan-500/20 w-[300px] cursor-grabbing">
-              <div className="flex items-center gap-3 mb-2">
-                <span className="text-xs font-medium text-white/20 w-6 flex-shrink-0">
-                  {elements.findIndex(el => el.id === activeElement.id) + 1}.
-                </span>
-                <p className="text-sm text-white/80 truncate">{activeElement.question}</p>
-              </div>
-              <div className="text-xs text-white/30">
-                {ANSWER_TYPES.find(t => t.value === activeElement.answerType)?.label || activeElement.answerType}
-                {activeElement.stageId && stages.length > 1 && (
-                  <> • {stages.find(s => s.id === activeElement.stageId)?.name || ''}</>
-                )}
-              </div>
-              {dragOverStageId && (
-                <div className="mt-2 text-[10px] text-cyan-400 font-medium text-center animate-pulse">
-                  → Pindah ke {stages.find(s => s.id === dragOverStageId)?.name || ''}
-                </div>
-              )}
-            </div>
+            <DragOverlayPreview
+              activeElement={activeElement}
+              index={elements.findIndex(el => el.id === activeElement.id) + 1}
+              answerTypeLabel={ANSWER_TYPES.find(t => t.value === activeElement.answerType)?.label || activeElement.answerType}
+              stageName={activeElement.stageId && stages.length > 1 ? stages.find(s => s.id === activeElement.stageId)?.name || '' : undefined}
+              targetStageName={dragOverStageId ? stages.find(s => s.id === dragOverStageId)?.name || '' : undefined}
+            />
           ) : null}
         </DragOverlay>
       </DndContext>
