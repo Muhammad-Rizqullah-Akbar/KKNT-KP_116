@@ -108,7 +108,7 @@ function CadreOverviewDashboard() {
                 <Icon name="checkCircle" className="w-3 h-3 text-emerald-400" />
                 KADER LAPANGAN AKTIF
               </span>
-              <span className="text-xs font-mono text-slate-400">{(userData as any)?.organization || 'Kemitraan BPOM'}</span>
+              <span className="text-xs font-mono text-slate-400">{userData?.organization || 'Kemitraan BPOM'}</span>
             </div>
             <h1 className="text-2xl font-bold font-display text-white">{user?.displayName || 'Kader Lapangan'}</h1>
             <p className="text-xs text-slate-400">Ringkasan performa penyebaran kode distribusi dan tanggapan kuesioner Anda.</p>
@@ -284,7 +284,7 @@ function AdminOverviewDashboard() {
 
       const responseMap = new Map<string, any>()
       rawCombined.forEach((r) => {
-        const id = r.responseId || r.id || (r as any).docId
+        const id = r.responseId || r.id || r.docId
         if (id && !responseMap.has(id)) {
           responseMap.set(id, r)
         } else if (!id) {
@@ -313,7 +313,7 @@ function AdminOverviewDashboard() {
             const validation = form.validation || { mode: 'all_required', exceptions: [], allowOverride: true }
             const stages = form.stages && form.stages.length > 0 ? form.stages : [{ id: 'default', name: 'Semua Pertanyaan', order: 0, questionIds: form.questions.map((q: any) => q.id), includeInScoring: true }]
 
-            const engine = new ScoringEngine(questionsWithScoring, scoring as any, validation as any, stages as any)
+            const engine = new ScoringEngine(questionsWithScoring, scoring, validation, stages)
             const result = engine.calculateScore(mappedAnswers)
             if (result && typeof result.percentage === 'number' && !isNaN(result.percentage)) {
               calculatedScore = Math.round(result.percentage)
@@ -374,7 +374,7 @@ function AdminOverviewDashboard() {
       if (fId === tId || fId.includes(tId) || tId.includes(fId)) return true
     }
 
-    const matchedForm = (r as any).matchedForm
+    const matchedForm = r.matchedForm
     if (matchedForm) {
       const fId = String(matchedForm.id || matchedForm.formId || '').toLowerCase().trim()
       const fCode = String(matchedForm.code || matchedForm.formCode || '').toLowerCase().trim()
@@ -721,7 +721,7 @@ function AdminOverviewDashboard() {
       }
     }
 
-    const matchedForm = forms.find((f) => f.id === r.formId || f.title === r.formTitle) || (r as any).matchedForm
+    const matchedForm = forms.find((f) => f.id === r.formId || f.title === r.formTitle) || r.matchedForm
     if (matchedForm && matchedForm.questions && Array.isArray(matchedForm.questions) && matchedForm.questions.length > 0) {
       const aspectGroups = new Map<string, { title: string; questionIds: string[] }>()
 
@@ -832,7 +832,7 @@ function AdminOverviewDashboard() {
     const matchFormId = (r: any, targetId: string) => {
       if (!targetId || targetId === 'all') return true
       const tId = String(targetId).toLowerCase().trim()
-      const rFormId = String(r.formId || (r as any).metadata?.formId || r.distributionId || r.distributionCode || r.id || r.code || '').toLowerCase().trim()
+      const rFormId = String(r.formId || r.metadata?.formId || r.distributionId || r.distributionCode || r.id || r.code || '').toLowerCase().trim()
       return rFormId === tId || (rFormId !== '' && tId !== '' && (rFormId.includes(tId) || tId.includes(rFormId)))
     }
 
@@ -840,10 +840,10 @@ function AdminOverviewDashboard() {
       const formResponses = responses.filter(
         (r) =>
           r.formId === formObj.id ||
-          (r as any).metadata?.formId === formObj.id ||
+          r.metadata?.formId === formObj.id ||
           r.formTitle === formObj.title ||
-          (r as any).matchedForm?.id === formObj.id ||
-          (r as any).matchedForm?.title === formObj.title ||
+          r.matchedForm?.id === formObj.id ||
+          r.matchedForm?.title === formObj.title ||
           matchFormId(r, formObj.id)
       )
 
@@ -997,7 +997,7 @@ function AdminOverviewDashboard() {
   const getWidgetData = (widget: any) => {
     const targetResponses = selectedFormId === 'all' 
       ? responses 
-      : responses.filter(r => !widget.formId || r.formId === widget.formId || r.formId === selectedFormId || (r as any).metadata?.formId === widget.formId)
+      : responses.filter(r => !widget.formId || r.formId === widget.formId || r.formId === selectedFormId || r.metadata?.formId === widget.formId)
 
     const counts: Record<string, number> = {}
 
