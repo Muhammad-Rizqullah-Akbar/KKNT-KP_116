@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { safeFetchJson } from '@/lib/infra/safe-fetch'
@@ -66,6 +67,7 @@ const ROLE_OPTIONS: { id: UserRole; label: string; icon: IconName; colorClass: s
 export default function UserManagementPage() {
   const { userRole, user, userData, loading: authLoading } = useAuth()
   const router = useRouter()
+  const queryClient = useQueryClient()
 
   useEffect(() => {
     if (!authLoading) {
@@ -82,10 +84,27 @@ export default function UserManagementPage() {
     }
   }, [authLoading, userRole, userData, router])
 
-  const [users, setUsers] = useState<User[]>([])
-  const [loading, setLoading] = useState(true)
+  const {
+    data: users = [],
+    isLoading: loading,
+    error: usersError,
+    refetch,
+  } = useQuery<User[]>({
+    queryKey: ['users'],
+    queryFn: async () => {
+      const { ok, data, error: fetchErr } = await safeFetchJson<{ users?: User[] }>('/api/auth/users')
+      if (!ok || !data) {
+        throw new Error(fetchErr || 'Gagal mengambil data user')
+      }
+      return data.users || []
+    },
+  })
+
   const [error, setError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
+
+  // Surface fetch errors (from useQuery) alongside mutation errors
+  const displayError = error ?? (usersError ? (usersError as Error).message : null)
 
   // Search & Filters
   const [searchTerm, setSearchTerm] = useState('')
@@ -117,27 +136,7 @@ export default function UserManagementPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Fetch All Users
-  const fetchUsers = async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const { ok, data, error: fetchErr } = await safeFetchJson('/api/auth/users')
-
-      if (!ok || !data) {
-        throw new Error(fetchErr || 'Gagal mengambil data user')
-      }
-
-      setUsers(data.users || [])
-    } catch (err: any) {
-      setError(err.message)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    fetchUsers()
-  }, [])
+  // (users are loaded via useQuery above)
 
   // Filtered Partnership list for Cadre assignment
   const partnershipUsers = useMemo(() => {
@@ -259,7 +258,9 @@ export default function UserManagementPage() {
         throw new Error(data.message || 'Gagal menghapus user.')
       }
 
-      setUsers((prev) => prev.filter((u) => u.uid !== selectedUser.uid))
+      queryClient.setQueryData<User[]>(['users'], (prev = []) =>
+        prev.filter((u) => u.uid !== selectedUser.uid)
+      )
       setSelectedUids((prev) => prev.filter((id) => id !== selectedUser.uid))
       setSuccessMessage(`✅ Akun ${selectedUser.email} berhasil dihapus.`)
       setShowDeleteModal(false)
@@ -290,7 +291,9 @@ export default function UserManagementPage() {
         throw new Error(data.message || 'Gagal menghapus daftar user terpilih.')
       }
 
-      setUsers((prev) => prev.filter((u) => !selectedUids.includes(u.uid)))
+      queryClient.setQueryData<User[]>(['users'], (prev = []) =>
+        prev.filter((u) => !selectedUids.includes(u.uid))
+      )
       setSuccessMessage(`✅ Berhasil menghapus ${data.deletedCount || selectedUids.length} akun pengguna terpilih.`)
       setSelectedUids([])
       setShowBulkDeleteModal(false)
@@ -339,7 +342,7 @@ export default function UserManagementPage() {
       setRegisterPartnershipId('')
       setRegisterRole('super_admin')
 
-      await fetchUsers()
+      queryClient.invalidateQueries({ queryKey: ['users'] })
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -379,7 +382,7 @@ export default function UserManagementPage() {
         throw new Error(data.message || 'Gagal memperbarui role.')
       }
 
-      setUsers((prev) =>
+      queryClient.setQueryData<User[]>(['users'], (prev = []) =>
         prev.map((u) =>
           u.uid === selectedUser.uid
             ? { ...u, role: editRole, organization: editOrganization, phone: editPhone }
@@ -439,7 +442,7 @@ export default function UserManagementPage() {
             </div>
           </div>
           <button
-            onClick={fetchUsers}
+            onClick={() => refetch()}
             className="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200 font-bold flex items-center gap-1.5 transition-all text-xs shrink-0"
           >
             <Icon name="refreshCw" className="w-3.5 h-3.5 text-amber-300" />
@@ -448,10 +451,10 @@ export default function UserManagementPage() {
         </div>
 
         {/* Feedback Messages */}
-        {error && (
+        {displayError && (
           <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-center gap-3 animate-fadeIn">
             <Icon name="alertCircle" className="w-5 h-5 shrink-0" />
-            <span>{error}</span>
+            <span>{displayError}</span>
           </div>
         )}
 
