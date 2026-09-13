@@ -4,7 +4,7 @@ import React from 'react'
 import type { PublicAspect, PublicQuestion } from '@/lib/domain/forms/types'
 import { Icon } from '@/components/ui/Icons'
 
-import { FormPublicRenderer } from '@/components/forms/v1_5/FormPublicRenderer'
+import { FormPublicRenderer } from '@/components/forms/FormPublicRenderer'
 
 interface PublicReviewScreenProps {
   code: string

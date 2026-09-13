@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { FormBuilderV2 } from '@/components/forms/v1_5/FormBuilderV2'
+import { FormBuilderV2 } from '@/components/forms/FormBuilderV2'
 import type { BuilderState } from '@/lib/domain/forms/builder-state'
 
 export default function FormBuilderV15TestPage() {

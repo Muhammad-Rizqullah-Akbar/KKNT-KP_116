@@ -14,7 +14,7 @@ import type { ComponentType } from 'react'
  * Only loads when user actually opens the builder
  */
 export const LazyFormBuilderV2 = dynamic(
-  () => import('@/components/forms/v1_5/FormBuilderV2').then(mod => mod.FormBuilderV2),
+  () => import('@/components/forms/FormBuilderV2').then(mod => mod.FormBuilderV2),
   {
     loading: () => (
       <div className="flex items-center justify-center h-64">
@@ -80,7 +80,7 @@ export const LazyMitraProgressModal = dynamic(
  * Lazy load FormPublicRenderer - only needed on public form pages
  */
 export const LazyFormPublicRenderer = dynamic(
-  () => import('@/components/forms/v1_5/FormPublicRenderer').then(mod => mod.FormPublicRenderer),
+  () => import('@/components/forms/FormPublicRenderer').then(mod => mod.FormPublicRenderer),
   {
     ssr: false, // Form interactions are client-side
   }
