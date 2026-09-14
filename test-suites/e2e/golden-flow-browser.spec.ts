@@ -44,6 +44,8 @@ function getAdmin() {
     try {
       db.settings({ host: 'localhost:8090', ssl: false, ignoreUndefinedProperties: true })
     } catch {}
+    // Auth emulator: wajib set env sebelum getAuth() agar adminAuth.createUser tidak hit production
+    process.env.FIREBASE_AUTH_EMULATOR_HOST = process.env.FIREBASE_AUTH_EMULATOR_HOST || 'localhost:9099'
   }
   return { adminAuth: getAuth(app), adminFirestore: db }
 }
