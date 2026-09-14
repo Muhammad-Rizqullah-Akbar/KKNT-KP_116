@@ -19,16 +19,18 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
       - name: Setup Java (Firebase emulator dependency)
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y openjdk-17-jre-headless
-      - name: Run E2E (Playwright auto-starts emulator + dev server via webServer)
-        run: npx playwright test
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      # emulators:exec auto-starts emulator, waits for readiness, sets
+      # FIRESTORE_EMULATOR_HOST / FIREBASE_AUTH_EMULATOR_HOST, runs the command,
+      # then tears the emulator down. webServer (Playwright) only starts Next dev.
+      - name: Run E2E (Firebase emulator + Playwright)
+        run: npx firebase emulators:exec --only firestore,auth --project desa-sehat-2026 "npx playwright test"
         env:
           FIREBASE_PROJECT_ID: desa-sehat-2026
           NEXT_PUBLIC_FIREBASE_PROJECT_ID: desa-sehat-2026
-          FIRESTORE_EMULATOR_HOST: localhost:8090
-          FIREBASE_AUTH_EMULATOR_HOST: localhost:9099
           NEXT_PUBLIC_USE_EMULATOR: "true"
           NEXT_PUBLIC_FIREBASE_API_KEY: ${{ vars.NEXT_PUBLIC_FIREBASE_API_KEY }}
           NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ vars.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}

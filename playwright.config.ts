@@ -23,27 +23,19 @@ export default defineConfig({
       use: { browserName: 'chromium' },
     },
   ],
-  // webServer array: Playwright starts all, waits for each URL, kills all on exit.
-  // Emulator + dev server hidup dalam satu lifecycle Playwright (bukan antar-step CI).
-  webServer: [
-    {
-      command: 'firebase emulators:start --only firestore,auth --project desa-sehat-2026',
-      url: 'http://localhost:8090',
-      reuseExistingServer: false,
-      timeout: 180_000,
+  // webServer: hanya Next dev. Emulator di-start oleh `firebase emulators:exec`
+  // (di CI) atau manual (di lokal). globalSetup bind emulator Firestore.
+  webServer: {
+    command: 'npm run dev',
+    url: 'http://localhost:3000',
+    reuseExistingServer: !process.env.CI,
+    timeout: 180_000,
+    env: {
+      FIRESTORE_EMULATOR_HOST: 'localhost:8090',
+      FIREBASE_AUTH_EMULATOR_HOST: 'localhost:9099',
+      NEXT_PUBLIC_USE_EMULATOR: 'true',
+      FIREBASE_PROJECT_ID: 'desa-sehat-2026',
+      NEXT_PUBLIC_FIREBASE_PROJECT_ID: 'desa-sehat-2026',
     },
-    {
-      command: 'npm run dev',
-      url: 'http://localhost:3000',
-      reuseExistingServer: false,
-      timeout: 180_000,
-      env: {
-        FIRESTORE_EMULATOR_HOST: 'localhost:8090',
-        FIREBASE_AUTH_EMULATOR_HOST: 'localhost:9099',
-        NEXT_PUBLIC_USE_EMULATOR: 'true',
-        FIREBASE_PROJECT_ID: 'desa-sehat-2026',
-        NEXT_PUBLIC_FIREBASE_PROJECT_ID: 'desa-sehat-2026',
-      },
-    },
-  ],
+  },
 })
