@@ -22,7 +22,10 @@ export interface ItemAnalysisQuestion {
 const isScorable = (q: any): boolean => {
   const t = (q.answerType || q.type || '').toLowerCase()
   if (t.startsWith('biodata-')) return false
-  if (q.biodataKey || q.identifierType) return false
+  // identifierType = 'name'/'email' (biodata). 'none'/'' = bukan identifier.
+  const idType = (q.identifierType || '').toLowerCase()
+  if (idType && idType !== 'none') return false
+  if (q.biodataKey) return false
   if (t === 'number') return false
   if (t === 'short-text' || t === 'long-text' || t === 'text' || t === 'textarea' || t === 'date') return false
   if (t === 'file-upload' || t === 'image' || t === 'signature') return false
