@@ -50,11 +50,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Listen to auth state changes & Sinkronisasi Session
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      // Pastikan loading tetap true selama fetch userData (hindari flash "Sesi Kadaluwarsa")
+      setLoading(true)
       setUser(currentUser)
-      
+
       if (currentUser) {
         const data = await getUserData(currentUser.uid)
-        
+
         // Cek jika user terdaftar memiliki role yang valid
         if (data && data.role && validRoles.includes(data.role)) {
           setUserData(data)
@@ -64,7 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         setUserData(null)
       }
-      
+
       setLoading(false)
     })
 
@@ -73,10 +75,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Login wrapper
   const handleLogin = async (email: string, pass: string): Promise<LoginResult> => {
-    const result = await loginWithEmail(email, pass)
-    setUser(result.user)
-    setUserData(result.userData)
-    return result
+    setLoading(true)
+    try {
+      const result = await loginWithEmail(email, pass)
+      setUser(result.user)
+      setUserData(result.userData)
+      setLoading(false)
+      return result
+    } catch (error) {
+      setLoading(false)
+      throw error
+    }
   }
 
   // Logout wrapper
