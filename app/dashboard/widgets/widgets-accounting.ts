@@ -304,7 +304,7 @@ export function computeAccountingForStack(
     })
 
     let mPreScores = mPre.map(extractScore).filter((s): s is number => s !== null)
-    let mPostScores = mPost.map(extractScore).filter((s): s is number => s !== null)
+    const mPostScores = mPost.map(extractScore).filter((s): s is number => s !== null)
 
     if (partner.id === 'umum' && mPreScores.length === 0 && mPostScores.length === 0 && responses.length > 0) {
       mPreScores = responses.map(extractScore).filter((s): s is number => s !== null)

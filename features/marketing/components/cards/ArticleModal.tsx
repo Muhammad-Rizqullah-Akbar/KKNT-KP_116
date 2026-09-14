@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect } from 'react'
-import Link from 'next/link'
 import { Icon } from '@/components/ui/Icons'
 import { sanitizeHtml } from '@/lib/infra/sanitize-html'
 

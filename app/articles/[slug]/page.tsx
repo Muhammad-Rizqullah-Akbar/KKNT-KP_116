@@ -9,13 +9,12 @@ import {
   updateArticle,
   type ArticleData
 } from '@/lib/repositories/articles.repo'
-import { auth, storage } from '@/lib/infra/firebase-client'
+import { auth } from '@/lib/infra/firebase-client'
 import { uploadOptimizedArticleImage } from '@/lib/infra/storage'
 import { onAuthStateChanged } from 'firebase/auth'
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { VIEW_COOLDOWN_MS } from '@/lib/constants'
 
-import { shuffleArray, type HeadingItem, type LightboxImage, formatDate, formatViews } from './article-utils'
+import { shuffleArray, type HeadingItem, type LightboxImage } from './article-utils'
 import { ArticleNavbar } from './article-navbar'
 import { ArticleHero } from './article-hero'
 import { AdminBar } from './admin-bar'

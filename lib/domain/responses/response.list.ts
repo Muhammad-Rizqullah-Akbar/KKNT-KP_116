@@ -29,8 +29,8 @@ export async function listResponsesWorkflow(
   if (authContext.role === 'partnership') {
     const allResponses = await listResponsesDoc(options)
     // Find all distribution IDs and codes owned by this partnership or subordinate cadres
-    let partnerCodes = new Set<string>()
-    let partnerCadreUids = new Set<string>([authContext.uid])
+    const partnerCodes = new Set<string>()
+    const partnerCadreUids = new Set<string>([authContext.uid])
     let partnerOrg = ''
 
     try {
@@ -88,7 +88,7 @@ export async function listResponsesWorkflow(
 
   // Cadre Scope: Only own responses or responses to own distribution codes
   const allResponses = await listResponsesDoc(options)
-  let cadreCodes = new Set<string>()
+  const cadreCodes = new Set<string>()
   try {
     const allDists = await listDistributionsDoc()
     allDists.forEach((d) => {

@@ -177,7 +177,7 @@ export async function enrichResponsesWithFormScoring(docs: ResponseDoc[]): Promi
             let aspects = form.aspects || []
             let questions = form.questions || []
             let scoring = form.scoring || { totalPoints: 100, mode: 'auto', stagePointDistribution: {} }
-            let thresholds = form.thresholds || []
+            const thresholds = form.thresholds || []
 
             if (!form.aspects || form.aspects.length === 0) {
               const adapted = adaptLegacyForm(form)

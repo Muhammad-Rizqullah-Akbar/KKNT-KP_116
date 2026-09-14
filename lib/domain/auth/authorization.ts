@@ -2,7 +2,7 @@ import 'server-only'
 
 import { cookies } from 'next/headers'
 import type { DecodedIdToken } from 'firebase-admin/auth'
-import { adminAuth, adminFirestore } from '@/lib/infra/firebase-admin'
+import { adminAuth } from '@/lib/infra/firebase-admin'
 
 export const SESSION_COOKIE_NAME = '__session'
 // Role enum FINAL (3 nilai): admin & internal_bpom telah di-merge ke super_admin.

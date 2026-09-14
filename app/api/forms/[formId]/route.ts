@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getAuthorizationContext, requireRole } from '@/lib/domain/auth/authorization'
+import { getAuthorizationContext } from '@/lib/domain/auth/authorization'
 import { getFormAggregateFromDb } from '@/lib/repositories/form-versions.repo'
 import { saveDraftWorkflow, updateFormMetadataWorkflow } from '@/lib/domain/forms/form-management.service'
 import { deleteForm } from '@/lib/repositories/forms.repo'
@@ -46,7 +46,6 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     )
   }
 }
-import { toPublicFormProjection } from '@/lib/domain/forms/legacy-adapter'
 
 interface RouteParams {
   params: Promise<{ formId: string }>

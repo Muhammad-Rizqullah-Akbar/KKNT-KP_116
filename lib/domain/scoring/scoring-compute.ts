@@ -270,7 +270,7 @@ export function calculateQuestionScore(
       if (indMax <= 0) indMax = 5
 
       // Resolve selected value from tableAnswers using all possible keys
-      let selectedVal =
+      const selectedVal =
         tableAnswers[indId] ??
         tableAnswers[`${question.questionId}-${index}`] ??
         tableAnswers[`${question.questionId}_${index}`] ??

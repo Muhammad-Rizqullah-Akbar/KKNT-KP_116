@@ -102,7 +102,6 @@ import {
   Sliders,
   Upload,
   Heading,
-  Layout,
   LayoutDashboard as LayoutIcon,
   CircleDot,
   ChevronDown,

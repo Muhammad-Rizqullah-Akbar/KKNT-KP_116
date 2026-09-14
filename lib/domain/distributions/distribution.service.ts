@@ -10,8 +10,7 @@ import {
   archiveDistributionDoc,
   deleteDistributionDoc,
 } from '@/lib/repositories/distributions.repo'
-import { safeGetDoc, safeGetCollectionDocs } from '@/lib/repositories/safe-firestore'
-import { checkFormAccessDoc } from '@/lib/repositories/form-access.repo'
+import { safeGetDoc } from '@/lib/repositories/safe-firestore'
 import {
   getFormAggregateFromDb,
   getFormVersionSnapshotsFromDb,

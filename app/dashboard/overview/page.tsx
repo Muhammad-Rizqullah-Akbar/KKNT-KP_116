@@ -4,7 +4,6 @@ import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Topbar } from '@/features/dashboard/components/layout/Topbar'
 import { useAuth } from '@/context/AuthContext'
-import { safeFetchJson } from '@/lib/infra/safe-fetch'
 import { queryKeys } from '@/lib/query-keys'
 import {
   findMatchingForm,

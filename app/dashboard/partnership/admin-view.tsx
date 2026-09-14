@@ -1,7 +1,7 @@
 'use client'
 
 import { Icon } from '@/components/ui/Icons'
-import { SkeletonCard, SkeletonTable } from '@/components/ui/Skeleton'
+import { SkeletonCard } from '@/components/ui/Skeleton'
 import { PARTNERSHIP_TYPES } from './types'
 import type { UserProfile, CadresByMitraGroup, CadreProgressSummary, MitraProgressSummary } from './types'
 import CadresView from './cadres-view'

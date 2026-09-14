@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server'
-import { getAuthorizationContext, requireRole, AuthorizationError } from '@/lib/domain/auth/authorization'
+import { getAuthorizationContext } from '@/lib/domain/auth/authorization'
 import {
   listFormAggregatesFromDb,
 } from '@/lib/repositories/form-versions.repo'
 import { createFormWorkflow } from '@/lib/domain/forms/form-management.service'
-import { toPublicFormProjection } from '@/lib/domain/forms/legacy-adapter'
 import { formSchema } from '@/lib/schemas'
 
 /**

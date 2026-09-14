@@ -20,7 +20,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
       return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
     }
 
-    let dist = await getDistributionDoc(distributionId)
+    const dist = await getDistributionDoc(distributionId)
     if (!dist) {
       return NextResponse.json(
         { success: false, message: `Distribusi dengan ID "${distributionId}" tidak ditemukan.` },

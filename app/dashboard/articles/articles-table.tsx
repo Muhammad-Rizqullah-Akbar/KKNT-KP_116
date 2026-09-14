@@ -1,6 +1,5 @@
 'use client'
 
-import { Dispatch, SetStateAction } from 'react'
 import { Icon } from '@/components/ui/Icons'
 import { SkeletonTable } from '@/components/ui/Skeleton'
 import { statusColors, formatViews, formatDate } from './articles-types'

@@ -5,7 +5,7 @@
 // grade/recommendation resolvers moved to preview-recommendation.ts,
 // and shared types moved to preview-types.ts.
 
-import { FlexibleQuestion, FormScoring, FormValidation, FormStage } from '@/features/form-builder/components/shared/ElementTypes'
+import { FormScoring, FormValidation, FormStage } from '@/features/form-builder/components/shared/ElementTypes'
 import type { ScoringResult, AnswerMap } from './preview-types'
 import { calculateQuestionScore } from './preview-question-score'
 import { generateRecommendations, getGrade } from './preview-recommendation'

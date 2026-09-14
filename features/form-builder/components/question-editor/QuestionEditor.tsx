@@ -3,7 +3,6 @@
 import React, { useState } from 'react'
 import type { QuestionType, BiodataKey } from '@/lib/domain/forms/types'
 import type { FormAspect, BuilderQuestion } from '@/lib/domain/forms/builder-state'
-import { QUESTION_TYPES } from '@/lib/domain/forms/types'
 import { LikertScaleEditor } from '././LikertScaleEditor'
 import { Icon } from '@/components/ui/Icons'
 import { BiodataNormalizationPanel } from './BiodataNormalizationPanel'

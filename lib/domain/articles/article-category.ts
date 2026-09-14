@@ -39,7 +39,7 @@ export function cleanAndRepairJson(raw: string): { success: boolean; data?: any;
   }
 
   try {
-    let repaired = cleaned
+    const repaired = cleaned
       // Remove trailing commas before closing braces/brackets
       .replace(/,\s*([\]}])/g, '$1')
       // Normalize single quotes around keys and string values

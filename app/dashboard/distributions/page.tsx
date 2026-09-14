@@ -21,7 +21,7 @@ import EditModal from './edit-modal'
 import DeleteConfirmModal from './delete-confirm-modal'
 import PermissionModal from './permission-modal'
 import ToastNotification from './toast-notification'
-import type { DistributionDetail, VersionItem, DeleteTarget } from './types'
+import type { DistributionDetail, VersionItem } from './types'
 import { usePermissionModal } from './use-permission-modal'
 import { useDistributionSelection } from './use-distribution-selection'
 
@@ -46,7 +46,7 @@ export default function DistributionsDashboardPage() {
         throw new Error(distRes.error || 'Gagal memuat daftar distribusi.')
       }
 
-      let formsList = formRes.ok && formRes.data && Array.isArray(formRes.data.forms) ? formRes.data.forms : []
+      const formsList = formRes.ok && formRes.data && Array.isArray(formRes.data.forms) ? formRes.data.forms : []
       const isGlobal = ['super_admin'].includes(userRole || '')
 
       const permittedForms = formsList.filter((form: FormAggregateDoc) => {

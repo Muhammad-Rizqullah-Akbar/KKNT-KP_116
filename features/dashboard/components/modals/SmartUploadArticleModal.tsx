@@ -5,7 +5,6 @@ import { Icon } from '@/components/ui/Icons'
 import {
   parseRawTextToArticle,
   getSampleDraftText,
-  cleanAndRepairJson,
   exportArticleToJson,
   type ParsedArticle,
 } from '@/lib/domain/articles/smart-article-parser'

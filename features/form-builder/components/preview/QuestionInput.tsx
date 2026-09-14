@@ -205,7 +205,7 @@ export function QuestionInput({ question, value, onChange, isDisabled }: Questio
           ]
 
       const sanitizedScales = rawScales.map((sc: any, sIdx: number) => {
-        let text = String(sc.label || sc.text || sc.name || '')
+        const text = String(sc.label || sc.text || sc.name || '')
         let clean = text.replace(/^(\d+[\.\-\s\(\)\:]+)+/g, '').replace(/[\(\)]/g, '').trim()
         if (!clean) clean = text || `Skala ${sIdx + 1}`
         return {
@@ -255,7 +255,7 @@ export function QuestionInput({ question, value, onChange, isDisabled }: Questio
           ]
 
       const sanitizedScales = rawScales.map((sc: any, sIdx: number) => {
-        let text = String(sc.label || sc.text || sc.name || '')
+        const text = String(sc.label || sc.text || sc.name || '')
         let clean = text.replace(/^(\d+[\.\-\s\(\)\:]+)+/g, '').replace(/[\(\)]/g, '').trim()
         if (!clean) clean = text || `Skala ${sIdx + 1}`
         return {

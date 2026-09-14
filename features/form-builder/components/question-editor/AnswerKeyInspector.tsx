@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import type { Question, QuestionType, ScoringConfig } from '@/lib/domain/forms/types'
+import type { ScoringConfig } from '@/lib/domain/forms/types'
 import type { FormAspect, BuilderQuestion } from '@/lib/domain/forms/builder-state'
 import type { DetailedIndicator } from '././LikertScaleEditor'
 import { QUESTION_TYPES } from '@/lib/domain/forms/types'

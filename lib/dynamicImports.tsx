@@ -5,7 +5,6 @@
  */
 
 import dynamic from 'next/dynamic'
-import type { ComponentType } from 'react'
 
 // ============ FORM BUILDER COMPONENTS ============
 

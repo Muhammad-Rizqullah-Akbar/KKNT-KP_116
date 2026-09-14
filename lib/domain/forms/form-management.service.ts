@@ -199,7 +199,7 @@ export async function duplicateFormWorkflow(
   }
 
   const rawTitle = existing.metadata.title || 'Formulir'
-  let baseTitle = rawTitle.replace(/^\[Salinan[^\]]*\]\s*/i, '').replace(/^Salinan\s*(?:V1\.5)?\s*[-–:]\s*/i, '').trim()
+  const baseTitle = rawTitle.replace(/^\[Salinan[^\]]*\]\s*/i, '').replace(/^Salinan\s*(?:V1\.5)?\s*[-–:]\s*/i, '').trim()
   let cleanTitle = baseTitle
   if (/pre[-_\s]*test/i.test(baseTitle)) {
     cleanTitle = baseTitle.replace(/pre[-_\s]*test/gi, 'Post-Test')

@@ -84,7 +84,7 @@ export function getMitraProgressSummary(
   let totalResponses = 0
   let totalArticles = 0
   let totalArticleViews = 0
-  let allScores: number[] = []
+  const allScores: number[] = []
 
   // Articles authored directly by Mitra
   const mitraEmail = (mitra.email || '').toLowerCase().trim()
