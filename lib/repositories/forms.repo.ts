@@ -18,7 +18,6 @@ import {
 } from 'firebase/firestore'
 import type {
   FormData,
-  FormGroup,
 } from './forms.types'
 import {
   cleanFormData,
@@ -33,7 +32,6 @@ export type {
   FormScoring,
   FormQuestion,
   FormData,
-  FormGroup,
   FormResponse,
   DashboardStats,
 } from './forms.types'
@@ -56,18 +54,6 @@ export const getForms = async (): Promise<FormData[]> => {
     return snapshot.docs.map((doc) => deserializeFormData(doc))
   } catch (error) {
     console.error('Error getting forms:', error)
-    throw error
-  }
-}
-
-export const getFormsByGroup = async (groupId: string): Promise<FormData[]> => {
-  try {
-    const formsRef = collection(firestore, 'forms')
-    const q = query(formsRef, where('groupId', '==', groupId))
-    const snapshot = await getDocs(q)
-    return snapshot.docs.map((doc) => deserializeFormData(doc))
-  } catch (error) {
-    console.error('Error getting forms by group:', error)
     throw error
   }
 }
@@ -198,109 +184,3 @@ export const incrementFilledCount = async (formId: string): Promise<void> => {
   }
 }
 
-// ============ FORM GROUP CRUD ============
-
-/**
- * @deprecated formGroups akan dihapus pada migrasi data (M3) — target struktur
- * tidak lagi memakai pengelompokan form terpisah (forms jadi self-contained).
- * Jangan pakai untuk fitur baru. Fungsi dipertahankan sementara agar dashboard lama tetap jalan.
- */
-export const getFormGroups = async (): Promise<FormGroup[]> => {
-  try {
-    const groupsRef = collection(firestore, 'formGroups')
-    const snapshot = await getDocs(groupsRef)
-    return snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as FormGroup[]
-  } catch (error) {
-    console.error('Error getting form groups:', error)
-    throw error
-  }
-}
-
-export const getFormGroupById = async (groupId: string): Promise<FormGroup | null> => {
-  try {
-    const docRef = doc(firestore, 'formGroups', groupId)
-    const docSnap = await getDoc(docRef)
-    if (docSnap.exists()) {
-      return { id: docSnap.id, ...docSnap.data() } as FormGroup
-    }
-    return null
-  } catch (error) {
-    console.error('Error getting form group:', error)
-    throw error
-  }
-}
-
-export const getFormGroupByCode = async (code: string): Promise<FormGroup | null> => {
-  try {
-    const groupsRef = collection(firestore, 'formGroups')
-    const q = query(groupsRef, where('code', '==', code))
-    const snapshot = await getDocs(q)
-    if (!snapshot.empty) {
-      return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as FormGroup
-    }
-    return null
-  } catch (error) {
-    console.error('Error getting form group by code:', error)
-    throw error
-  }
-}
-
-export const createFormGroup = async (
-  groupData: Omit<FormGroup, 'id' | 'createdAt' | 'updatedAt'>
-): Promise<FormGroup> => {
-  try {
-    const groupsRef = collection(firestore, 'formGroups')
-
-    const cleanData: any = {
-      code: groupData.code || '',
-      title: groupData.title || '',
-      description: groupData.description || '',
-      target: groupData.target || '',
-      color: groupData.color || 'cyan',
-      formCount: groupData.formCount || 0,
-      createdBy: groupData.createdBy || '',
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    }
-
-    const docRef = await addDoc(groupsRef, cleanData)
-    return { id: docRef.id, ...groupData }
-  } catch (error) {
-    console.error('Error creating form group:', error)
-    throw error
-  }
-}
-
-export const updateFormGroup = async (
-  groupId: string,
-  groupData: Partial<FormGroup>
-): Promise<void> => {
-  try {
-    const docRef = doc(firestore, 'formGroups', groupId)
-    const cleanData: any = { ...groupData, updatedAt: serverTimestamp() }
-    Object.keys(cleanData).forEach(key => {
-      if (cleanData[key] === undefined) delete cleanData[key]
-    })
-    await updateDoc(docRef, cleanData)
-  } catch (error) {
-    console.error('Error updating form group:', error)
-    throw error
-  }
-}
-
-export const deleteFormGroup = async (groupId: string): Promise<void> => {
-  try {
-    const formsInGroup = await getFormsByGroup(groupId)
-    for (const form of formsInGroup) {
-      if (form.id) await deleteForm(form.id)
-    }
-    const docRef = doc(firestore, 'formGroups', groupId)
-    await deleteDoc(docRef)
-  } catch (error) {
-    console.error('Error deleting form group:', error)
-    throw error
-  }
-}

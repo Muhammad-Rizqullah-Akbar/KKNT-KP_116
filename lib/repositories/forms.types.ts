@@ -100,19 +100,6 @@ export interface FormData {
   scoring?: FormScoring
 }
 
-export interface FormGroup {
-  id: string
-  code: string
-  title: string
-  description: string
-  target: string
-  color: string
-  formCount: number
-  createdAt?: string
-  updatedAt?: string
-  createdBy?: string
-}
-
 export interface FormResponse {
   id?: string
   formId: string
