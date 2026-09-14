@@ -4,7 +4,7 @@ import { safeFetchJson } from '@/lib/infra/safe-fetch'
 import { resolveOptionLabel } from '@/lib/domain/answers/normalizer'
 import type { WidgetItem, WidgetCmsData, ChartData } from './widgets-types'
 import { COLOR_SCHEMES } from './widgets-types'
-import { mapAnswersToQuestionIds, findMatchingForm } from './widgets-form-matcher'
+import { findMatchingForm } from './widgets-form-matcher'
 
 // Fetch & transform all widget CMS data from database (was previously inline loadWidgetData)
 export async function fetchWidgetData(): Promise<WidgetCmsData> {
@@ -15,8 +15,6 @@ export async function fetchWidgetData(): Promise<WidgetCmsData> {
     safeFetchJson('/api/auth/users'),
     safeFetchJson('/api/responses'),
   ])
-
-  const { ScoringEngine } = await import('@/lib/domain/scoring/preview-engine')
 
   let rawCombined: any[] = Array.isArray(resData) ? [...resData] : []
   if (v15RespRes.ok && v15RespRes.data && Array.isArray(v15RespRes.data.responses)) {
@@ -35,45 +33,21 @@ export async function fetchWidgetData(): Promise<WidgetCmsData> {
   })
   const uniqueResponses = Array.from(responseMap.values())
 
-  // Transform responses with exact Data Responden score calculation engine
+  // Transform responses — pakai result yang SUDAH di-compute di DB (bukan scoring ulang)
   const transformedResponses = uniqueResponses.map((r: any) => {
     const form = findMatchingForm(r, v10Data)
-    const mappedAnswers = mapAnswersToQuestionIds(r.answers || {}, form || null)
 
-    let calculatedScore = 0
-    if (form && form.questions && form.questions.length > 0) {
-      try {
-        const questionsWithScoring = form.questions.map((q: any) => {
-          const type = q.answerType || q.type || 'short-text'
-          let scheme: 'none' | 'binary' | 'likert' | 'rating' | 'indicator' = 'none'
-          if (type === 'single-choice' || type === 'dropdown' || type === 'binary' || type === 'multiple-choice') scheme = 'binary'
-          else if (type === 'indicator-table' || type === 'likert') scheme = 'indicator'
-          else if (type === 'rating') scheme = 'rating'
-          return { ...q, scoring: q.scoring || { scheme, weight: 1 } }
-        })
-
-        const scoring = form.scoring || { totalPoints: 100, mode: 'auto', distribution: {}, overrides: {}, allowOverride: true, autoBalance: true }
-        const validation = form.validation || { mode: 'all_required', exceptions: [], allowOverride: true }
-        const stages = form.stages && form.stages.length > 0 ? form.stages : [{ id: 'default', name: 'Semua Pertanyaan', order: 0, questionIds: form.questions.map((q: any) => q.id), includeInScoring: true }]
-
-        const engine = new ScoringEngine(questionsWithScoring, scoring, validation, stages)
-        const result = engine.calculateScore(mappedAnswers)
-        if (result && typeof result.percentage === 'number' && !isNaN(result.percentage)) {
-          calculatedScore = Math.round(result.percentage)
-        }
-      } catch {}
-    }
-
+    // Skor final: prefer result.percentage (authoritative, sudah di-compute via scoring engine canonical)
     const storedScore =
-      typeof r.score === 'number' && r.score > 0
-        ? r.score
-        : typeof r.result?.percentage === 'number' && r.result.percentage > 0
+      typeof r.result?.percentage === 'number' && r.result.percentage > 0
         ? r.result.percentage
+        : typeof r.score === 'number' && r.score > 0
+        ? r.score
         : typeof r.totalScore === 'number' && r.totalScore > 0
         ? r.totalScore
         : null
 
-    const finalScore = storedScore !== null ? storedScore : calculatedScore
+    const finalScore = storedScore !== null ? Math.round(storedScore) : 0
 
     const respondentName = extractRespondentName(r, form)
     const respondentEmail = extractRespondentEmail(r, form)

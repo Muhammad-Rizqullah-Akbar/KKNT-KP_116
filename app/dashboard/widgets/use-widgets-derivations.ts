@@ -121,7 +121,7 @@ export function useWidgetsDerivations(input: DerivationsInput) {
         if (scoreData && scoreData.count > 0) {
           formAverages[formObj.id] = Math.round(scoreData.totalPct / scoreData.count)
         } else {
-          formAverages[formObj.id] = 75
+          formAverages[formObj.id] = 0 // no data, jangan menampilkan 75 palsu
         }
       })
       return { aspectTitle, formAverages }
@@ -274,7 +274,7 @@ export function useWidgetsDerivations(input: DerivationsInput) {
       const id = r.respondentId || r.respondentEmail || r.respondentName || r.respondent?.email || r.respondent?.name || r.responseId || r.id
       if (id) uSet.add(id)
 
-      const s = typeof r.score === 'number' && r.score > 0 ? r.score : typeof r.percentage === 'number' ? r.percentage : 75
+      const s = typeof r.score === 'number' && r.score > 0 ? r.score : typeof r.percentage === 'number' ? r.percentage : 0
       if (s >= 80) highCount++
       else if (s >= 60) midCount++
       else lowCount++
@@ -315,7 +315,7 @@ export function useWidgetsDerivations(input: DerivationsInput) {
       let lowCount = 0
 
       matchedList.forEach((r: any) => {
-        const s = typeof r.score === 'number' && r.score > 0 ? r.score : typeof r.percentage === 'number' ? r.percentage : 75
+        const s = typeof r.score === 'number' && r.score > 0 ? r.score : typeof r.percentage === 'number' ? r.percentage : 0
         if (s >= 80) highCount++
         else if (s >= 60) midCount++
         else lowCount++
@@ -420,7 +420,7 @@ export function useWidgetsDerivations(input: DerivationsInput) {
       })
 
       const posttestPass = totalAnswers > 0 ? Math.round((validPassAnswers / totalAnswers) * 100) : 0
-      const pretestPass = Math.max(0, Math.round(posttestPass * 0.65))
+      const pretestPass = posttestPass // tidak ada data pretest terpisah; jangan menciptakan angka fiktif
       const delta = posttestPass - pretestPass
 
       const difficulty = posttestPass < 50 ? 'Tingkat Tinggi' : posttestPass < 75 ? 'Sedang' : 'Mudah'

@@ -85,7 +85,7 @@ export function getRespondentAspects(
           }
         })
 
-        const pct = count > 0 ? Math.round(scoreSum / count) : Math.round(r.score || 75)
+        const pct = count > 0 ? Math.round(scoreSum / count) : Math.round(r.score || r.result?.percentage || 0)
         return {
           aspectId: g.title,
           title: g.title,
@@ -95,10 +95,6 @@ export function getRespondentAspects(
     }
   }
 
-  const baseScore = typeof r.score === 'number' && r.score > 0 ? r.score : 75
-  return [
-    { aspectId: 'pengetahuan', title: 'Aspek Pengetahuan', percentage: Math.round(baseScore) },
-    { aspectId: 'sikap', title: 'Aspek Sikap', percentage: Math.round(baseScore) },
-    { aspectId: 'perilaku', title: 'Aspek Perilaku', percentage: Math.round(baseScore) },
-  ]
+  // Tidak ada data aspek valid → return kosong (bukan menampilkan 75% palsu)
+  return []
 }

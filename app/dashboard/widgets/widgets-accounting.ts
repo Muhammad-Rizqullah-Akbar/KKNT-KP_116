@@ -128,20 +128,8 @@ export function computeAccountingForStack(
     avgPosttest = Math.round(postScores.reduce((a, b) => a + b, 0) / postScores.length)
   }
 
-  if (preScores.length > 0 && (postScores.length === 0 || avgPretest === avgPosttest)) {
-    avgPosttest = Math.min(100, Math.round(avgPretest * 1.125) || 81)
-  } else if (preScores.length === 0 && postScores.length > 0) {
-    avgPretest = Math.max(20, Math.round(avgPosttest * 0.88))
-  } else if (preScores.length === 0 && postScores.length === 0 && responses.length > 0) {
-    const fallbackScores = responses.map(extractScore).filter((s): s is number => s !== null)
-    if (fallbackScores.length > 0) {
-      avgPretest = Math.round(fallbackScores.reduce((a, b) => a + b, 0) / fallbackScores.length)
-      avgPosttest = Math.min(100, Math.round(avgPretest * 1.125) || 81)
-    } else {
-      avgPretest = 72
-      avgPosttest = 81
-    }
-  }
+  // JANGAN menciptakan angka fiktif. Jika pre/post kosong, biarkan 0 (no data).
+  // Fallback hanya ketika TIDAK ada response sama sekali → pakai data responses yang ada.
 
   const delta = avgPosttest - avgPretest
   const combinedScores = [...preScores, ...postScores]
@@ -346,8 +334,7 @@ export function computeAccountingForStack(
     if (mPreScores.length > 0) mAvgPre = Math.round(mPreScores.reduce((a, b) => a + b, 0) / mPreScores.length)
     if (mPostScores.length > 0) mAvgPost = Math.round(mPostScores.reduce((a, b) => a + b, 0) / mPostScores.length)
 
-    if (mPreScores.length > 0 && mPostScores.length === 0) mAvgPost = Math.min(100, Math.round(mAvgPre * 1.25))
-    else if (mPreScores.length === 0 && mPostScores.length > 0) mAvgPre = Math.max(20, Math.round(mAvgPost * 0.7))
+    // JANGAN menciptakan angka fiktif (hapus *1.25 / *0.7 fallback)
 
     const mDelta = mAvgPost - mAvgPre
     const mComb = [...mPreScores, ...mPostScores]
