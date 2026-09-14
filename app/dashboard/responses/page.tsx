@@ -325,8 +325,8 @@ export default function ResponsesDashboardPage() {
   return (
     <div className="flex flex-col min-h-screen bg-slate-950 text-slate-100 font-sans">
       <Topbar
-        title="Hasil Penilaian Resmi & Data Responden Terverifikasi"
-        subtitle="Auditing hasil kuesioner terkirim (submitted), analisis skor lingkaran, dan evaluasi kontribusi kader per orang"
+        title="Hasil Penilaian"
+        subtitle="Audit kuesioner terkirim, analisis skor, dan evaluasi kontribusi kader"
       />
 
       <div className="flex-1 p-4 sm:p-6 space-y-6 max-w-7xl mx-auto w-full">
