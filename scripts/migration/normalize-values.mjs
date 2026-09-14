@@ -113,16 +113,37 @@ async function main() {
     formMap.set(d.id, { id: d.id, ...d.data() })
   }
 
-  // 2. Enrich form "bahaya" + "kedaluwarsa" — inject label
+  // 2. Enrich form "bahaya" + "kedaluwarsa" — inject label + resolve correctAnswer index → label
   let enrichedForms = 0
   for (const [fid, form] of formMap) {
     let changed = false
     for (const q of form.questions || []) {
       if (isBahayaQuestion(q)) {
+        const correct = q.config?.correctAnswer
         q.config = { ...(q.config || {}), options: BAHAYA_LABELS }
+        // resolve correctAnswer index (1-based) → label
+        if (correct !== undefined && correct !== '' ) {
+          const items = Array.isArray(correct) ? correct : [correct]
+          const resolved = items.map((c) => {
+            const n = Number(c)
+            if (!isNaN(n) && n >= 1 && n <= BAHAYA_LABELS.length) return BAHAYA_LABELS[n - 1]
+            return c
+          })
+          q.config.correctAnswer = Array.isArray(correct) ? resolved : resolved[0]
+        }
         changed = true
       } else if (isKedaluwarsaQuestion(q)) {
+        const correct = q.config?.correctAnswer
         q.config = { ...(q.config || {}), options: KEDALUWARSA_LABELS }
+        if (correct !== undefined && correct !== '' ) {
+          const items = Array.isArray(correct) ? correct : [correct]
+          const resolved = items.map((c) => {
+            const n = Number(c)
+            if (!isNaN(n) && n >= 1 && n <= KEDALUWARSA_LABELS.length) return KEDALUWARSA_LABELS[n - 1]
+            return c
+          })
+          q.config.correctAnswer = Array.isArray(correct) ? resolved : resolved[0]
+        }
         changed = true
       }
     }
@@ -131,7 +152,7 @@ async function main() {
       enrichedForms++
     }
   }
-  console.log(`✅ forms enriched (bahaya + kedaluwarsa labels): ${enrichedForms}`)
+  console.log(`✅ forms enriched (bahaya + kedaluwarsa labels + correctAnswer resolve): ${enrichedForms}`)
 
   // 3. Normalisasi semua response value → label
   const respSnap = await db.collection('responses').get()
