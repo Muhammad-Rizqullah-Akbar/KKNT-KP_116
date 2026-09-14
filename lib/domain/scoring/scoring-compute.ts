@@ -116,7 +116,7 @@ export function calculateQuestionScore(
     }
   }
 
-  // 2. MULTIPLE CHOICE
+  // 2. MULTIPLE CHOICE — BINARY STRICT (BPOM: 1 poin per soal, benar semua = 1, ada salah = 0)
   if (type === 'multiple-choice') {
     const options = normalizeQuestionOptions(question)
     const correctOptionIds = resolveCorrectOptionIds(question, options)
@@ -124,70 +124,36 @@ export function calculateQuestionScore(
     const optionScores: Record<string, number> = (question.answerKey as any)?.optionScores || {}
     const selectedOptionIds: string[] = Array.isArray(answerValue) ? answerValue : (answerValue !== undefined && answerValue !== null ? [answerValue] : [])
 
-    let maxScore = 0
-    if (correctOptionIds.length > 0) {
-      options.forEach((o: any) => {
-        const isOptCorrect = correctOptionIds.some((cid) => cid === o.optionId || cid === o.label)
-        if (isOptCorrect) {
-          const pts = typeof o.score === 'number' ? o.score : (optionScores[o.optionId] ?? 5)
-          maxScore += pts
-        }
-      })
-      if (maxScore <= 0) maxScore = correctOptionIds.length * 5
-    } else {
-      options.forEach((o: any) => {
-        const pts = typeof o.score === 'number' ? o.score : (optionScores[o.optionId] ?? 0)
-        if (pts > 0) maxScore += pts
-      })
-    }
-    if (maxScore <= 0) maxScore = 5
+    // BPOM binary: soal dihitung 1 poin penuh jika SEMUA opsi benar dipilih TEPAT (tanpa opsi salah).
+    // maxScore = 1 (satu soal), bukan jumlah opsi.
+    const maxScore = 1
 
     let score = 0
-    selectedOptionIds.forEach((itemVal) => {
-      const strVal = String(itemVal).trim()
-      const cleanVal = strVal.toLowerCase().replace(/[^a-z0-9]/g, '')
-      let optObj = options.find((o: any) => o.optionId === strVal || o.id === strVal || o.label === strVal)
-      if (!optObj && cleanVal) {
-        optObj = options.find((o: any) => {
-          const cL = o.label ? o.label.toLowerCase().replace(/[^a-z0-9]/g, '') : ''
-          const cId = o.optionId ? o.optionId.toLowerCase().replace(/[^a-z0-9]/g, '') : ''
-          return cL === cleanVal || cId === cleanVal
-        })
-      }
-
-      if (correctOptionIds.length > 0) {
-        const isItemCorrect = correctOptionIds.some((cid) => {
-          const cleanCid = cid.toLowerCase().replace(/[^a-z0-9]/g, '')
-          return (
-            cid === strVal ||
-            (optObj && (cid === optObj.optionId || cid === (optObj as any).id || cid === optObj.label)) ||
-            (cleanCid && (cleanCid === cleanVal || (optObj && (cleanCid === optObj.label.toLowerCase().replace(/[^a-z0-9]/g, '') || cleanCid === optObj.optionId.toLowerCase().replace(/[^a-z0-9]/g, '')))))
-          )
-        })
-
-        const resolvedOptScore =
-          optionScores[strVal] ??
-          (optObj?.optionId ? optionScores[optObj.optionId] : undefined) ??
-          (optObj?.label ? optionScores[optObj.label] : undefined)
-
-        if (isItemCorrect) {
-          score += optObj?.score ?? resolvedOptScore ?? (maxScore / Math.max(1, correctOptionIds.length))
-        } else {
-          score += resolvedOptScore ?? 0
+    if (correctOptionIds.length > 0 && selectedOptionIds.length > 0) {
+      // Resolve selected → optionId (canonical)
+      const selectedResolved: string[] = []
+      selectedOptionIds.forEach((itemVal) => {
+        const strVal = String(itemVal).trim()
+        const cleanVal = strVal.toLowerCase().replace(/[^a-z0-9]/g, '')
+        let optObj = options.find((o: any) => o.optionId === strVal || o.id === strVal || o.label === strVal)
+        if (!optObj && cleanVal) {
+          optObj = options.find((o: any) => {
+            const cL = o.label ? o.label.toLowerCase().replace(/[^a-z0-9]/g, '') : ''
+            const cId = o.optionId ? o.optionId.toLowerCase().replace(/[^a-z0-9]/g, '') : ''
+            return cL === cleanVal || cId === cleanVal
+          })
         }
-      } else {
-        const resolvedOptScore =
-          optionScores[strVal] ??
-          (optObj?.optionId ? optionScores[optObj.optionId] : undefined) ??
-          (optObj?.label ? optionScores[optObj.label] : undefined)
+        if (optObj) selectedResolved.push(optObj.optionId)
+        else selectedResolved.push(strVal)
+      })
 
-        if (optObj && typeof optObj.score === 'number') {
-          score += optObj.score
-        } else if (resolvedOptScore !== undefined) {
-          score += resolvedOptScore
-        }
-      }
-    })
+      // Binary strict: jumlah & isi opsi terpilih HARUS sama persis dengan correct
+      const sortedSelected = [...selectedResolved].sort()
+      const sortedCorrect = [...correctOptionIds].sort()
+      const allCorrect = sortedSelected.length === sortedCorrect.length &&
+        sortedSelected.every((s, i) => s === sortedCorrect[i])
+      if (allCorrect) score = 1
+    }
 
     const selectedLabels = selectedOptionIds.map((itemVal) => {
       const strVal = String(itemVal).trim()
