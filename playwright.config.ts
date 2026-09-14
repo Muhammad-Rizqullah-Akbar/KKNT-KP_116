@@ -27,7 +27,7 @@ export default defineConfig({
   // Emulator + dev server hidup dalam satu lifecycle Playwright (bukan antar-step CI).
   webServer: [
     {
-      command: 'npx firebase-tools emulators:start --only firestore,auth --project desa-sehat-2026',
+      command: 'firebase emulators:start --only firestore,auth --project desa-sehat-2026',
       url: 'http://localhost:8090',
       reuseExistingServer: false,
       timeout: 180_000,
