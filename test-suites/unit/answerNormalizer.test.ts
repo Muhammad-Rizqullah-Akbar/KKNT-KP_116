@@ -5,7 +5,7 @@ import {
   normalizeAnswerValue,
   normalizeScaleLabel,
   getQuestionOptions,
-} from '../lib/domain/answers/normalizer'
+} from '../../lib/domain/answers/normalizer'
 
 describe('Answer Normalizer (single source of truth)', () => {
   test('Jenis Kelamin: index "1" → "1. Laki Laki" (NOT "Pilihan 1")', () => {
