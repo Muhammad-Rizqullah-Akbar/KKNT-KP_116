@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useMemo } from 'react'
 import { Button } from '@/components/shared/Button'
 import { Icon } from '@/components/ui/Icons'
 import {
@@ -43,6 +44,16 @@ export function WidgetsVisualizationStep({
   handleChangeChartTypeOnCard,
   handleChangeColorSchemeOnCard,
 }: WidgetsVisualizationStepProps) {
+  const [page, setPage] = useState(0)
+  const PAGE_SIZE = 9
+
+  const totalPages = Math.max(1, Math.ceil(filteredWidgets.length / PAGE_SIZE))
+  const safePage = Math.min(page, totalPages - 1)
+  const pagedWidgets = useMemo(
+    () => filteredWidgets.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE),
+    [filteredWidgets, safePage]
+  )
+
   return (
     <div className="space-y-6">
       <div className="rounded-3xl bg-slate-900 border border-slate-800 p-6 space-y-4 shadow-xl">
@@ -144,9 +155,9 @@ export function WidgetsVisualizationStep({
         </div>
       </div>
 
-      {/* WIDGET CARDS GRID FOR VISUALIZATION */}
+      {/* WIDGET CARDS GRID FOR VISUALIZATION (paginated) */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredWidgets.map((widget) => {
+        {pagedWidgets.map((widget) => {
           const chartData = getWidgetChartData(widget, responses, forms, v15Forms)
           const scheme = COLOR_SCHEMES.find((cs) => cs.id === widget.config?.colorScheme) || COLOR_SCHEMES[0]
           return (
@@ -234,6 +245,32 @@ export function WidgetsVisualizationStep({
           )
         })}
       </div>
+
+      {/* PAGINATION CONTROLS */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between gap-3 pt-2 font-mono text-xs">
+          <span className="text-slate-400">
+            Menampilkan {safePage * PAGE_SIZE + 1}–{Math.min((safePage + 1) * PAGE_SIZE, filteredWidgets.length)} dari {filteredWidgets.length} widget
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage(Math.max(0, safePage - 1))}
+              disabled={safePage === 0}
+              className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 hover:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed font-bold"
+            >
+              Sebelumnya
+            </button>
+            <span className="text-slate-400 font-bold">{safePage + 1} / {totalPages}</span>
+            <button
+              onClick={() => setPage(Math.min(totalPages - 1, safePage + 1))}
+              disabled={safePage >= totalPages - 1}
+              className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 hover:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed font-bold"
+            >
+              Berikutnya
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
