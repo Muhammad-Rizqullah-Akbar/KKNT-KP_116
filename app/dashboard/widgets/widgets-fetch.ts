@@ -1,6 +1,7 @@
 import { getAllResponses, getForms } from '@/lib/repositories/forms.repo'
 import { extractRespondentName, extractRespondentEmail } from '@/lib/domain/responses/respondent-utils'
 import { safeFetchJson } from '@/lib/infra/safe-fetch'
+import { resolveOptionLabel } from '@/lib/domain/answers/normalizer'
 import type { WidgetItem, WidgetCmsData, ChartData } from './widgets-types'
 import { COLOR_SCHEMES } from './widgets-types'
 import { mapAnswersToQuestionIds, findMatchingForm } from './widgets-form-matcher'
@@ -180,48 +181,10 @@ export async function fetchWidgetData(): Promise<WidgetCmsData> {
 // HELPER TO RESOLVE OPTION CODE/ID TO HUMAN-READABLE TEXT LABEL
 function resolveOptionText(val: any, questionObj?: any): string {
   if (val === undefined || val === null || val === '') return ''
-  const strVal = String(val).trim()
-  if (!strVal) return ''
-
-  if (questionObj) {
-    const options = questionObj.options || questionObj.presentation?.options || questionObj.config?.options || []
-    if (Array.isArray(options) && options.length > 0) {
-      const matched = options.find((opt: any) => {
-        if (typeof opt === 'string') return opt === strVal || opt.toLowerCase() === strVal.toLowerCase()
-        if (opt && typeof opt === 'object') {
-          const optId = String(opt.id || opt.optionId || opt.value || opt.val || '').trim()
-          const optLabel = String(opt.label || opt.text || opt.title || '').trim()
-          return optId === strVal || optLabel === strVal || (optId && strVal.toLowerCase() === optId.toLowerCase())
-        }
-        return false
-      })
-
-      if (matched) {
-        if (typeof matched === 'string') return matched
-        return (matched.label || matched.text || matched.title || strVal).trim()
-      }
-
-      if (!isNaN(Number(strVal))) {
-        const idx = Number(strVal)
-        if (idx >= 0 && idx < options.length) {
-          const opt = options[idx]
-          if (typeof opt === 'string') return opt
-          return (opt.label || opt.text || opt.title || strVal).trim()
-        }
-      }
-    }
-  }
-
-  if (/^(opt_|option_|choice_|q_\d+_a_)/i.test(strVal)) {
-    const parts = strVal.split('_')
-    const lastPart = parts[parts.length - 1]
-    if (!isNaN(Number(lastPart))) {
-      return `Pilihan ${Number(lastPart) + 1}`
-    }
-    return 'Jawaban Terpilih'
-  }
-
-  return strVal
+  // Delegate to canonical normalizer (single source of truth).
+  const resolved = resolveOptionLabel(questionObj, val)
+  if (resolved && resolved !== String(val).trim()) return resolved
+  return String(val).trim()
 }
 
 // Calculate REAL Answer Frequencies Directly From Database Responses

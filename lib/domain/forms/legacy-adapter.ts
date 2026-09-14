@@ -1,7 +1,7 @@
 import type { AnswerKey, CanonicalForm, FormStatus, LegacyScoringAdapterInput, PublicCanonicalForm, PublicQuestion, Question, QuestionOption, QuestionType } from './types'
 import { QUESTION_TYPES } from './types'
 
-type LegacyQuestion = { id?: string; type?: string; answerType?: string; question?: string; label?: string; description?: string; required?: boolean; options?: string[]; media?: { type?: string; url?: string; caption?: string }; config?: Record<string, unknown>; scoring?: { scheme?: string; weight?: number } }
+type LegacyQuestion = { id?: string; stageId?: string; aspectId?: string; type?: string; answerType?: string; question?: string; label?: string; description?: string; required?: boolean; options?: string[]; media?: { type?: string; url?: string; caption?: string }; config?: Record<string, unknown>; scoring?: { scheme?: string; weight?: number } }
 type LegacyForm = { id?: string; title?: string; code?: string; description?: string; target?: string; category?: string; status?: string; questions?: LegacyQuestion[]; scoring?: Record<string, unknown>; validation?: Record<string, unknown>; createdAt?: string; updatedAt?: string; createdBy?: string }
 export type LegacyAdaptationResult = { canonical: CanonicalForm; warnings: string[] }
 
@@ -140,9 +140,16 @@ function adaptQuestion(formId: string, source: LegacyQuestion, warnings: string[
     ? (source.scoring.scheme as Question['scoring']['scheme'])
     : undefined
 
-  // If correct answer exists for a choice question, default to binary scheme even if scheme was none
+  // If correct answer exists for a choice question, FORCE binary scheme
+  // (legacy data stored scheme="none" but has a correctAnswer → must be scored).
+  const hasCorrectAnswer =
+    rawCorrectAnswer !== undefined &&
+    rawCorrectAnswer !== null &&
+    rawCorrectAnswer !== '' &&
+    !(Array.isArray(rawCorrectAnswer) && rawCorrectAnswer.length === 0)
+
   let finalScheme = explicitScheme !== undefined ? explicitScheme : defaultScheme
-  if (parsedAnswerKey.kind === 'option' && ['single-choice', 'dropdown', 'binary', 'multiple-choice'].includes(type)) {
+  if (hasCorrectAnswer && ['single-choice', 'dropdown', 'binary', 'multiple-choice'].includes(type)) {
     finalScheme = 'binary'
   }
 
@@ -152,6 +159,7 @@ function adaptQuestion(formId: string, source: LegacyQuestion, warnings: string[
     questionId,
     type,
     prompt: source.question || source.label || '',
+    aspectId: source.stageId || source.aspectId,
     required: source.required === true,
     options,
     presentation: {
@@ -189,12 +197,20 @@ export function adaptLegacyForm(legacy: LegacyForm): LegacyAdaptationResult {
   let adaptedDistribution: Record<string, number> = {}
 
   if (Array.isArray(rawStages) && rawStages.length > 0) {
-    const autoWeight = Math.floor(100 / rawStages.length)
+    // Hanya stage yang dinilai (includeInScoring=true) yang mendapat bobot.
+    const scoredStages = rawStages.filter((stg: any) => stg.includeInScoring !== false && stg.isScored !== false)
+
     adaptedAspects = rawStages.map((stg: any, idx: number) => {
       const stgId = stg.id || stg.aspectId || `stage_${idx}`
       const stgTitle = stg.name || stg.title || stg.label || `Aspek ${idx + 1}`
       const isScored = stg.includeInScoring !== false && stg.isScored !== false
-      const weight = Number(rawDistribution[stgId]) || (idx === rawStages.length - 1 ? 100 - autoWeight * (rawStages.length - 1) : autoWeight)
+
+      // Bobot hanya untuk stage yang dinilai; non-scored = 0.
+      let weight = 0
+      if (isScored) {
+        const rawWeight = Number(rawDistribution[stgId])
+        weight = rawWeight > 0 ? rawWeight : Math.floor(100 / scoredStages.length)
+      }
       adaptedDistribution[stgId] = weight
 
       return {
@@ -204,6 +220,25 @@ export function adaptLegacyForm(legacy: LegacyForm): LegacyAdaptationResult {
         isScored,
       }
     })
+
+    // Normalisasi total bobot = 100 (hanya untuk scored stages)
+    const totalWeight = scoredStages.reduce((sum, stg) => {
+      const stgId = stg.id || stg.aspectId || `stage_${scoredStages.indexOf(stg)}`
+      return sum + (adaptedDistribution[stgId] || 0)
+    }, 0)
+    if (totalWeight > 0 && totalWeight !== 100) {
+      scoredStages.forEach((stg, i) => {
+        const stgId = stg.id || stg.aspectId || `stage_${scoredStages.indexOf(stg)}`
+        const rawW = adaptedDistribution[stgId] || 0
+        // ProporSI: last stage absorbs rounding remainder
+        const normalized = i === scoredStages.length - 1
+          ? 100 - Math.round((totalWeight - rawW) / totalWeight * 100)
+          : Math.round(rawW / totalWeight * 100)
+        adaptedDistribution[stgId] = normalized
+        const asp = adaptedAspects.find((a: any) => a.aspectId === stgId)
+        if (asp) asp.weightPercentage = normalized
+      })
+    }
   } else {
     adaptedAspects = [
       {

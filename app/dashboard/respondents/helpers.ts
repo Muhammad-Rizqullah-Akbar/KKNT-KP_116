@@ -316,7 +316,7 @@ export const getRespondentAspects = (r: any, forms: FormData[]): AspectScore[] =
     if ((form as any).aspects && Array.isArray((form as any).aspects) && (form as any).aspects.length > 0) {
       const validAspects = (form as any).aspects.filter((aspect: any) => {
         const t = (aspect.title || aspect.name || '').trim()
-        return t && t !== 'Semua Pertanyaan' && t !== 'default'
+        return t && t !== 'Semua Pertanyaan' && t !== 'default' && !isBiodataAspect(t) && (aspect as any).isScored !== false
       })
       if (validAspects.length > 0) {
         return validAspects.map((asp: any) => ({
@@ -332,7 +332,7 @@ export const getRespondentAspects = (r: any, forms: FormData[]): AspectScore[] =
     if (form.stages && Array.isArray(form.stages) && form.stages.length > 0) {
       const validStages = form.stages.filter((stage: any) => {
         const t = (stage.name || stage.title || '').trim()
-        return t && t !== 'Semua Pertanyaan' && t !== 'default'
+        return t && t !== 'Semua Pertanyaan' && t !== 'default' && !isBiodataAspect(t) && (stage as any).includeInScoring !== false
       })
       if (validStages.length > 0) {
         return validStages.map((st: any) => ({
@@ -364,7 +364,7 @@ export const getRespondentAspects = (r: any, forms: FormData[]): AspectScore[] =
           }
         }
 
-        if (aspectTitle && aspectTitle !== 'default' && aspectTitle !== 'Semua Pertanyaan') {
+        if (aspectTitle && aspectTitle !== 'default' && aspectTitle !== 'Semua Pertanyaan' && !isBiodataAspect(aspectTitle)) {
           if (!aspectGroups.has(aspectTitle)) {
             aspectGroups.set(aspectTitle, { title: aspectTitle, count: 1 })
           } else {
