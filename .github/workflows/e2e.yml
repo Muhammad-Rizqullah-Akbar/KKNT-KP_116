@@ -22,7 +22,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '21'
       # emulators:exec auto-starts emulator, waits for readiness, sets
       # FIRESTORE_EMULATOR_HOST / FIREBASE_AUTH_EMULATOR_HOST, runs the command,
       # then tears the emulator down. webServer (Playwright) only starts Next dev.
