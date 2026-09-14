@@ -58,6 +58,7 @@ app/flow.html
 /risk-registry.md
 # Test artifacts (hasil playwright, report)
 /test-suites/results/
+/test-results/
 # Scratch/temp script (seed/verify emulator, latency probe)
 *.tmp.js
 # Upload lokal (media user)
