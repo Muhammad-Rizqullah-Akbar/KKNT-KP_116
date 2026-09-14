@@ -203,7 +203,7 @@ export function getRespondentAspects(
           }
         })
 
-        const pct = count > 0 ? Math.round(scoreSum / count) : Math.round(r.score || 75)
+        const pct = count > 0 ? Math.round(scoreSum / count) : Math.round(r.score || r.result?.percentage || 0)
         return {
           aspectId: g.title,
           title: g.title,
@@ -213,12 +213,8 @@ export function getRespondentAspects(
     }
   }
 
-  const baseScore = typeof r.score === 'number' && r.score > 0 ? r.score : 75
-  return [
-    { aspectId: 'pengetahuan', title: 'Aspek Pengetahuan', percentage: Math.round(baseScore) },
-    { aspectId: 'sikap', title: 'Aspek Sikap', percentage: Math.round(baseScore) },
-    { aspectId: 'perilaku', title: 'Aspek Perilaku', percentage: Math.round(baseScore) },
-  ]
+  // Tidak ada data aspek valid → return kosong (bukan menampilkan 75% palsu)
+  return []
 }
 
 export function normAspectTitle(title: string): string {
@@ -229,20 +225,10 @@ export function normAspectTitle(title: string): string {
   return title
 }
 
-// Resolve kode opsi / id ke label teks yang bisa dibaca
+// Resolve kode opsi / id ke label teks yang bisa dibaca.
+// Format jawaban sekarang = angka murni ("2","4","Benar","Salah"), jadi passthrough
+// (jangan menciptakan "Pilihan N" yang menyesatkan).
 export function resolveOptionText(val: any): string {
   if (val === undefined || val === null || val === '') return ''
-  const strVal = String(val).trim()
-  if (!strVal) return ''
-
-  if (/^(opt_|option_|choice_|q_\d+_a_)/i.test(strVal)) {
-    const parts = strVal.split('_')
-    const lastPart = parts[parts.length - 1]
-    if (!isNaN(Number(lastPart))) {
-      return `Pilihan ${Number(lastPart) + 1}`
-    }
-    return 'Jawaban Terpilih'
-  }
-
-  return strVal
+  return String(val).trim()
 }
