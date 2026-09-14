@@ -124,7 +124,7 @@ Struktur test:
 
 ## 🚀 Deployment
 
-Pipeline CI/CD (GitHub Actions) terdiri dari 5 workflow:
+### CI (GitHub Actions) — 4 workflow
 
 | Workflow | Fungsi | Trigger |
 |---|---|---|
@@ -132,30 +132,33 @@ Pipeline CI/CD (GitHub Actions) terdiri dari 5 workflow:
 | `quality.yml` | Typecheck + ESLint + unit test | PR + push main |
 | `e2e.yml` | Playwright E2E (Firebase emulator) | push main + manual |
 | `security.yml` | Gitleaks + CodeQL + Trivy + npm audit | PR + push main |
-| `deploy.yml` | **CD** — deploy Vercel (prod + preview) | push main (prod) + PR (preview) |
 
-**Strategi zero-downtime**: Vercel atomic deploy + instant rollback. Gate via branch protection (`main` wajib lolos semua checks sebelum merge).
+### CD (Vercel Git Integration) — auto-deploy
 
-### Setup CD (sekali saja)
+Deploy ditangani **langsung oleh Vercel** (bukan GitHub Actions). Setiap push ke `main` otomatis build + deploy production; setiap PR dapat preview URL unik.
 
-1. **Set secret & variable di GitHub Actions** — jalankan helper:
-   ```bash
-   bash scripts/setup-github-secrets.sh
-   ```
-   Atau manual: GitHub → repo → Settings → Secrets and variables → Actions.
+**Setup sekali saja:**
 
-   | Jenis | Nama | Nilai |
+1. Hubungkan repo ke Vercel (Project → Import Git Repository).
+2. Set environment variables di **Vercel Dashboard** → Project → Settings → Environment Variables:
+
+   | Jenis | Nama | Sumber |
    |---|---|---|
-   | Secret | `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` | Dari Vercel project |
-   | Secret | `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY` | Dari Firebase service account |
-   | Variable | `NEXT_PUBLIC_FIREBASE_*` (6 nilai) | Dari Firebase web app config |
+   | Production | `FIREBASE_PROJECT_ID` | Firebase service account |
+   | Production | `FIREBASE_CLIENT_EMAIL` | Firebase service account |
+   | Production | `FIREBASE_PRIVATE_KEY` | Firebase service account (secret) |
+   | Production/Preview/Dev | `NEXT_PUBLIC_FIREBASE_API_KEY` | Firebase web config |
+   | Production/Preview/Dev | `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | Firebase web config |
+   | Production/Preview/Dev | `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | Firebase web config |
+   | Production/Preview/Dev | `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` | Firebase web config |
+   | Production/Preview/Dev | `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | Firebase web config |
+   | Production/Preview/Dev | `NEXT_PUBLIC_FIREBASE_APP_ID` | Firebase web config |
+   | Production/Preview/Dev | `NEXT_PUBLIC_USE_EMULATOR` | `false` |
 
-2. **Set env di Vercel Dashboard** — Project → Settings → Environment Variables (nilai runtime aplikasi dibaca Vercel, bukan GitHub).
-
-3. Push ke `main` → deploy production otomatis.
+3. Push ke `main` → Vercel auto-deploy (zero-downtime, instant rollback).
 
 ```bash
-# Deploy manual (alternatif)
+# Deploy manual (alternatif, butuh `vercel login` dulu)
 npm run build
 vercel --prod
 ```
