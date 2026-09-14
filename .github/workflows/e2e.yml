@@ -1,9 +1,9 @@
 name: E2E (Playwright)
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
-  # E2E hanya manual trigger untuk sekarang (butuh webServer config + emulator)
-  # Aktifkan push main setelah playwright.config.ts dilengkapi webServer
 
 jobs:
   e2e:
@@ -18,18 +18,21 @@ jobs:
       - run: npm ci
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
+      - name: Install Firebase CLI + Java (for emulator)
+        run: |
+          npm install -g firebase-tools
+          sudo apt-get install -y openjdk-17-jre-headless || true
       - name: Run Playwright tests
         run: npx playwright test
         env:
-          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
-          FIREBASE_CLIENT_EMAIL: ${{ secrets.FIREBASE_CLIENT_EMAIL }}
-          FIREBASE_PRIVATE_KEY: ${{ secrets.FIREBASE_PRIVATE_KEY }}
+          FIREBASE_PROJECT_ID: desa-sehat-2026
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: desa-sehat-2026
           NEXT_PUBLIC_FIREBASE_API_KEY: ${{ vars.NEXT_PUBLIC_FIREBASE_API_KEY }}
           NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ vars.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
-          NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ vars.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
       - name: Upload report
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: playwright-report
-          path: playwright-report/
+          path: test-suites/results/playwright-report/
+          retention-days: 14
