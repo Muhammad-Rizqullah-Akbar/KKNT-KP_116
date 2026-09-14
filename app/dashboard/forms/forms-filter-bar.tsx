@@ -1,7 +1,6 @@
 'use client'
 
 import { Icon } from '@/components/ui/Icons'
-import type { FormGroup } from '@/lib/repositories/forms.repo'
 import type { LegacyStatusFilter, LegacyViewMode } from './forms-utils'
 
 type FormsFilterBarProps = {
@@ -9,7 +8,6 @@ type FormsFilterBarProps = {
   statusFilter: LegacyStatusFilter
   selectedGroupId: string
   viewMode: LegacyViewMode
-  groups: FormGroup[]
   setSearchTerm: (v: string) => void
   setStatusFilter: (v: LegacyStatusFilter) => void
   setSelectedGroupId: (v: string) => void
@@ -18,7 +16,7 @@ type FormsFilterBarProps = {
 
 export default function FormsFilterBar(props: FormsFilterBarProps) {
   const {
-    searchTerm, statusFilter, selectedGroupId, viewMode, groups,
+    searchTerm, statusFilter, selectedGroupId, viewMode,
     setSearchTerm, setStatusFilter, setSelectedGroupId, setViewMode,
   } = props
 
@@ -54,21 +52,6 @@ export default function FormsFilterBar(props: FormsFilterBarProps) {
           ))}
         </div>
 
-        {/* Form Group Filter */}
-        {groups.length > 0 && (
-          <select
-            value={selectedGroupId}
-            onChange={(e) => setSelectedGroupId(e.target.value)}
-            className="px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-300 focus:outline-none focus:border-indigo-500 cursor-pointer"
-          >
-            <option value="all">Semua Kelompok Form</option>
-            {groups.map((group) => (
-              <option key={group.id} value={group.id}>
-                {group.title} ({group.code})
-              </option>
-            ))}
-          </select>
-        )}
       </div>
 
       {/* Grid / Table Toggle */}

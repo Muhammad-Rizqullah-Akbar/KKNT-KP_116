@@ -78,7 +78,6 @@ export function useWidgetsPage() {
     data: {
       responses = [],
       forms = [],
-      groups = [],
       v15Forms = [],
       users = [],
       dynamicWidgets = [],

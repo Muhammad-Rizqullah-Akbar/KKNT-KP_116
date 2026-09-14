@@ -8,7 +8,6 @@ import { Topbar } from '@/features/dashboard/components/layout/Topbar'
 import {
   getAllResponses,
   getForms,
-  getFormGroups,
   deleteResponse,
   type FormResponse,
 } from '@/lib/repositories/forms.repo'
@@ -79,16 +78,14 @@ export default function RespondentsPage() {
   const { data: respondentsData, isLoading: loading } = useQuery({
     queryKey: queryKeys.dashboard.respondents,
     queryFn: async () => {
-      const [responsesData, formsData, groupsData] = await Promise.all([
+      const [responsesData, formsData] = await Promise.all([
         getAllResponses(),
         getForms(),
-        getFormGroups(),
       ])
 
       const transformedRespondents: Respondent[] = await Promise.all(
         responsesData.map(async (response: FormResponse) => {
           const form = findMatchingForm(response, formsData)
-          const group = form?.groupId ? groupsData.find(groupItem => groupItem.id === form.groupId) : null
 
           // 🔥 MAPPING JAWABAN KHUSUS UNTUK SCORING ENGINE (Flatten object & IDs)
           const mappedAnswers = mapAnswersToQuestionIds(response.answers || {}, form || null)
@@ -129,7 +126,7 @@ export default function RespondentsPage() {
             formCode: response.formCode || form?.code || response.distributionCode || '',
             formTitle: resolvedFormTitle,
             groupId: form?.groupId || null,
-            groupName: group?.title || null,
+            groupName: null,
             submittedAt: submittedDate.toISOString(),
             date: submittedDate.toLocaleDateString('id-ID', {
               day: '2-digit', month: 'short', year: 'numeric',
@@ -147,13 +144,12 @@ export default function RespondentsPage() {
         })
       )
 
-      return { respondents: transformedRespondents, forms: formsData, groups: groupsData }
+      return { respondents: transformedRespondents, forms: formsData }
     },
   })
 
   const respondents = respondentsData?.respondents ?? []
   const forms = respondentsData?.forms ?? []
-  const groups = respondentsData?.groups ?? []
 
   // ============ FILTER ============
   const filteredData = useMemo(() => {

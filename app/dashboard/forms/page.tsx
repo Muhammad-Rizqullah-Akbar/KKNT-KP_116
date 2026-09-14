@@ -9,12 +9,10 @@ import { Icon } from '@/components/ui/Icons'
 import { PreviewModal } from '@/features/form-builder/components/preview/PreviewModal'
 import {
   getForms,
-  getFormGroups,
   createForm,
   updateFormStatus,
   deleteForm,
   type FormData as LegacyFormData,
-  type FormGroup,
 } from '@/lib/repositories/forms.repo'
 import { useAuth } from '@/context/AuthContext'
 import { queryKeys } from '@/lib/query-keys'
@@ -40,16 +38,15 @@ export default function LegacyFormsPage() {
   }, [loading, userRole, userData, router])
 
   // ============ SERVER-STATE (TanStack Query) ============
-  const legacyQuery = useQuery<{ forms: LegacyFormData[]; groups: FormGroup[] }>({
+  const legacyQuery = useQuery<{ forms: LegacyFormData[] }>({
     queryKey: queryKeys.forms.legacy,
     queryFn: async () => {
-      const [formsData, groupsData] = await Promise.all([getForms(), getFormGroups()])
-      return { forms: formsData, groups: groupsData }
+      const formsData = await getForms()
+      return { forms: formsData }
     },
   })
 
   const forms = legacyQuery.data?.forms ?? []
-  const groups = legacyQuery.data?.groups ?? []
   const isLoading = legacyQuery.isLoading
   const error = legacyQuery.error ? (legacyQuery.error as Error).message : null
   const loadLegacyData = () => legacyQuery.refetch()
@@ -185,7 +182,6 @@ export default function LegacyFormsPage() {
           statusFilter={statusFilter}
           selectedGroupId={selectedGroupId}
           viewMode={viewMode}
-          groups={groups}
           setSearchTerm={setSearchTerm}
           setStatusFilter={setStatusFilter}
           setSelectedGroupId={setSelectedGroupId}

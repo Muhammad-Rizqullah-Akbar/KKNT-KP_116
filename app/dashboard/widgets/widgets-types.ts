@@ -1,4 +1,4 @@
-import type { FormResponse, FormData as LegacyFormData, FormGroup } from '@/lib/repositories/forms.repo'
+import type { FormResponse, FormData as LegacyFormData } from '@/lib/repositories/forms.repo'
 import type { IconName } from '@/components/ui/Icons'
 
 // ============================================================================
@@ -54,7 +54,6 @@ export interface StackedAccountingItem {
 export type WidgetCmsData = {
   responses: FormResponse[]
   forms: LegacyFormData[]
-  groups: FormGroup[]
   v15Forms: any[]
   users: any[]
   dynamicWidgets: WidgetItem[]

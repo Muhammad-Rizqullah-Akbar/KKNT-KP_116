@@ -1,4 +1,4 @@
-import { getAllResponses, getForms, getFormGroups } from '@/lib/repositories/forms.repo'
+import { getAllResponses, getForms } from '@/lib/repositories/forms.repo'
 import { extractRespondentName, extractRespondentEmail } from '@/lib/domain/responses/respondent-utils'
 import { safeFetchJson } from '@/lib/infra/safe-fetch'
 import type { WidgetItem, WidgetCmsData, ChartData } from './widgets-types'
@@ -7,10 +7,9 @@ import { mapAnswersToQuestionIds, findMatchingForm } from './widgets-form-matche
 
 // Fetch & transform all widget CMS data from database (was previously inline loadWidgetData)
 export async function fetchWidgetData(): Promise<WidgetCmsData> {
-  const [resData, v10Data, groupsData, v15Res, usersRes, v15RespRes] = await Promise.all([
+  const [resData, v10Data, v15Res, usersRes, v15RespRes] = await Promise.all([
     getAllResponses().catch(() => []),
     getForms().catch(() => []),
-    getFormGroups().catch(() => []),
     safeFetchJson('/api/forms'),
     safeFetchJson('/api/auth/users'),
     safeFetchJson('/api/responses'),
@@ -172,7 +171,6 @@ export async function fetchWidgetData(): Promise<WidgetCmsData> {
   return {
     responses: transformedResponses,
     forms: v10Data,
-    groups: groupsData,
     v15Forms,
     users,
     dynamicWidgets,

@@ -1,7 +1,7 @@
 // app/api/public/check-code/route.ts
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getFormByCode, getFormGroupByCode } from '@/lib/repositories/forms.repo'
+import { getFormByCode } from '@/lib/repositories/forms.repo'
 
 export async function GET(request: NextRequest) {
   try {
@@ -30,30 +30,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // ============ 1. CEK APAKAH KODE ADALAH GROUP ============
-    try {
-      const group = await getFormGroupByCode(code)
-      if (group) {
-        return NextResponse.json({
-          success: true,
-          type: 'group',
-          data: {
-            id: group.id,
-            code: group.code,
-            title: group.title,
-            description: group.description,
-            target: group.target,
-            color: group.color,
-            formCount: group.formCount,
-          }
-        })
-      }
-    } catch (groupError) {
-      console.error('Error checking group:', groupError)
-      // Lanjut ke pengecekan form
-    }
-
-    // ============ 2. CEK APAKAH KODE ADALAH SINGLE FORM ============
+    // ============ CEK APAKAH KODE ADALAH SINGLE FORM ============
     try {
       const form = await getFormByCode(code)
       if (form) {
