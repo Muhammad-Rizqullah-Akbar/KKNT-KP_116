@@ -28,7 +28,7 @@ jobs:
           sleep 20
       - name: Seed test data to emulator
         run: |
-          FIRESTORE_EMULATOR_HOST=localhost:8090 node scripts/migration/seed.mjs
+          FIRESTORE_EMULATOR_HOST=localhost:8090 node scripts/migration/seed-e2e.mjs
       - name: Run Playwright tests
         run: npx playwright test
         env:
