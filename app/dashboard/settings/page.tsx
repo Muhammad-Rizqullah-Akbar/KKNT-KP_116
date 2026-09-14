@@ -26,6 +26,7 @@ import PartnershipSection from './partnership-section'
 import GallerySection from './gallery-section'
 import GalleryModal from './gallery-modal'
 import DeleteGalleryModal from './delete-gallery-modal'
+import { CostMonitoringSection } from './cost-monitoring-section'
 
 export default function SettingsPage() {
   const { userRole, userData, loading: authLoading } = useAuth()
@@ -43,7 +44,7 @@ export default function SettingsPage() {
   }, [authLoading, userRole, userData, router])
 
   // ============ STATE UTAMA ============
-  const [activeTab, setActiveTab] = useState<'hero' | 'partnership' | 'gallery'>('hero')
+  const [activeTab, setActiveTab] = useState<'hero' | 'partnership' | 'gallery' | 'cost'>('hero')
   const [saving, setSaving] = useState(false)
   const { visible, message, show, hide } = useToast()
 
@@ -248,6 +249,17 @@ export default function SettingsPage() {
             <Icon name="image" className="w-4 h-4" />
             Galeri Dokumentasi
           </button>
+          <button
+            onClick={() => setActiveTab('cost')}
+            className={`px-4 py-2.5 rounded-xl text-sm font-medium transition-all whitespace-nowrap flex items-center gap-2 ${
+              activeTab === 'cost'
+                ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20'
+                : 'text-white/50 hover:text-white hover:bg-white/[0.03]'
+            }`}
+          >
+            <Icon name="trendingUp" className="w-4 h-4" />
+            Monitoring Biaya
+          </button>
         </div>
 
         {loading ? (
@@ -286,6 +298,9 @@ export default function SettingsPage() {
                 onDelete={handleGalleryDelete}
               />
             )}
+
+            {/* TAB 4: MONITORING BIAYA (OBSERVABILITY) */}
+            {activeTab === 'cost' && <CostMonitoringSection />}
           </>
         )}
       </div>
