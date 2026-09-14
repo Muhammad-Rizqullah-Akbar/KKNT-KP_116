@@ -14,9 +14,11 @@ export function calculateQuestionScore(
   const prompt = question.prompt || question.questionId
   const aspectId = question.aspectId || 'default'
 
-  // Non-scoring question types
-  const nonScoringTypes = ['short-text', 'long-text', 'text', 'textarea', 'date', 'file-upload', 'image', 'signature', 'descriptive']
-  if (nonScoringTypes.includes(type)) {
+  // Non-scoring question types + biodata (tidak dinilai)
+  const nonScoringTypes = ['short-text', 'long-text', 'text', 'textarea', 'date', 'file-upload', 'image', 'signature', 'descriptive', 'number']
+  const isBiodataType = typeof type === 'string' && type.startsWith('biodata-')
+  const hasBiodataKey = Boolean((question as any).biodataKey)
+  if (nonScoringTypes.includes(type) || isBiodataType || hasBiodataKey) {
     return {
       questionId: question.questionId,
       aspectId,
@@ -34,6 +36,21 @@ export function calculateQuestionScore(
   if (type === 'single-choice' || type === 'binary' || type === 'dropdown') {
     const options = normalizeQuestionOptions(question)
     const correctOptionIds = resolveCorrectOptionIds(question, options)
+
+    // Soal tanpa kunci jawaban (biodata, sumber informasi, dsb) TIDAK dinilai.
+    if (correctOptionIds.length === 0) {
+      return {
+        questionId: question.questionId,
+        aspectId,
+        questionType: type,
+        prompt,
+        rawScore: 0,
+        maximumScore: 0,
+        percentage: 0,
+        includedInTotal: false,
+        selectedValue: answerValue,
+      }
+    }
 
     const optionScores: Record<string, number> = (question.answerKey as any)?.optionScores || {}
 
@@ -121,6 +138,21 @@ export function calculateQuestionScore(
   if (type === 'multiple-choice') {
     const options = normalizeQuestionOptions(question)
     const correctOptionIds = resolveCorrectOptionIds(question, options)
+
+    // Soal tanpa kunci jawaban (biodata, sumber informasi, dsb) TIDAK dinilai.
+    if (correctOptionIds.length === 0) {
+      return {
+        questionId: question.questionId,
+        aspectId,
+        questionType: type,
+        prompt,
+        rawScore: 0,
+        maximumScore: 0,
+        percentage: 0,
+        includedInTotal: false,
+        selectedValue: answerValue,
+      }
+    }
 
     const selectedOptionIds: string[] = Array.isArray(answerValue) ? answerValue : (answerValue !== undefined && answerValue !== null ? [answerValue] : [])
 

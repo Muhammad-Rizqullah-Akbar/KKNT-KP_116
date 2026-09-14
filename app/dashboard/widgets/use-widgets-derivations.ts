@@ -352,6 +352,19 @@ export function useWidgetsDerivations(input: DerivationsInput) {
   const itemQuestionAnalysis = useMemo(() => {
     const questionList: { id: string; text: string; formTitle: string; formId: string; questionId: string; answerType: string; correctAnswer: any }[] = []
 
+    // Pertanyaan biodata / non-scored TIDAK dinilai (tidak masuk item analysis)
+    const isScorable = (q: any): boolean => {
+      const t = (q.answerType || q.type || '').toLowerCase()
+      if (t.startsWith('biodata-')) return false
+      if (q.biodataKey || q.identifierType) return false
+      if (t === 'number') return false
+      if (t === 'short-text' || t === 'long-text' || t === 'text' || t === 'textarea' || t === 'date') return false
+      if (t === 'file-upload' || t === 'image' || t === 'signature') return false
+      const hasCorrect = q.config?.correctAnswer ?? q.correctAnswer ?? q.answerKey ?? undefined
+      if (hasCorrect === undefined || hasCorrect === null || hasCorrect === '') return false
+      return true
+    }
+
     v15Forms.forEach((f) => {
       const isSelected =
         itemAnalysisFormFilter === 'all'
@@ -362,6 +375,7 @@ export function useWidgetsDerivations(input: DerivationsInput) {
           : f.formId === itemAnalysisFormFilter
       if (isSelected) {
         f.questions?.forEach((q: any) => {
+          if (!isScorable(q)) return
           const text = q.title || q.question || 'Pertanyaan Evaluasi'
           questionList.push({
             id: `q-v15-${q.id || q.questionId}`,
@@ -386,6 +400,7 @@ export function useWidgetsDerivations(input: DerivationsInput) {
           : f.id === itemAnalysisFormFilter
       if (isSelected) {
         f.questions?.forEach((q: any) => {
+          if (!isScorable(q)) return
           const text = q.question || q.label || 'Pertanyaan Evaluasi'
           questionList.push({
             id: `q-v10-${q.id}`,

@@ -121,14 +121,6 @@ export function Sidebar({ userRole }: SidebarProps) {
       ],
     },
     {
-      section: 'Versi 1.0 (Lama / Benchmark)',
-      items: [
-        { href: '/dashboard/form-builder', icon: 'filePlus', label: 'Form Builder V1.0', badge: 'V1.0' },
-        { href: '/dashboard/forms', icon: 'clipboardList', label: 'Daftar Formulir V1.0', badge: 'V1.0' },
-        { href: '/dashboard/respondents', icon: 'users', label: 'Data Responden V1.0', badge: 'V1.0' },
-      ],
-    },
-    {
       section: 'Sistem',
       items: [
         { href: '/dashboard/settings', icon: 'settings', label: 'Pengaturan' },
@@ -193,9 +185,6 @@ export function Sidebar({ userRole }: SidebarProps) {
                   <span className="font-display font-bold text-sm block leading-tight text-white group-hover:text-cyan-400 transition-colors truncate">
                     KKNT-KP<span className="text-cyan-400"> UH</span>
                   </span>
-                  <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 shrink-0">
-                    V1.5
-                  </span>
                 </div>
                 <span className="text-[10px] text-white/40 font-medium block truncate">Desa Pangan Aman</span>
               </div>
@@ -222,9 +211,6 @@ export function Sidebar({ userRole }: SidebarProps) {
                   <p className="text-[11px] font-bold text-white/35 uppercase tracking-wider">
                     {section.section}
                   </p>
-                  {section.section.includes('1.5') && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
-                  )}
                 </div>
               ) : (
                 <div className="my-2 border-t border-white/[0.06]" />
