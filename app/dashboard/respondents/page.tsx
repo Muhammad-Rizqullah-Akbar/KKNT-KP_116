@@ -16,8 +16,6 @@ import { queryKeys } from '@/lib/query-keys'
 import { useToast } from '@/lib/hooks'
 import {
   findMatchingForm,
-  mapAnswersToQuestionIds,
-  calculateScoreWithEngine,
   getMetricLabel,
   getStatusByScore,
   getRespondentAspects,
@@ -87,25 +85,17 @@ export default function RespondentsPage() {
         responsesData.map(async (response: FormResponse) => {
           const form = findMatchingForm(response, formsData)
 
-          // 🔥 MAPPING JAWABAN KHUSUS UNTUK SCORING ENGINE (Flatten object & IDs)
-          const mappedAnswers = mapAnswersToQuestionIds(response.answers || {}, form || null)
-
-          // 🔥 KALKULASI SKOR DENGAN DISTRIBUSI ASLI
-          const { score: calculatedScore, details, perStage } = await calculateScoreWithEngine(
-            mappedAnswers,
-            form || null
-          )
-
+          // Skor final: prefer result.percentage (authoritative, sudah di-compute di DB)
           const storedScore =
-            typeof (response as any).score === 'number' && (response as any).score > 0
-              ? (response as any).score
-              : typeof (response as any).result?.percentage === 'number' && (response as any).result.percentage > 0
+            typeof (response as any).result?.percentage === 'number' && (response as any).result.percentage > 0
               ? (response as any).result.percentage
+              : typeof (response as any).score === 'number' && (response as any).score > 0
+              ? (response as any).score
               : typeof (response as any).totalScore === 'number' && (response as any).totalScore > 0
               ? (response as any).totalScore
               : null
 
-          const finalScore = storedScore !== null ? storedScore : calculatedScore
+          const finalScore = storedScore !== null ? Math.round(storedScore) : 0
 
           const metric = getMetricLabel(finalScore)
           const status = getStatusByScore(finalScore)
@@ -137,8 +127,6 @@ export default function RespondentsPage() {
             score: finalScore,
             metric,
             status,
-            scoringDetails: details,
-            scoringPerStage: perStage,
             result: (response as any).result || null,
           }
         })

@@ -43,25 +43,12 @@ export function computeAccountingStacks(accountingStacks: any[], responses: any[
       avgPosttest = Math.round(postScores.reduce((a, b) => a + b, 0) / postScores.length)
     }
 
-    if (preScores.length > 0 && (postScores.length === 0 || avgPretest === avgPosttest)) {
-      avgPosttest = Math.min(100, Math.round(avgPretest * 1.125) || 81)
-    } else if (preScores.length === 0 && postScores.length > 0) {
-      avgPretest = Math.max(20, Math.round(avgPosttest * 0.88))
-    } else if (preScores.length === 0 && postScores.length === 0 && responses.length > 0) {
-      const fallbackScores = responses.map(extractScore).filter((s): s is number => s !== null)
-      if (fallbackScores.length > 0) {
-        avgPretest = Math.round(fallbackScores.reduce((a, b) => a + b, 0) / fallbackScores.length)
-        avgPosttest = Math.min(100, Math.round(avgPretest * 1.125) || 81)
-      } else {
-        avgPretest = 72
-        avgPosttest = 81
-      }
-    }
+    // JANGAN menciptakan angka fiktif. Jika pre/post kosong, biarkan 0 (no data).
 
     const delta = avgPosttest - avgPretest
     const combined = [...preScores, ...postScores]
     const passCount = combined.filter((s) => s >= 75).length
-    const passRate = combined.length > 0 ? Math.round((passCount / combined.length) * 100) : (avgPosttest >= 75 ? 85 : 65)
+    const passRate = combined.length > 0 ? Math.round((passCount / combined.length) * 100) : 0
 
     const matchedStackResponses = [...preResponses, ...postResponses]
     const stackTotalResponsesCount = matchedStackResponses.length
@@ -187,7 +174,7 @@ export function computeRespondentAnswerDistribution(activeOverviewStackObj: any,
     const id = r.respondentId || r.respondentEmail || r.respondentName || r.respondent?.email || r.respondent?.name || r.responseId || r.id
     if (id) uSet.add(id)
 
-    const s = typeof r.score === 'number' && r.score > 0 ? r.score : typeof r.percentage === 'number' ? r.percentage : 75
+    const s = typeof r.score === 'number' && r.score > 0 ? r.score : typeof r.percentage === 'number' ? r.percentage : 0
     if (s >= 80) highCount++
     else if (s >= 60) midCount++
     else lowCount++
@@ -231,7 +218,7 @@ export function computePerStackPartitionBreakdown(
     let lowCount = 0
 
     matchedList.forEach((r: any) => {
-      const s = typeof r.score === 'number' && r.score > 0 ? r.score : typeof r.percentage === 'number' ? r.percentage : 75
+      const s = typeof r.score === 'number' && r.score > 0 ? r.score : typeof r.percentage === 'number' ? r.percentage : 0
       if (s >= 80) highCount++
       else if (s >= 60) midCount++
       else lowCount++

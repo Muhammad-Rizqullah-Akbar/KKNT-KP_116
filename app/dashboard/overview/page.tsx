@@ -7,7 +7,6 @@ import { useAuth } from '@/context/AuthContext'
 import { safeFetchJson } from '@/lib/infra/safe-fetch'
 import { queryKeys } from '@/lib/query-keys'
 import {
-  mapAnswersToQuestionIds,
   findMatchingForm,
   matchSelectedForm,
   extractScore,
@@ -68,46 +67,20 @@ function AdminOverviewDashboard() {
       })
       const uniqueResponses = Array.from(responseMap.values())
 
-      const { ScoringEngine } = await import('@/lib/domain/scoring/preview-engine')
-
       const transformedResponses = uniqueResponses.map((r: any) => {
         const form = findMatchingForm(r, formsData)
-        const mappedAnswers = mapAnswersToQuestionIds(r.answers || {}, form || null)
 
-        let calculatedScore = 0
-        if (form && form.questions && form.questions.length > 0) {
-          try {
-            const questionsWithScoring = form.questions.map((q: any) => {
-              const type = q.answerType || q.type || 'short-text'
-              let scheme: 'none' | 'binary' | 'likert' | 'rating' | 'indicator' = 'none'
-              if (type === 'single-choice' || type === 'dropdown' || type === 'binary' || type === 'multiple-choice') scheme = 'binary'
-              else if (type === 'indicator-table' || type === 'likert') scheme = 'indicator'
-              else if (type === 'rating') scheme = 'rating'
-              return { ...q, scoring: q.scoring || { scheme, weight: 1 } }
-            })
-
-            const scoring = form.scoring || { totalPoints: 100, mode: 'auto', distribution: {}, overrides: {}, allowOverride: true, autoBalance: true }
-            const validation = form.validation || { mode: 'all_required', exceptions: [], allowOverride: true }
-            const stages = form.stages && form.stages.length > 0 ? form.stages : [{ id: 'default', name: 'Semua Pertanyaan', order: 0, questionIds: form.questions.map((q: any) => q.id), includeInScoring: true }]
-
-            const engine = new ScoringEngine(questionsWithScoring, scoring, validation, stages)
-            const result = engine.calculateScore(mappedAnswers)
-            if (result && typeof result.percentage === 'number' && !isNaN(result.percentage)) {
-              calculatedScore = Math.round(result.percentage)
-            }
-          } catch {}
-        }
-
+        // Skor final: prefer result.percentage (authoritative, sudah di-compute via scoring engine canonical)
         const storedScore =
-          typeof r.score === 'number' && r.score > 0
-            ? r.score
-            : typeof r.result?.percentage === 'number' && r.result.percentage > 0
+          typeof r.result?.percentage === 'number' && r.result.percentage > 0
             ? r.result.percentage
+            : typeof r.score === 'number' && r.score > 0
+            ? r.score
             : typeof r.totalScore === 'number' && r.totalScore > 0
             ? r.totalScore
             : null
 
-        const finalScore = storedScore !== null ? storedScore : calculatedScore
+        const finalScore = storedScore !== null ? Math.round(storedScore) : 0
 
         return {
           ...r,
@@ -156,7 +129,7 @@ function AdminOverviewDashboard() {
     const scoresList = filteredResponses.map(extractScore).filter((s): s is number => s !== null)
     const avgScore = scoresList.length > 0
       ? Math.round(scoresList.reduce((sum, s) => sum + s, 0) / scoresList.length)
-      : (filteredResponses.length > 0 ? 75 : 0)
+      : 0
 
     const passCount = scoresList.filter((s) => s >= 80).length
     const passRate = scoresList.length > 0 ? Math.round((passCount / scoresList.length) * 100) : 0

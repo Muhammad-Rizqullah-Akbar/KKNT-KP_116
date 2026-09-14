@@ -98,7 +98,7 @@ export function exportRespondentsToExcel(
       'Metrik / Predikat': r.metric,
       ...aspScoreObj,
       'Status': r.status,
-      'Total Soal': r.scoringDetails?.totalQuestions || 0,
+      'Total Soal': (r as any).result?.questions?.length || 0,
     }
   })
   const ws2 = XLSX.utils.json_to_sheet(respData)
