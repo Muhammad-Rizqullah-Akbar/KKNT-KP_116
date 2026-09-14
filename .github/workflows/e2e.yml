@@ -18,15 +18,25 @@ jobs:
       - run: npm ci
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
-      - name: Install Firebase CLI + Java (for emulator)
+      - name: Setup Java (emulator dependency)
         run: |
-          npm install -g firebase-tools
-          sudo apt-get install -y openjdk-17-jre-headless || true
+          sudo apt-get update -y
+          sudo apt-get install -y openjdk-17-jre-headless
+      - name: Start Firebase emulator (background)
+        run: |
+          npx firebase-tools emulators:start --only firestore,auth --project desa-sehat-2026 &
+          sleep 20
+      - name: Seed test data to emulator
+        run: |
+          FIRESTORE_EMULATOR_HOST=localhost:8090 node scripts/migration/seed.mjs
       - name: Run Playwright tests
         run: npx playwright test
         env:
           FIREBASE_PROJECT_ID: desa-sehat-2026
           NEXT_PUBLIC_FIREBASE_PROJECT_ID: desa-sehat-2026
+          FIRESTORE_EMULATOR_HOST: localhost:8090
+          FIREBASE_AUTH_EMULATOR_HOST: localhost:9099
+          NEXT_PUBLIC_USE_EMULATOR: "true"
           NEXT_PUBLIC_FIREBASE_API_KEY: ${{ vars.NEXT_PUBLIC_FIREBASE_API_KEY }}
           NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ vars.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
       - name: Upload report
