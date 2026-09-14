@@ -1,6 +1,7 @@
 import { defineConfig } from '@playwright/test'
 
 export default defineConfig({
+  globalSetup: './test-suites/e2e/global-setup.ts',
   testDir: './test-suites/e2e',
   testMatch: '**/*.spec.ts',
   timeout: 120_000,
@@ -22,18 +23,27 @@ export default defineConfig({
       use: { browserName: 'chromium' },
     },
   ],
-  // webServer: hanya dev server (emulator + seed di-start terpisah di CI)
-  webServer: {
-    command: 'npm run dev',
-    url: 'http://localhost:3000',
-    reuseExistingServer: !process.env.CI,
-    timeout: 180_000,
-    env: {
-      FIRESTORE_EMULATOR_HOST: 'localhost:8090',
-      FIREBASE_AUTH_EMULATOR_HOST: 'localhost:9099',
-      NEXT_PUBLIC_USE_EMULATOR: 'true',
-      FIREBASE_PROJECT_ID: 'desa-sehat-2026',
-      NEXT_PUBLIC_FIREBASE_PROJECT_ID: 'desa-sehat-2026',
+  // webServer array: Playwright starts all, waits for each URL, kills all on exit.
+  // Emulator + dev server hidup dalam satu lifecycle Playwright (bukan antar-step CI).
+  webServer: [
+    {
+      command: 'npx firebase-tools emulators:start --only firestore,auth --project desa-sehat-2026',
+      url: 'http://localhost:8090',
+      reuseExistingServer: false,
+      timeout: 180_000,
     },
-  },
+    {
+      command: 'npm run dev',
+      url: 'http://localhost:3000',
+      reuseExistingServer: false,
+      timeout: 180_000,
+      env: {
+        FIRESTORE_EMULATOR_HOST: 'localhost:8090',
+        FIREBASE_AUTH_EMULATOR_HOST: 'localhost:9099',
+        NEXT_PUBLIC_USE_EMULATOR: 'true',
+        FIREBASE_PROJECT_ID: 'desa-sehat-2026',
+        NEXT_PUBLIC_FIREBASE_PROJECT_ID: 'desa-sehat-2026',
+      },
+    },
+  ],
 })
