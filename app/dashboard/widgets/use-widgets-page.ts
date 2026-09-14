@@ -16,7 +16,7 @@ import {
 import { useWidgetsDerivations } from './use-widgets-derivations'
 
 export function useWidgetsPage() {
-  const { user, userData, userRole, loading: authLoading } = useAuth()
+  const { userData, userRole, loading: authLoading } = useAuth()
   const router = useRouter()
 
   useEffect(() => {

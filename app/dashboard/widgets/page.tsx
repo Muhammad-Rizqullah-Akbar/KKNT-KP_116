@@ -169,7 +169,6 @@ export default function WidgetsPage() {
             respondentAnswerDistribution={w.respondentAnswerDistribution}
             perStackPartitionBreakdown={w.perStackPartitionBreakdown}
             aspectFormMatrix={w.aspectFormMatrix}
-            handleUpdateStackItem={w.handleUpdateStackItem}
             onContinue={() => w.setSetupStep(3)}
           />
         )}

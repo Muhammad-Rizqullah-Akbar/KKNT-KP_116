@@ -28,7 +28,7 @@ type DerivationsInput = {
 // Seluruh perhitungan turunan (useMemo) untuk halaman widget CMS.
 export function useWidgetsDerivations(input: DerivationsInput) {
   const {
-    accountingStacks, activeStackId, formCodeSearchTerm,
+    accountingStacks, formCodeSearchTerm,
     responses, forms, v15Forms, users, widgets,
     activeStackObj, itemAnalysisFormFilter,
     selectedFormFilter, selectedQuestionFilter, searchTerm, chartTypeFilter,

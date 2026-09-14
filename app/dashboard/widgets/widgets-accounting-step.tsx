@@ -47,7 +47,6 @@ type WidgetsAccountingStepProps = {
   respondentAnswerDistribution: RespondentAnswerDistribution
   perStackPartitionBreakdown: PerStackPartitionItem[]
   aspectFormMatrix: AspectFormMatrix
-  handleUpdateStackItem: (stackId: string, updates: Partial<StackedAccountingItem>) => void
   onContinue: () => void
 }
 
@@ -60,7 +59,6 @@ export function WidgetsAccountingStep({
   respondentAnswerDistribution,
   perStackPartitionBreakdown,
   aspectFormMatrix,
-  handleUpdateStackItem,
   onContinue,
 }: WidgetsAccountingStepProps) {
   return (
