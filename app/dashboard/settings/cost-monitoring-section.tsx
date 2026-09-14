@@ -27,9 +27,9 @@ export function CostMonitoringSection() {
   const { data, isLoading, isError } = useQuery({
     queryKey: ['cost-monitoring'],
     queryFn: async () => {
-      const res = await safeFetchJson('/api/cost/monitoring')
-      if (!res.ok || !res.data) throw new Error('Gagal memuat data biaya')
-      return res.data as CostMonitoringData
+      const res = await safeFetchJson<any>('/api/cost/monitoring')
+      if (!res.ok || !res.data?.data) throw new Error('Gagal memuat data biaya')
+      return res.data.data as CostMonitoringData
     },
     staleTime: 10 * 60 * 1000, // cache 10 menit
     gcTime: 60 * 60 * 1000,

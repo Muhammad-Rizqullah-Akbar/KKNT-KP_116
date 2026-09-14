@@ -14,7 +14,15 @@ type WidgetsGridProps = {
 const PAGE_SIZE = 6
 
 export default function WidgetsGrid({ loading, displayedWidgets, responses, selectedFormId }: WidgetsGridProps) {
+  // Hooks HARUS dipanggil sebelum semua early return (Rules of Hooks).
   const [page, setPage] = useState(0)
+
+  const totalPages = Math.max(1, Math.ceil(displayedWidgets.length / PAGE_SIZE))
+  const safePage = Math.min(page, totalPages - 1)
+  const pagedWidgets = useMemo(
+    () => displayedWidgets.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE),
+    [displayedWidgets, safePage]
+  )
 
   if (loading) {
     return (
@@ -33,13 +41,6 @@ export default function WidgetsGrid({ loading, displayedWidgets, responses, sele
       </div>
     )
   }
-
-  const totalPages = Math.max(1, Math.ceil(displayedWidgets.length / PAGE_SIZE))
-  const safePage = Math.min(page, totalPages - 1)
-  const pagedWidgets = useMemo(
-    () => displayedWidgets.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE),
-    [displayedWidgets, safePage]
-  )
 
   return (
     <div className="space-y-4">
