@@ -19,10 +19,12 @@
 
 import fs from 'node:fs'
 import path from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { initializeApp } from 'firebase-admin/app'
 import { getFirestore } from 'firebase-admin/firestore'
 
 const ROOT = path.resolve(process.cwd())
+const tsImport = (rel) => import(pathToFileURL(path.resolve(ROOT, rel)).href)
 const EXPORT_DIR = path.join(ROOT, 'data', 'export')
 const TRANSFORMED_DIR = path.join(ROOT, 'data', 'transformed')
 
@@ -218,6 +220,58 @@ async function main() {
   results.article_categories = await seedCollection('article_categories', articleCategories)
   results.form_registry = await seedCollection('form_registry', transformedRegistry)
   results.settings = await seedCollection('settings', settings)
+
+  // 8. COMPUTE RESULT: replika data bersih — hitung result.aspects untuk semua response
+  //    (data menyesuaikan kode canonical, bukan sebaliknya)
+  console.log('\n=== COMPUTE RESULT (aspects per-aspek) ===')
+  const { adaptLegacyForm } = await tsImport('lib/domain/forms/legacy-adapter.ts')
+  const { calculateResponseScore } = await tsImport('lib/domain/scoring/scoring-aspects.ts')
+  const { resolveQuestionAnswer } = await tsImport('lib/domain/scoring/scoring-labels.ts')
+  const THRESHOLDS = [
+    { id: 't_ms', min: 75, max: 100, grade: 'MS', title: 'Memenuhi Syarat (MS)', description: 'Skor ≥ 75%' },
+    { id: 't_bl', min: 60, max: 74, grade: 'BL', title: 'Binaan Lanjutan', description: 'Skor 60–74%' },
+    { id: 't_pp', min: 0, max: 59, grade: 'PP', title: 'Perlu Perbaikan', description: 'Skor < 60%' },
+  ]
+  const formMapForCompute = new Map(cleanForms.map((f) => [f.id, { id: f.id, ...f.data }]))
+  let computedCount = 0
+  for (const r of transformedResponses) {
+    const form = formMapForCompute.get(r.data.formId)
+    if (!form) continue
+    const { canonical } = adaptLegacyForm({ id: form.id, ...form })
+    const questions = canonical.version.questions
+    const aspects = canonical.version.aspects
+    const scoring = canonical.version.scoring
+    const answers = r.data.answers || {}
+    const resolvedAnswers = {}
+    questions.forEach((q, idx) => {
+      const ans = resolveQuestionAnswer(q, answers, idx)
+      if (ans !== undefined) resolvedAnswers[q.questionId] = ans
+    })
+    const scoreOutput = calculateResponseScore(
+      { aspects, questions, scoring, thresholds: THRESHOLDS, recommendations: { mode: 'manual' } },
+      resolvedAnswers
+    )
+    await db.collection('responses').doc(r.id).set({
+      result: {
+        scoringEngineVersion: 'v1.5',
+        calculatedAt: r.data.submittedAt || r.data.updatedAt || new Date().toISOString(),
+        rawScore: scoreOutput.rawScore,
+        maximumScore: scoreOutput.maximumScore,
+        percentage: scoreOutput.percentage,
+        grade: scoreOutput.gradeResult.grade,
+        thresholdId: scoreOutput.gradeResult.thresholdId,
+        thresholdTitle: scoreOutput.gradeResult.title,
+        thresholdDescription: scoreOutput.gradeResult.description,
+        aspects: scoreOutput.aspectResults,
+        questions: scoreOutput.questionResults,
+        recommendations: [],
+      },
+      versionId: `v1-${form.id}`,
+      versionNumber: 1,
+    }, { merge: true })
+    computedCount++
+  }
+  console.log(`  ✅ result computed: ${computedCount} response`)
 
   console.log('\n=== SEED RESULT ===')
   console.log(JSON.stringify(results, null, 2))
