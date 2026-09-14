@@ -307,12 +307,12 @@ export default function ResponsesDashboardPage() {
     setIsDeleteModalOpen(true)
   }
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     if (filteredResponses.length === 0) {
       alert('Tidak ada data respon untuk diexport.')
       return
     }
-    exportResponsesToExcel(filteredResponses, selectedFormId)
+    await exportResponsesToExcel(filteredResponses, selectedFormId)
   }
 
   const handleResetFilters = () => {

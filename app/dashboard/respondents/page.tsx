@@ -242,12 +242,12 @@ export default function RespondentsPage() {
     window.print()
   }
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     if (filteredData.length === 0) {
       toast.show('Tidak ada data untuk diexport')
       return
     }
-    exportRespondentsToExcel(filteredData, selectedForms, forms)
+    await exportRespondentsToExcel(filteredData, selectedForms, forms)
     toast.show(`${filteredData.length} data berhasil diexport ke Excel!`)
   }
 
