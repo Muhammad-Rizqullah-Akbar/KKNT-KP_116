@@ -71,8 +71,8 @@ export function resolveCorrectOptionIds(question: BuilderQuestion, options: Norm
         }
       }
       if (matched) {
+        // Hanya simpan optionId canonical (jangan double-add label).
         if (!correctOptionIds.includes(matched.optionId)) correctOptionIds.push(matched.optionId)
-        if (!correctOptionIds.includes(matched.label)) correctOptionIds.push(matched.label)
       } else {
         if (!correctOptionIds.includes(strItem)) correctOptionIds.push(strItem)
       }

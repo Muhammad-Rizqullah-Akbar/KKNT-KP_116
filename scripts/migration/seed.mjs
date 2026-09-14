@@ -166,6 +166,24 @@ const transformedArticles = articles.map((a) => ({
 // 6. form_registry (rename)
 const transformedRegistry = formRegistry
 
+// 6b. DISTRIBUSI: remap formId → 4 form target (fix 404 legacy formId)
+const DIST_FORM_MAP = {
+  KKPD88A: 'u7FFy0mHml4ie9B2DIF2', // Pre-Test SMA N1 Bantaeng
+  KKPD6SC: 'HPSpuvMNuUmopVoPY2lr', // Post-Test SMA N1 Bantaeng
+  KKPDP8D: 'HPSpuvMNuUmopVoPY2lr', // Post-Test SMA (dup code, same form)
+  KKPD5X9: 'u7FFy0mHml4ie9B2DIF2', // PSP Siswa Bantaeng → Pre SMA
+  KKPDDKV: '3F0Gp3cxlmXpp0uk7blI', // Pelatihan BPOM → Pre SMP (testing fallback)
+  KKPD6GP: 'RXFg44Ch6wxXToSo7wdV', // Pendampingan Desa → Post SMP
+}
+const transformedDistributions = distributions.map((d) => {
+  const code = (d.data.code || d.data.distributionCode || '').toUpperCase()
+  const mappedFormId = DIST_FORM_MAP[code]
+  if (mappedFormId) {
+    return { ...d, data: { ...d.data, formId: mappedFormId } }
+  }
+  return d
+})
+
 // 7. responses (normalized) — buang yang ada field _normalized marker? tidak, sudah clean
 // pastikan responses punya partnershipId (denorm untuk query efisien)
 const transformedResponses = normalizedResponses.map((r) => {
@@ -194,7 +212,7 @@ async function main() {
   results.partnerships = await seedCollection('partnerships', partnerships)
   results.forms = await seedCollection('forms', cleanForms)
   results.form_versions = await seedCollection('form_versions', formVersions)
-  results.distributions = await seedCollection('distributions', distributions)
+  results.distributions = await seedCollection('distributions', transformedDistributions)
   results.responses = await seedCollection('responses', transformedResponses)
   results.articles = await seedCollection('articles', transformedArticles)
   results.article_categories = await seedCollection('article_categories', articleCategories)
