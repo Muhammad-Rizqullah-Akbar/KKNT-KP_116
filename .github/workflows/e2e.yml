@@ -22,21 +22,29 @@ jobs:
         run: |
           sudo apt-get update -y
           sudo apt-get install -y openjdk-17-jre-headless
-      - name: Start Firebase emulator (background)
+      - name: Run E2E (emulator + seed + test in one shell)
         run: |
-          npx firebase-tools emulators:start --only firestore,auth --project desa-sehat-2026 &
-          sleep 20
-      - name: Seed test data to emulator
-        run: |
+          set -e
+          # 1. Start emulator in background
+          npx firebase-tools emulators:start --only firestore,auth --project desa-sehat-2026 > /tmp/emulator.log 2>&1 &
+          EMULATOR_PID=$!
+          # 2. Wait for emulator ready
+          for i in $(seq 1 60); do
+            if curl -s http://localhost:8090 > /dev/null 2>&1; then break; fi
+            sleep 2
+          done
+          # 3. Seed minimal data
           FIRESTORE_EMULATOR_HOST=localhost:8090 node scripts/migration/seed-e2e.mjs
-      - name: Run Playwright tests
-        run: npx playwright test
+          # 4. Run Playwright (webServer auto-starts dev server)
+          FIRESTORE_EMULATOR_HOST=localhost:8090 \
+          FIREBASE_AUTH_EMULATOR_HOST=localhost:9099 \
+          NEXT_PUBLIC_USE_EMULATOR=true \
+          FIREBASE_PROJECT_ID=desa-sehat-2026 \
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID=desa-sehat-2026 \
+          npx playwright test
+          # 5. Cleanup
+          kill $EMULATOR_PID 2>/dev/null || true
         env:
-          FIREBASE_PROJECT_ID: desa-sehat-2026
-          NEXT_PUBLIC_FIREBASE_PROJECT_ID: desa-sehat-2026
-          FIRESTORE_EMULATOR_HOST: localhost:8090
-          FIREBASE_AUTH_EMULATOR_HOST: localhost:9099
-          NEXT_PUBLIC_USE_EMULATOR: "true"
           NEXT_PUBLIC_FIREBASE_API_KEY: ${{ vars.NEXT_PUBLIC_FIREBASE_API_KEY }}
           NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ vars.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
       - name: Upload report
