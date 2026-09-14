@@ -28,28 +28,32 @@
       "collectionGroup": "responses",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "distributionCode", "order": "ASCENDING" }
+        { "fieldPath": "formId", "order": "ASCENDING" },
+        { "fieldPath": "submittedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "responses",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "distributionId", "order": "ASCENDING" },
+        { "fieldPath": "submittedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "responses",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "ownerId", "order": "ASCENDING" },
+        { "fieldPath": "submittedAt", "order": "DESCENDING" }
       ]
     },
     {
       "collectionGroup": "distributions",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "ownerId", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "distributions",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "partnershipId", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "distributions",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "formId", "order": "ASCENDING" }
+        { "fieldPath": "formId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
       ]
     }
   ],
