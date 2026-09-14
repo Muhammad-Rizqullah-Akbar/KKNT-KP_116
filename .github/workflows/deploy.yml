@@ -1,13 +1,18 @@
 name: Deploy (CD)
 
-# Continuous Deployment ke Vercel.
+# ============================================================
+# CONTINUOUS DEPLOYMENT — Vercel
 #
-# - push/merge ke `main` → Production
-# - pull_request         → Preview (URL unik per PR)
+# Gate strategy: branch protection pada `main` mewajibkan SEMUA
+# status checks hijau (Build, Quality, E2E, Security) SEBELUM merge.
+# Jadi setiap push ke `main` sudah pasti lolos seluruh pipeline.
 #
-# Alur zero-downtime ditangani Vercel (atomic deploy + instant rollback).
-# Environment terpisah: production vs preview, masing-masing dengan secret
-# Firebase sendiri (lihat README bagian Deployment untuk daftar env).
+#   push ke main            → deploy production (atomic + rollback instan)
+#   pull_request            → deploy preview (URL unik per PR)
+#
+# Environment "production" dilindungi manual approval (opsional,
+# dikonfigurasi di GitHub → Settings → Environments).
+# ============================================================
 
 on:
   push:
@@ -22,26 +27,11 @@ permissions:
 
 jobs:
   # ---------------------------------------------------------------------------
-  # Gate: hanya deploy jika seluruh CI sebelumnya hijau (Build + Quality + E2E).
-  # ---------------------------------------------------------------------------
-  ci-gate:
-    name: CI Gate (menunggu Build, Quality, E2E, Security hijau)
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-    steps:
-      - name: Check required workflows passed
-        run: |
-          echo "Deploy main akan dipicu setelah checks wajib lolos."
-          echo "Checks: build.yml (Build), quality.yml (Typecheck+ESLint), e2e.yml (Playwright), security.yml (Gitleaks+CodeQL)."
-          echo "Jika salah satu gagal, jangan deploy — perbaiki dulu."
-
-  # ---------------------------------------------------------------------------
-  # Deploy production ke Vercel (target = main).
+  # Deploy production (target = main, sudah lolos seluruh CI gate).
   # ---------------------------------------------------------------------------
   deploy-production:
     name: Deploy Production (Vercel)
     runs-on: ubuntu-latest
-    needs: [ci-gate]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     environment:
       name: production
@@ -49,7 +39,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Deploy ke Vercel
+      - name: Deploy ke Vercel (production)
         id: deploy
         uses: amondnet/vercel-action@v25
         with:
@@ -58,25 +48,9 @@ jobs:
           vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
           vercel-args: '--prod'
           working-directory: ./
-        env:
-          # Production Firebase credentials (secret GitHub Actions, TIDAK di repo)
-          NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
-          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
-          NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
-          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
-          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
-          NEXT_PUBLIC_FIREBASE_APP_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}
-          FIREBASE_CLIENT_EMAIL: ${{ secrets.FIREBASE_CLIENT_EMAIL }}
-          FIREBASE_PRIVATE_KEY: ${{ secrets.FIREBASE_PRIVATE_KEY }}
-          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
-
-      - name: Notify deploy URL
-        if: success()
-        run: |
-          echo "✅ Production deployed: ${{ steps.deploy.outputs.preview-url }}"
 
   # ---------------------------------------------------------------------------
-  # Deploy preview ke Vercel (target = pull request).
+  # Deploy preview (target = pull request).
   # ---------------------------------------------------------------------------
   deploy-preview:
     name: Deploy Preview (Vercel)
@@ -97,16 +71,6 @@ jobs:
           vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
           vercel-args: ''
           working-directory: ./
-        env:
-          NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
-          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
-          NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
-          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
-          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
-          NEXT_PUBLIC_FIREBASE_APP_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}
-          FIREBASE_CLIENT_EMAIL: ${{ secrets.FIREBASE_CLIENT_EMAIL }}
-          FIREBASE_PRIVATE_KEY: ${{ secrets.FIREBASE_PRIVATE_KEY }}
-          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
 
       - name: Comment preview URL ke PR
         uses: thollander/actions-comment-pull-request@v3
@@ -114,3 +78,12 @@ jobs:
           message: |
             🚀 **Preview deployment siap!**
             🔗 URL: ${{ steps.deploy.outputs.preview-url }}
+
+# ============================================================
+# CATATAN PENTING — env vars untuk Vercel:
+#   Nilai NEXT_PUBLIC_FIREBASE_* dan FIREBASE_* (server) di-set di
+#   Vercel Dashboard → Project → Settings → Environment Variables.
+#   Vercel build membaca dari sana, BUKAN dari GitHub Actions env.
+#   (GitHub Actions hanya menyediakan VERCEL_TOKEN/ORG_ID/PROJECT_ID
+#   untuk autentikasi deploy, bukan nilai runtime aplikasi.)
+# ============================================================
