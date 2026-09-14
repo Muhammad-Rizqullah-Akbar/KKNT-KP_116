@@ -84,6 +84,8 @@ export function useWidgetsPage() {
   } = useQuery<WidgetCmsData>({
     queryKey: queryKeys.widgets.cmsData,
     queryFn: fetchWidgetData,
+    staleTime: 5 * 60 * 1000, // 5 menit: cache data, hindari refetch berulang (cost optimization)
+    gcTime: 30 * 60 * 1000, // 30 menit garbage collection
   })
 
   // Hydrate widget/stacks from localStorage (or fall back to dynamically-generated widgets)

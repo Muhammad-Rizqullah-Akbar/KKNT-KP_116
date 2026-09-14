@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useMemo } from 'react'
 import { Icon } from '@/components/ui/Icons'
 
 interface ItemAnalysisRow {
@@ -24,6 +25,8 @@ interface WidgetsItemAnalysisStepProps {
   onContinue: () => void
 }
 
+const PAGE_SIZE = 10
+
 export function WidgetsItemAnalysisStep({
   itemQuestionAnalysis,
   itemAnalysisFormFilter,
@@ -31,6 +34,17 @@ export function WidgetsItemAnalysisStep({
   targetForms,
   onContinue,
 }: WidgetsItemAnalysisStepProps) {
+  const [page, setPage] = useState(0)
+
+  // Reset ke halaman 1 saat filter berubah
+  const totalPages = Math.max(1, Math.ceil(itemQuestionAnalysis.length / PAGE_SIZE))
+  const safePage = Math.min(page, totalPages - 1)
+
+  const pagedRows = useMemo(
+    () => itemQuestionAnalysis.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE),
+    [itemQuestionAnalysis, safePage]
+  )
+
   return (
     <div className="rounded-3xl bg-slate-900 border border-slate-800 p-6 space-y-6 shadow-xl">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-4">
@@ -57,7 +71,7 @@ export function WidgetsItemAnalysisStep({
       <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-slate-800/80 font-mono text-xs">
         <span className="text-slate-400 font-bold shrink-0">Filter Formulir:</span>
         <button
-          onClick={() => setItemAnalysisFormFilter('all')}
+          onClick={() => { setItemAnalysisFormFilter('all'); setPage(0) }}
           className={`px-3 py-1.5 rounded-xl border transition-all shrink-0 font-bold ${
             itemAnalysisFormFilter === 'all'
               ? 'bg-cyan-500 text-slate-950 border-cyan-400'
@@ -69,7 +83,7 @@ export function WidgetsItemAnalysisStep({
         {targetForms.map((fObj) => (
           <button
             key={fObj.id}
-            onClick={() => setItemAnalysisFormFilter(fObj.id)}
+            onClick={() => { setItemAnalysisFormFilter(fObj.id); setPage(0) }}
             className={`px-3 py-1.5 rounded-xl border transition-all shrink-0 font-bold ${
               itemAnalysisFormFilter === fObj.id
                 ? 'bg-purple-500 text-slate-950 border-purple-400'
@@ -87,53 +101,81 @@ export function WidgetsItemAnalysisStep({
           Belum ada butir pertanyaan ditemukan pada formulir yang dipilih.
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950">
-          <table className="w-full text-xs font-mono text-left">
-            <thead className="bg-slate-900 text-slate-400 uppercase text-[10px] font-bold tracking-wider">
-              <tr>
-                <th className="p-3.5 border-b border-slate-800">Teks Pertanyaan / Indikator Evaluasi</th>
-                <th className="p-3.5 border-b border-slate-800 text-center">Jawaban DB</th>
-                <th className="p-3.5 border-b border-slate-800 text-center">Pretest (%)</th>
-                <th className="p-3.5 border-b border-slate-800 text-center">Posttest (%)</th>
-                <th className="p-3.5 border-b border-slate-800 text-center">Indeks Kesulitan</th>
-                <th className="p-3.5 border-b border-slate-800 text-right">Status Pemahaman</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800/80">
-              {itemQuestionAnalysis.map((q) => (
-                <tr key={q.id} className="hover:bg-slate-900/60 transition-colors">
-                  <td className="p-3.5 max-w-xs">
-                    <div className="font-bold text-slate-100">{q.text}</div>
-                    <div className="text-[10px] text-purple-300 font-mono">{q.formTitle}</div>
-                  </td>
-                  <td className="p-3.5 text-center text-slate-300 font-bold">{q.totalAnswers} Jawaban</td>
-                  <td className="p-3.5 text-center text-cyan-400 font-bold">{q.pretestPass}%</td>
-                  <td className="p-3.5 text-center text-purple-300 font-bold">{q.posttestPass}%</td>
-                  <td className="p-3.5 text-center">
-                    <span className="px-2 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-800 text-[10px]">
-                      {q.difficulty}
-                    </span>
-                  </td>
-                  <td className="p-3.5 text-right">
-                    <span
-                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
-                        q.status === 'Sangat Dipahami'
-                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
-                          : q.status === 'Cukup Dipahami'
-                          ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30'
-                          : q.status === 'Belum Ada Respon'
-                          ? 'bg-slate-900 text-slate-500 border-slate-800'
-                          : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
-                      }`}
-                    >
-                      {q.status}
-                    </span>
-                  </td>
+        <>
+          <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950">
+            <table className="w-full text-xs font-mono text-left">
+              <thead className="bg-slate-900 text-slate-400 uppercase text-[10px] font-bold tracking-wider">
+                <tr>
+                  <th className="p-3.5 border-b border-slate-800">Teks Pertanyaan / Indikator Evaluasi</th>
+                  <th className="p-3.5 border-b border-slate-800 text-center">Jawaban DB</th>
+                  <th className="p-3.5 border-b border-slate-800 text-center">Pretest (%)</th>
+                  <th className="p-3.5 border-b border-slate-800 text-center">Posttest (%)</th>
+                  <th className="p-3.5 border-b border-slate-800 text-center">Indeks Kesulitan</th>
+                  <th className="p-3.5 border-b border-slate-800 text-right">Status Pemahaman</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-slate-800/80">
+                {pagedRows.map((q) => (
+                  <tr key={q.id} className="hover:bg-slate-900/60 transition-colors">
+                    <td className="p-3.5 max-w-xs">
+                      <div className="font-bold text-slate-100">{q.text}</div>
+                      <div className="text-[10px] text-purple-300 font-mono">{q.formTitle}</div>
+                    </td>
+                    <td className="p-3.5 text-center text-slate-300 font-bold">{q.totalAnswers} Jawaban</td>
+                    <td className="p-3.5 text-center text-cyan-400 font-bold">{q.pretestPass}%</td>
+                    <td className="p-3.5 text-center text-purple-300 font-bold">{q.posttestPass}%</td>
+                    <td className="p-3.5 text-center">
+                      <span className="px-2 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-800 text-[10px]">
+                        {q.difficulty}
+                      </span>
+                    </td>
+                    <td className="p-3.5 text-right">
+                      <span
+                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                          q.status === 'Sangat Dipahami'
+                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                            : q.status === 'Cukup Dipahami'
+                            ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30'
+                            : q.status === 'Belum Ada Respon'
+                            ? 'bg-slate-900 text-slate-500 border-slate-800'
+                            : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                        }`}
+                      >
+                        {q.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* PAGINATION CONTROLS */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between gap-3 pt-2 font-mono text-xs">
+              <span className="text-slate-400">
+                Menampilkan {safePage * PAGE_SIZE + 1}–{Math.min((safePage + 1) * PAGE_SIZE, itemQuestionAnalysis.length)} dari {itemQuestionAnalysis.length} butir soal
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setPage(Math.max(0, safePage - 1))}
+                  disabled={safePage === 0}
+                  className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 hover:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed font-bold"
+                >
+                  Sebelumnya
+                </button>
+                <span className="text-slate-400 font-bold">{safePage + 1} / {totalPages}</span>
+                <button
+                  onClick={() => setPage(Math.min(totalPages - 1, safePage + 1))}
+                  disabled={safePage >= totalPages - 1}
+                  className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 hover:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed font-bold"
+                >
+                  Berikutnya
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   )
