@@ -42,12 +42,10 @@ export async function GET() {
 
   return NextResponse.json({
     success: true,
-    data: {
-      endpoints,
-      totalCostUsdPerMonth,
-      freeTierDailyReads: 50000,
-      freeTierDailyWrites: 20000,
-      freeTierDailyDeletes: 20000,
-    },
+    endpoints,
+    totalCostUsdPerMonth,
+    freeTierDailyReads: 50000,
+    freeTierDailyWrites: 20000,
+    freeTierDailyDeletes: 20000,
   })
 }

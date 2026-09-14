@@ -28,8 +28,8 @@ export function CostMonitoringSection() {
     queryKey: ['cost-monitoring'],
     queryFn: async () => {
       const res = await safeFetchJson<any>('/api/cost/monitoring')
-      if (!res.ok || !res.data?.data) throw new Error('Gagal memuat data biaya')
-      return res.data.data as CostMonitoringData
+      if (!res.ok || !res.data || !Array.isArray(res.data.endpoints)) throw new Error('Gagal memuat data biaya')
+      return res.data as CostMonitoringData
     },
     staleTime: 10 * 60 * 1000, // cache 10 menit
     gcTime: 60 * 60 * 1000,
