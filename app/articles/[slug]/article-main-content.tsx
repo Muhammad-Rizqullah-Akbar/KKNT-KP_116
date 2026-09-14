@@ -16,6 +16,8 @@ interface ArticleMainContentProps {
   activeHeading: string
   onScrollToHeading: (id: string) => void
   onOpenLightbox: (image: LightboxImage) => void
+  pretestAvailability?: { available: boolean; reason: string } | null
+  posttestAvailability?: { available: boolean; reason: string } | null
 }
 
 export function ArticleMainContent({
@@ -28,8 +30,15 @@ export function ArticleMainContent({
   activeHeading,
   onScrollToHeading,
   onOpenLightbox,
+  pretestAvailability,
+  posttestAvailability,
 }: ArticleMainContentProps) {
   const pretestCode = article.pretestCode || (article as any).pretestFormId
+  const posttestCode = article.posttestCode || article.embeddedDistributionCode
+
+  // Banner hanya tampil jika kode ada DAN (belum ada validasi OR validasi = available)
+  const showPretest = pretestCode && (!pretestAvailability || pretestAvailability.available)
+  const showPosttest = posttestCode && (!posttestAvailability || posttestAvailability.available)
 
   return (
     <main className="relative w-full max-w-6xl mx-auto mt-8 sm:mt-10 px-4 sm:px-6 lg:px-8">
@@ -69,7 +78,7 @@ export function ArticleMainContent({
         {/* KONTEN UTAMA ARTIKEL */}
         <article className="lg:col-span-6 article-content text-white/60 leading-relaxed space-y-8 text-base sm:text-lg">
           {/* 1. PRETEST QUESTIONNAIRE BANNER (AT THE VERY TOP - BEFORE READING ARTICLE) */}
-          {pretestCode && (
+          {showPretest && (
             <div className="mb-8 p-6 rounded-3xl bg-gradient-to-br from-cyan-950/90 via-slate-900 to-slate-950 border-2 border-cyan-500/50 shadow-2xl space-y-3 font-sans">
               <div className="flex items-center justify-between gap-3 border-b border-cyan-500/20 pb-3">
                 <div className="flex items-center gap-3">
@@ -148,7 +157,7 @@ export function ArticleMainContent({
           )}
 
           {/* 2. POSTTEST QUESTIONNAIRE BANNER (AT THE VERY BOTTOM - AFTER READING ARTICLE & GALLERY) */}
-          {(article.posttestCode || article.embeddedDistributionCode) && (
+          {showPosttest && (
             <div className="mt-10 p-6 rounded-3xl bg-gradient-to-br from-purple-950/90 via-slate-900 to-slate-950 border-2 border-purple-500/50 shadow-2xl space-y-3 font-sans">
               <div className="flex items-center justify-between gap-3 border-b border-purple-500/20 pb-3">
                 <div className="flex items-center gap-3">

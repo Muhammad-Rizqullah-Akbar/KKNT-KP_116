@@ -45,6 +45,10 @@ export default function ArticleDetailPage({ params }: { params: Promise<{ slug: 
   const [isTocPopoverOpen, setIsTocPopoverOpen] = useState(false)
   const [parsedHeadings, setParsedHeadings] = useState<HeadingItem[]>([])
 
+  // State validasi akses form (server-side): pretest & posttest tersedia/tidak
+  const [pretestAvailability, setPretestAvailability] = useState<{ available: boolean; reason: string } | null>(null)
+  const [posttestAvailability, setPosttestAvailability] = useState<{ available: boolean; reason: string } | null>(null)
+
   const contentRef = useRef<HTMLDivElement>(null)
 
   // ============ 1. CEK STATUS AUTHENTICATION ADMIN ============
@@ -97,6 +101,38 @@ export default function ArticleDetailPage({ params }: { params: Promise<{ slug: 
 
     fetchArticleDetail()
   }, [slug])
+
+  // ============ 2b. VALIDASI AKSES FORM (SERVER-SIDE) ============
+  // Saat artikel dibuka, cek pretest/posttest form: masih dibuka/tidak, ada/tidak.
+  // Ini dilakukan DI SERVER via API, bukan menebak di client.
+  useEffect(() => {
+    if (!article) return
+    const codes = {
+      pretest: article.pretestCode || (article as any).pretestFormId,
+      posttest: article.posttestCode || article.embeddedDistributionCode,
+    }
+
+    const check = async (type: 'pretest' | 'posttest', code?: string) => {
+      if (!code) {
+        if (type === 'pretest') setPretestAvailability(null)
+        else setPosttestAvailability(null)
+        return
+      }
+      try {
+        const res = await fetch(`/api/public/check-availability?code=${encodeURIComponent(code)}`)
+        const data = await res.json()
+        const result = { available: Boolean(data.available), reason: data.reason || 'error' }
+        if (type === 'pretest') setPretestAvailability(result)
+        else setPosttestAvailability(result)
+      } catch {
+        if (type === 'pretest') setPretestAvailability({ available: false, reason: 'error' })
+        else setPosttestAvailability({ available: false, reason: 'error' })
+      }
+    }
+
+    check('pretest', codes.pretest)
+    check('posttest', codes.posttest)
+  }, [article])
 
   // ============ 3. AKURASI VIEWS METRIC (IP API + 5 DETIK DELAY + LOCALSTORAGE) ============
   useEffect(() => {
@@ -340,6 +376,8 @@ export default function ArticleDetailPage({ params }: { params: Promise<{ slug: 
         activeHeading={activeHeading}
         onScrollToHeading={handleScrollToHeading}
         onOpenLightbox={openLightbox}
+        pretestAvailability={pretestAvailability}
+        posttestAvailability={posttestAvailability}
       />
 
       {/* ====== LIGHTBOX MODAL ====== */}
