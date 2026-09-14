@@ -31,8 +31,7 @@ function fixCorrectAnswer(q) {
   if (p.includes('menunjukan masa kedaluwarsa') || p.includes('menunjukan masa kadaluwarsa')) {
     return '6'
   }
-  // Benar/salah yang perlu dikoreksi
-  if (p.includes('mengambil gorengan')) return 'Salah'
+  // (ambil gorengan = "Benar" sesuai data asli & konfirmasi user — tidak perlu override)
   return null
 }
 
