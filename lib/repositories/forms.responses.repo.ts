@@ -13,6 +13,7 @@ import {
   orderBy,
   doc,
   getDocs,
+  limit,
 } from 'firebase/firestore'
 import type { FormResponse } from './forms.types'
 
@@ -134,10 +135,10 @@ export const submitFormResponse = async (
   }
 }
 
-export const getAllResponses = async (): Promise<FormResponse[]> => {
+export const getAllResponses = async (limitCount: number = 1000): Promise<FormResponse[]> => {
   try {
     const responsesRef = collection(firestore, 'responses')
-    const q = query(responsesRef, orderBy('submittedAt', 'desc'))
+    const q = query(responsesRef, orderBy('submittedAt', 'desc'), limit(limitCount))
     const snapshot = await getDocs(q)
     const list = snapshot.docs.map((doc) => ({
       id: doc.id,
