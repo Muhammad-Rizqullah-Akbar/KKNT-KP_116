@@ -127,10 +127,10 @@ export default function PreviewModal({ respondent, forms, onClose }: PreviewModa
       }
 
       if (/^(opt_|q_\d+_opt_)/i.test(strVal)) {
+        // Format jawaban sekarang angka murni; strip prefix opt_xxx_N → angka 1-based
         const numMatch = strVal.match(/\d+$/)?.[0]
         if (numMatch !== undefined) {
-          const letter = String.fromCharCode(65 + Number(numMatch))
-          return `Pilihan ${letter}`
+          return String(Number(numMatch) + 1)
         }
       }
 
