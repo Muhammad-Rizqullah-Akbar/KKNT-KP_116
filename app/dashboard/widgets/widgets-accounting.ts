@@ -9,23 +9,8 @@ export function computeAccountingForStack(
   v15Forms: any[],
   users: any[]
 ): AccountingResult {
-  const isV15Response = (r: any) => {
-    return (
-      r.scoringEngineVersion === 'v1.5' ||
-      r.result?.scoringEngineVersion === 'v1.5' ||
-      Boolean(r.versionId && String(r.versionId).trim() !== '') ||
-      Boolean(r.distributionCode && String(r.distributionCode).trim() !== '') ||
-      r.v15 === true
-    )
-  }
-
-  const targetResponsesByScheme = responses.filter((r: any) => {
-    const isV15 = isV15Response(r)
-    const isV10 = !isV15
-    if (stack.scoringScheme === 'v1_0') return isV10
-    if (stack.scoringScheme === 'v1_5') return isV15
-    return true
-  })
+  // Semua response diperlakukan sama (tidak ada lagi pemisahan V1.0 vs V1.5)
+  const targetResponsesByScheme = responses
 
   const allKnownForms = [...forms, ...v15Forms]
 

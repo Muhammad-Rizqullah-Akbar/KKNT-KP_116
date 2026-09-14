@@ -45,7 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const validRoles = ['super_admin', 'super_admin', 'super_admin', 'partnership', 'cadre']
+  const validRoles = ['super_admin', 'partnership', 'cadre']
 
   // Listen to auth state changes & Sinkronisasi Session
   useEffect(() => {

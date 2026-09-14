@@ -47,7 +47,6 @@ export interface StackedAccountingItem {
   mode: 'single' | 'dual'
   pretestFormId: string
   posttestFormId: string
-  scoringScheme?: 'all' | 'v1_0' | 'v1_5'
   enabled: boolean
 }
 

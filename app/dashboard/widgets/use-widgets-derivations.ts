@@ -184,7 +184,7 @@ export function useWidgetsDerivations(input: DerivationsInput) {
       const formId = f.id || f.formId || 'unknown'
       const code = (f.code || f.formCode || f.distributionCode || f.pretestCode || f.posttestCode || '-').trim().toUpperCase()
       const title = f.title || f.metadata?.title || 'Formulir Tanpa Judul'
-      const version = f.versionId || (f.formId && String(f.formId).startsWith('form_')) ? 'V1.5' : 'V1.0'
+      const version = '' // tidak ada lagi versi V1.0/V1.5 — single format
       map.set(formId, {
         id: formId,
         code,
@@ -218,7 +218,7 @@ export function useWidgetsDerivations(input: DerivationsInput) {
             id: key,
             code,
             title,
-            version: 'Unassigned',
+            version: '',
             responses: [],
             respondentIds: new Set<string>(),
             scores: [],
@@ -332,7 +332,6 @@ export function useWidgetsDerivations(input: DerivationsInput) {
         stackId: stack.id,
         title: stack.title || `Stacking ${idx + 1}`,
         mode: stack.mode,
-        scoringScheme: stack.scoringScheme || 'all',
         respondentCount: stackResCount,
         preCount: res.preCount || 0,
         postCount: res.postCount || 0,
@@ -363,11 +362,11 @@ export function useWidgetsDerivations(input: DerivationsInput) {
           : f.formId === itemAnalysisFormFilter
       if (isSelected) {
         f.questions?.forEach((q: any) => {
-          const text = q.title || q.question || 'Pertanyaan Evaluasi V1.5'
+          const text = q.title || q.question || 'Pertanyaan Evaluasi'
           questionList.push({
             id: `q-v15-${q.id || q.questionId}`,
             text,
-            formTitle: f.metadata?.title || 'Form V1.5',
+            formTitle: f.metadata?.title || 'Form',
             formId: f.formId,
             questionId: q.id || q.questionId,
             answerType: q.answerType || q.type || 'short-text',
@@ -387,11 +386,11 @@ export function useWidgetsDerivations(input: DerivationsInput) {
           : f.id === itemAnalysisFormFilter
       if (isSelected) {
         f.questions?.forEach((q: any) => {
-          const text = q.question || q.label || 'Pertanyaan Evaluasi V1.0'
+          const text = q.question || q.label || 'Pertanyaan Evaluasi'
           questionList.push({
             id: `q-v10-${q.id}`,
             text,
-            formTitle: f.title || 'Form V1.0',
+            formTitle: f.title || 'Form',
             formId: f.id || f.code || '',
             questionId: q.id,
             answerType: q.answerType || q.type || 'short-text',

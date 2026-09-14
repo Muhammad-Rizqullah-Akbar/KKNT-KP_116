@@ -1,7 +1,6 @@
 // ============ KOMPUTASI ACCOUNTING STACKS (pure, diekstrak dari AdminOverviewDashboard) ============
 
 import {
-  isV15Response,
   findMatchingFormDeterministic,
   matchFormIdWithForms,
   extractScoreDeterministic,
@@ -14,13 +13,8 @@ import {
 // COMPUTE DYNAMIC ACCOUNTING STACKS FOR DASHBOARD OVERVIEW
 export function computeAccountingStacks(accountingStacks: any[], responses: any[], forms: any[]) {
   return accountingStacks.map((stack) => {
-    const targetResponsesByScheme = responses.filter((r: any) => {
-      const isV15 = isV15Response(r)
-      const isV10 = !isV15
-      if (stack.scoringScheme === 'v1_0') return isV10
-      if (stack.scoringScheme === 'v1_5') return isV15
-      return true
-    })
+    // Semua response diperlakukan sama (tidak ada lagi pemisahan V1.0 vs V1.5)
+    const targetResponsesByScheme = responses
 
     const matchFormId = (r: any, targetId: string) => matchFormIdWithForms(r, targetId, forms)
 
@@ -235,7 +229,6 @@ export function computePerStackPartitionBreakdown(
       stackId: stObj.stack.id,
       title: stObj.stack.title || `Stacking ${idx + 1}`,
       mode: stObj.stack.mode,
-      scoringScheme: stObj.stack.scoringScheme || 'all',
       respondentCount: stackResCount,
       preCount: stObj.preCount || 0,
       postCount: stObj.postCount || 0,

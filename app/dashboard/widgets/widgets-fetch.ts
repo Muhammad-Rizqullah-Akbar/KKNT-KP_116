@@ -79,7 +79,7 @@ export async function fetchWidgetData(): Promise<WidgetCmsData> {
   const dynamicWidgets: WidgetItem[] = []
   let positionCounter = 0
 
-  // Process V1.0 Questions from Database
+  // Process questions from Database
   v10Data.forEach((form) => {
     form.questions?.forEach((q: any, qIdx: number) => {
       const type = q.answerType || q.type || 'short-text'
@@ -101,7 +101,7 @@ export async function fetchWidgetData(): Promise<WidgetCmsData> {
           id: `widget-v10-${q.id}`,
           name: `${form.title}: ${qTitle}`,
           formId: form.id || 'v10-form',
-          formTitle: form.title || 'Formulir V1.0',
+          formTitle: form.title || 'Formulir',
           questionId: q.id,
           questionText: qTitle,
           chartType: assignedType,
@@ -117,18 +117,18 @@ export async function fetchWidgetData(): Promise<WidgetCmsData> {
     })
   })
 
-  // Process V1.5 Questions from Database
+  // Process questions from Database
   v15Forms.forEach((f15: any) => {
     f15.questions?.forEach((q: any, qIdx: number) => {
-      const qTitle = q.title || q.question || 'Pertanyaan V1.5'
+      const qTitle = q.title || q.question || 'Pertanyaan Evaluasi'
       const assignedType: 'bar' | 'pie' | 'line' | 'number' | 'matrix' =
         qIdx % 4 === 0 ? 'bar' : qIdx % 4 === 1 ? 'pie' : qIdx % 4 === 2 ? 'line' : 'matrix'
 
       dynamicWidgets.push({
         id: `widget-v15-${q.id || crypto.randomUUID()}`,
-        name: `[V1.5] ${f15.metadata?.title || 'Form V1.5'}: ${qTitle}`,
+        name: `${f15.metadata?.title || 'Form'}: ${qTitle}`,
         formId: f15.formId,
-        formTitle: f15.metadata?.title || 'Form V1.5',
+        formTitle: f15.metadata?.title || 'Form',
         questionId: q.id || q.questionId,
         questionText: qTitle,
         chartType: assignedType,

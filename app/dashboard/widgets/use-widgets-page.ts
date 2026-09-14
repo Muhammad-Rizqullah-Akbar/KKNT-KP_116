@@ -41,7 +41,6 @@ export function useWidgetsPage() {
       mode: 'single',
       pretestFormId: 'all',
       posttestFormId: 'all',
-      scoringScheme: 'all',
       enabled: true,
     },
   ])

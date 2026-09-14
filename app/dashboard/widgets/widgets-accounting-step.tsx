@@ -15,7 +15,6 @@ type PerStackPartitionItem = {
   stackId: string
   title: string
   mode: string
-  scoringScheme: string
   respondentCount: number
   preCount: number
   postCount: number
@@ -66,7 +65,7 @@ export function WidgetsAccountingStep({
 }: WidgetsAccountingStepProps) {
   return (
     <div className="space-y-6">
-      {/* STACK SELECTOR & SKEMA PENILAIAN TABS */}
+      {/* STACK SELECTOR */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900 p-3 rounded-2xl border border-slate-800 text-xs font-mono">
         <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
           <span className="text-slate-400 font-bold shrink-0">Stack Accounting:</span>
@@ -83,19 +82,6 @@ export function WidgetsAccountingStep({
               #{idx + 1} {s.title}
             </button>
           ))}
-        </div>
-
-        <div className="flex items-center gap-2 shrink-0">
-          <span className="text-slate-400 font-bold">Skema Penilaian:</span>
-          <select
-            value={activeStackObj.scoringScheme || 'all'}
-            onChange={(e) => handleUpdateStackItem(activeStackObj.id, { scoringScheme: e.target.value as any })}
-            className="bg-slate-950 border border-emerald-500/40 text-emerald-300 rounded-xl px-3 py-1.5 font-bold focus:outline-none focus:border-emerald-400"
-          >
-            <option value="all">Semua Skema (Gabungan V1.0 & V1.5)</option>
-            <option value="v1_0">Skema V1.0 (Data Responden Legacy)</option>
-            <option value="v1_5">Skema V1.5 (Hasil Penilaian Resmi)</option>
-          </select>
         </div>
       </div>
 
@@ -174,8 +160,8 @@ export function WidgetsAccountingStep({
                   </div>
 
                   <div className="flex items-center gap-3 text-xs">
-                    <span className="text-slate-400">{item.respondents} Responden DB</span>
-                    <span className="font-bold text-emerald-400">Pass Rate: {item.passRate}%</span>
+                    <span className="text-slate-400">{item.respondents} Responden</span>
+                    <span className="font-bold text-emerald-400">Lulus: {item.passRate}%</span>
                   </div>
                 </div>
 
@@ -185,7 +171,7 @@ export function WidgetsAccountingStep({
                     {/* PRETEST BAR (BASELINE - NO GAIN DISPLAYED) */}
                     <div className="space-y-1">
                       <div className="flex justify-between text-[11px]">
-                        <span className="text-slate-400 font-bold">Pretest Form (Skor Awal):</span>
+                        <span className="text-slate-400 font-bold">Pretest</span>
                         <span className="text-cyan-400 font-bold">{item.pretestAvg}%</span>
                       </div>
                       <div className="w-full h-3 rounded-full bg-slate-900 overflow-hidden border border-slate-800">
@@ -211,7 +197,7 @@ export function WidgetsAccountingStep({
                   </div>
                 ) : (
                   <div className="p-3 text-center text-slate-500 font-mono text-[11px] bg-slate-900/60 rounded-xl">
-                    Belum ada respon kuesioner terkumpul untuk instansi mitra ini di database.
+                    Belum ada respon terkumpul untuk instansi ini.
                   </div>
                 )}
               </div>
@@ -225,14 +211,14 @@ export function WidgetsAccountingStep({
             <div>
               <h4 className="font-bold text-sm text-slate-100 flex items-center gap-2">
                 <Icon name="users" className="w-4 h-4 text-cyan-400" />
-                <span>Sebaran Responden & Distribusi Kategori Jawaban Stacking ({respondentAnswerDistribution.totalRes} Responden)</span>
+                <span>Sebaran Responden</span>
               </h4>
               <p className="text-[11px] text-slate-400 mt-0.5">
-                Distribusi persentase sebaran tingkat pemahaman untuk <strong className="text-cyan-300">{activeStackObj.title}</strong> ({respondentAnswerDistribution.totalRes} responden terdeteksi).
+                Distribusi tingkat pemahaman ({respondentAnswerDistribution.totalRes} responden).
               </p>
             </div>
             <span className="px-2.5 py-1 rounded-full bg-cyan-500/20 text-cyan-300 text-[10px] font-bold border border-cyan-500/30">
-              TOTAL STACKING AKTIF: {respondentAnswerDistribution.totalRes} RESPONDEN
+              {respondentAnswerDistribution.totalRes} Responden
             </span>
           </div>
 
@@ -347,7 +333,7 @@ export function WidgetsAccountingStep({
               </p>
             </div>
             <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-mono font-bold border border-emerald-500/30">
-              PARITY WITH DATA RESPONDEN
+              {aspectFormMatrix.targetForms.length} Formulir
             </span>
           </div>
 

@@ -7,7 +7,7 @@ import { Sidebar } from './Sidebar'
 import { Icon } from '@/components/ui/Icons'
 import { clsx } from 'clsx'
 
-const VALID_ROLES = ['super_admin', 'super_admin', 'super_admin', 'partnership', 'cadre']
+const VALID_ROLES = ['super_admin', 'partnership', 'cadre']
 
 export function DashboardAuthGuard({ children }: { children: React.ReactNode }) {
   const { user, userData, userRole, loading, isAuthenticated, logout } = useAuth()
@@ -37,18 +37,31 @@ export function DashboardAuthGuard({ children }: { children: React.ReactNode }) 
   }, [])
 
   // 1. Verification of Client Session & User Credentials
+  //    Grace period: beri jeda kecil setelah loading selesai agar state auth settle
+  //    (hindari flash "session expired" saat login baru selesai).
   useEffect(() => {
-    if (!loading) {
+    if (loading) return
+
+    const timer = setTimeout(() => {
       const isRoleValid = userRole && VALID_ROLES.includes(userRole)
       const hasValidUserData = !!userData && !!userData.role && VALID_ROLES.includes(userData.role)
 
-      if (!user || !isAuthenticated || !isRoleValid || !hasValidUserData) {
-        console.warn('[AuthGuard] Akses ditolak atau Sesi Kadaluwarsa. Mengarahkan ke /login...')
+      // Hanya redirect jika BENAR-BENAR tidak ada user (bukan race condition transisi login)
+      if (!user && !isAuthenticated) {
+        console.warn('[AuthGuard] Tidak ada sesi aktif. Mengarahkan ke /login...')
+        router.replace('/login?reason=expired')
+        return
+      }
+
+      if (!isRoleValid || !hasValidUserData) {
+        console.warn('[AuthGuard] Role tidak valid. Mengarahkan ke /login...')
         logout().finally(() => {
-          router.replace('/login?reason=expired')
+          router.replace('/login?reason=unauthorized')
         })
       }
-    }
+    }, 400)
+
+    return () => clearTimeout(timer)
   }, [loading, user, userData, userRole, isAuthenticated, router, logout])
 
   // 2. Global Fetch Interceptor for 401 Unauthorized & 403 Forbidden API Responses
@@ -59,13 +72,17 @@ export function DashboardAuthGuard({ children }: { children: React.ReactNode }) 
 
     window.fetch = async (...args) => {
       const response = await originalFetch(...args)
-      
-      // If any API call returns 401 (Unauthorized) or 403 (Forbidden), auto-redirect to login
-      if (response.status === 401 || response.status === 403) {
-        console.warn('[AuthGuard] Sesi API kadaluwarsa (HTTP 401/403). Mengarahkan otomatis ke /login...')
-        logout().finally(() => {
-          window.location.href = '/login?reason=expired'
-        })
+
+      // Hindari redirect ganda: hanya redirect jika TIDAK sedang di halaman login,
+      // dan hanya untuk 401 (bukan 403 yang bisa dari permission endpoint).
+      if (response.status === 401) {
+        const isLoginPage = typeof window !== 'undefined' && window.location.pathname.startsWith('/login')
+        if (!isLoginPage) {
+          console.warn('[AuthGuard] Sesi API kadaluwarsa (HTTP 401). Mengarahkan otomatis ke /login...')
+          logout().finally(() => {
+            window.location.href = '/login?reason=expired'
+          })
+        }
       }
 
       return response

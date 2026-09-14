@@ -82,12 +82,12 @@ export function WidgetsVisualizationStep({
               <option value="all">Semua Formulir ({v15Forms.length + forms.length} Form)</option>
               {v15Forms.map((f) => (
                 <option key={f.formId} value={f.formId}>
-                  [V1.5] {f.metadata?.title || f.formId}
+                  {f.metadata?.title || f.formId}
                 </option>
               ))}
               {forms.map((f) => (
                 <option key={f.id} value={f.id}>
-                  [V1.0] {f.title}
+                  {f.title}
                 </option>
               ))}
             </select>

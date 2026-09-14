@@ -277,8 +277,8 @@ export function WidgetsStackingStep({
                   </span>
                 </div>
 
-                {/* MODE, SCHEME, & FORM SELECTORS FOR THIS STACK */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs font-mono">
+                {/* MODE & FORM SELECTORS FOR THIS STACK */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs font-mono">
                   <div className="space-y-1">
                     <label className="block text-slate-400 font-bold">Struktur Assessment</label>
                     <select
@@ -288,19 +288,6 @@ export function WidgetsStackingStep({
                     >
                       <option value="single">1 Form Multi-Stage (Pre & Post)</option>
                       <option value="dual">2 Form Terpisah (Form A vs Form B)</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="block text-emerald-400 font-bold">Skema Penilaian Data</label>
-                    <select
-                      value={stack.scoringScheme || 'all'}
-                      onChange={(e) => handleUpdateStackItem(stack.id, { scoringScheme: e.target.value as any })}
-                      className="w-full bg-slate-900 border border-emerald-500/40 text-emerald-300 rounded-xl px-3 py-2 font-bold"
-                    >
-                      <option value="all">Semua Skema (Gabungan V1.0 & V1.5)</option>
-                      <option value="v1_0">Skema V1.0 (Data Responden Legacy)</option>
-                      <option value="v1_5">Skema V1.5 (Hasil Penilaian Resmi)</option>
                     </select>
                   </div>
 
@@ -317,7 +304,7 @@ export function WidgetsStackingStep({
                         const codeStr = f.code || f.formCode || f.distributionCode || ''
                         return (
                           <option key={f.formId} value={f.formId}>
-                            [V1.5] {f.metadata?.title || f.formId} {codeStr ? `(Kode: ${codeStr})` : ''} — {cnt} Responden Terdeteksi
+                            {f.metadata?.title || f.formId} {codeStr ? `(Kode: ${codeStr})` : ''} — {cnt} Responden Terdeteksi
                           </option>
                         )
                       })}
@@ -327,7 +314,7 @@ export function WidgetsStackingStep({
                         const codeStr = f.code || (f as any).formCode || ''
                         return (
                           <option key={formIdStr || codeStr} value={formIdStr}>
-                            [V1.0] {f.title} {codeStr ? `(Kode: ${codeStr})` : ''} — {cnt} Responden Terdeteksi
+                            {f.title} {codeStr ? `(Kode: ${codeStr})` : ''} — {cnt} Responden Terdeteksi
                           </option>
                         )
                       })}
@@ -348,7 +335,7 @@ export function WidgetsStackingStep({
                         const codeStr = f.code || f.formCode || f.distributionCode || ''
                         return (
                           <option key={f.formId} value={f.formId}>
-                            [V1.5] {f.metadata?.title || f.formId} {codeStr ? `(Kode: ${codeStr})` : ''} — {cnt} Responden Terdeteksi
+                            {f.metadata?.title || f.formId} {codeStr ? `(Kode: ${codeStr})` : ''} — {cnt} Responden Terdeteksi
                           </option>
                         )
                       })}
@@ -358,7 +345,7 @@ export function WidgetsStackingStep({
                         const codeStr = f.code || (f as any).formCode || ''
                         return (
                           <option key={formIdStr || codeStr} value={formIdStr}>
-                            [V1.0] {f.title} {codeStr ? `(Kode: ${codeStr})` : ''} — {cnt} Responden Terdeteksi
+                            {f.title} {codeStr ? `(Kode: ${codeStr})` : ''} — {cnt} Responden Terdeteksi
                           </option>
                         )
                       })}
