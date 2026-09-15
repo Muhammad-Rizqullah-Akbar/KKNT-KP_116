@@ -10,14 +10,16 @@ interface CostEndpoint {
   writes: number
   deletes: number
   costUsdPerRequest: number
-  costUsdPerMonth: number
-  requestsUntilFreeTierExhausted: number
+  grossCostUsdPerMonth: number
+  netCostUsdPerMonth: number
+  requestsPerDayUntilFreeTierExhausted: number
   breakdown: Record<string, number>
 }
 
 interface CostMonitoringData {
+  assumedRequestsPerDay: number
   endpoints: CostEndpoint[]
-  totalCostUsdPerMonth: number
+  totalNetCostUsdPerMonth: number
   freeTierDailyReads: number
   freeTierDailyWrites: number
   freeTierDailyDeletes: number
@@ -31,7 +33,7 @@ export function CostMonitoringSection() {
       if (!res.ok || !res.data || !Array.isArray(res.data.endpoints)) throw new Error('Gagal memuat data biaya')
       return res.data as CostMonitoringData
     },
-    staleTime: 10 * 60 * 1000, // cache 10 menit
+    staleTime: 10 * 60 * 1000,
     gcTime: 60 * 60 * 1000,
   })
 
@@ -52,14 +54,20 @@ export function CostMonitoringSection() {
     )
   }
 
+  const isFree = data.totalNetCostUsdPerMonth < 0.0001
+
   return (
     <div className="space-y-6">
       {/* Ringkasan */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-1">
-          <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">Estimasi Biaya Bulanan</span>
-          <p className="text-3xl font-black font-mono text-cyan-400">${data.totalCostUsdPerMonth.toFixed(4)}</p>
-          <span className="text-[10px] text-slate-500 font-mono">Total semua endpoint</span>
+          <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">Estimasi Biaya Bulanan (NET)</span>
+          <p className={`text-3xl font-black font-mono ${isFree ? 'text-emerald-400' : 'text-cyan-400'}`}>
+            {isFree ? '$0.0000' : `$${data.totalNetCostUsdPerMonth.toFixed(4)}`}
+          </p>
+          <span className="text-[10px] text-slate-500 font-mono">
+            {isFree ? 'Sepenuhnya tercakup free tier (gratis)' : 'Setelah free tier harian'}
+          </span>
         </div>
         <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-1">
           <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">Free Tier Reads</span>
@@ -72,9 +80,9 @@ export function CostMonitoringSection() {
           <span className="text-[10px] text-slate-500 font-mono">Gratis per hari</span>
         </div>
         <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-1">
-          <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">Free Tier Deletes</span>
-          <p className="text-2xl font-black font-mono text-emerald-400">{data.freeTierDailyDeletes.toLocaleString()}/hari</p>
-          <span className="text-[10px] text-slate-500 font-mono">Gratis per hari</span>
+          <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">Asumsi Traffic</span>
+          <p className="text-2xl font-black font-mono text-cyan-400">{data.assumedRequestsPerDay} req/hari</p>
+          <span className="text-[10px] text-slate-500 font-mono">Dashboard internal</span>
         </div>
       </div>
 
@@ -87,7 +95,7 @@ export function CostMonitoringSection() {
               <th className="p-3.5 border-b border-slate-800 text-center">Reads/req</th>
               <th className="p-3.5 border-b border-slate-800 text-center">Writes/req</th>
               <th className="p-3.5 border-b border-slate-800 text-center">Biaya/req (USD)</th>
-              <th className="p-3.5 border-b border-slate-800 text-center">Biaya/bln (USD)</th>
+              <th className="p-3.5 border-b border-slate-800 text-center">Biaya/bln NET (USD)</th>
               <th className="p-3.5 border-b border-slate-800 text-center">Request/hari sblm habis free tier</th>
             </tr>
           </thead>
@@ -98,9 +106,13 @@ export function CostMonitoringSection() {
                 <td className="p-3.5 text-center text-cyan-400">{e.reads}</td>
                 <td className="p-3.5 text-center text-purple-300">{e.writes}</td>
                 <td className="p-3.5 text-center text-slate-300">${e.costUsdPerRequest.toFixed(6)}</td>
-                <td className="p-3.5 text-center text-amber-300">${e.costUsdPerMonth.toFixed(4)}</td>
+                <td className="p-3.5 text-center text-emerald-400 font-bold">
+                  {e.netCostUsdPerMonth < 0.0001 ? '$0.0000' : `$${e.netCostUsdPerMonth.toFixed(4)}`}
+                </td>
                 <td className="p-3.5 text-center text-slate-400">
-                  {e.requestsUntilFreeTierExhausted === Infinity ? '∞ (selalu free)' : e.requestsUntilFreeTierExhausted.toLocaleString()}
+                  {e.requestsPerDayUntilFreeTierExhausted === Infinity
+                    ? '∞ (selalu free)'
+                    : e.requestsPerDayUntilFreeTierExhausted.toLocaleString()}
                 </td>
               </tr>
             ))}
@@ -109,7 +121,7 @@ export function CostMonitoringSection() {
       </div>
 
       <p className="text-[11px] text-slate-500 font-mono">
-        Estimasi statis berdasarkan ukuran koleksi & pola baca yang sudah diaudit. Tidak melakukan operasi Firestore tambahan.
+        Estimasi statis NET (setelah free tier) berdasarkan ukuran koleksi produksi aktual (130 response, 4 form) & asumsi {data.assumedRequestsPerDay} request/hari. Tidak melakukan operasi Firestore tambahan.
       </p>
     </div>
   )

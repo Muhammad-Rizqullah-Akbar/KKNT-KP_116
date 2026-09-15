@@ -54,24 +54,21 @@ export const FIRESTORE_FREE_TIER_DAILY: FirestorePricing = {
 }
 
 /**
- * Ukuran koleksi (jumlah dokumen). Dipakai untuk estimasi STATIS
- * ketika code path diketahui melakukan full-collection scan.
- *
- * ANGKA CONTOH — ganti dengan angka produksi aktual.
- * Bisa dipindahkan ke Firestore settings agar bisa di-update
- * tanpa deploy ulang.
+ * Ukuran koleksi PRODUKSI AKTUAL (desa-sehat-2026), diverifikasi 14 Sep 2026.
+ * Bukan lagi angka contoh — ini snapshot nyata dari Firestore produksi.
+ * Update di sini jika data bertambah besar.
  */
 export const ESTIMATED_COLLECTION_SIZES: Record<string, number> = {
-  responses: 10_000,
-  forms: 500,
-  distributions: 200,
-  users: 300,
-  articles: 200,
-  form_access: 100,
-  partnerships: 200,
+  responses: 130,
+  forms: 4,
+  distributions: 11,
+  users: 14,
+  articles: 2,
+  form_access: 0,
+  partnerships: 2,
   form_registry: 2,
-  settings: 10,
-  article_categories: 20,
+  settings: 1,
+  article_categories: 4,
 }
 
 export const DEFAULT_COLLECTION_SIZE = 100
