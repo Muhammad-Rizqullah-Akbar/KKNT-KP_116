@@ -1,4 +1,4 @@
-import { getAllResponses, getForms } from '@/lib/repositories/forms.repo'
+import { getForms } from '@/lib/repositories/forms.repo'
 import { extractRespondentName, extractRespondentEmail } from '@/lib/domain/responses/respondent-utils'
 import { safeFetchJson } from '@/lib/infra/safe-fetch'
 import { resolveOptionLabel } from '@/lib/domain/answers/normalizer'
@@ -8,18 +8,19 @@ import { findMatchingForm } from './widgets-form-matcher'
 
 // Fetch & transform all widget CMS data from database (was previously inline loadWidgetData)
 export async function fetchWidgetData(): Promise<WidgetCmsData> {
-  const [resData, v10Data, v15Res, usersRes, v15RespRes] = await Promise.all([
-    getAllResponses().catch(() => []),
+  // COST: satu sumber response saja. Sebelumnya `getAllResponses()` dan
+  // `/api/responses` dipanggil bersamaan -> setiap response dibaca 2x dari Firestore.
+  const [v10Data, v15Res, usersRes, v15RespRes] = await Promise.all([
     getForms().catch(() => []),
     safeFetchJson('/api/forms'),
     safeFetchJson('/api/auth/users'),
     safeFetchJson('/api/responses'),
   ])
 
-  let rawCombined: any[] = Array.isArray(resData) ? [...resData] : []
-  if (v15RespRes.ok && v15RespRes.data && Array.isArray(v15RespRes.data.responses)) {
-    rawCombined = [...rawCombined, ...v15RespRes.data.responses]
-  }
+  const rawCombined: any[] =
+    v15RespRes.ok && v15RespRes.data && Array.isArray(v15RespRes.data.responses)
+      ? [...v15RespRes.data.responses]
+      : []
 
   // DEDUPLICATE BY UNIQUE RESPONSE ID TO PREVENT 2X OVERCOUNTING
   const responseMap = new Map<string, any>()

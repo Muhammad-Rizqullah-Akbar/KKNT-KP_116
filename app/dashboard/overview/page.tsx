@@ -42,18 +42,20 @@ function AdminOverviewDashboard() {
   const { data: overviewData, isLoading: loading } = useQuery({
     queryKey: queryKeys.dashboard.overview.admin,
     queryFn: async () => {
-      const { getForms, getAllResponses } = await import('@/lib/repositories/forms.repo')
+      // COST: hanya SATU sumber response. Sebelumnya `getAllResponses()` dan
+      // `/api/responses` dipanggil bersamaan, sehingga setiap response dibaca 2x
+      // dari Firestore. Kini cukup lewat API server-side (satu jalur, role-scoped).
+      const { getForms } = await import('@/lib/repositories/forms.repo')
       const { safeFetchJson } = await import('@/lib/infra/safe-fetch')
-      const [responsesData, formsData, v15RespRes] = await Promise.all([
-        getAllResponses().catch(() => []),
+      const [formsData, v15RespRes] = await Promise.all([
         getForms().catch(() => []),
         safeFetchJson('/api/responses'),
       ])
 
-      let rawCombined: any[] = Array.isArray(responsesData) ? [...responsesData] : []
-      if (v15RespRes.ok && v15RespRes.data && Array.isArray(v15RespRes.data.responses)) {
-        rawCombined = [...rawCombined, ...v15RespRes.data.responses]
-      }
+      const rawCombined: any[] =
+        v15RespRes.ok && v15RespRes.data && Array.isArray(v15RespRes.data.responses)
+          ? [...v15RespRes.data.responses]
+          : []
 
       const responseMap = new Map<string, any>()
       rawCombined.forEach((r) => {
