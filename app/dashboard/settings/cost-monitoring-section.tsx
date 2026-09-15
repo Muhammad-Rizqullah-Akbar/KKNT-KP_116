@@ -18,6 +18,7 @@ interface CostEndpoint {
 
 interface CostMonitoringData {
   assumedRequestsPerDay: number
+  collectionSizes: Record<string, number>
   endpoints: CostEndpoint[]
   totalNetCostUsdPerMonth: number
   freeTierDailyReads: number
@@ -121,7 +122,10 @@ export function CostMonitoringSection() {
       </div>
 
       <p className="text-[11px] text-slate-500 font-mono">
-        Estimasi statis NET (setelah free tier) berdasarkan ukuran koleksi produksi aktual (130 response, 4 form) & asumsi {data.assumedRequestsPerDay} request/hari. Tidak melakukan operasi Firestore tambahan.
+        Estimasi NET (setelah free tier) berdasarkan ukuran koleksi AKTUAL yang dibaca langsung dari Firestore
+        (responses: {data.collectionSizes.responses ?? '?'}, forms: {data.collectionSizes.forms ?? '?'},
+        distributions: {data.collectionSizes.distributions ?? '?'}, users: {data.collectionSizes.users ?? '?'})
+        & asumsi {data.assumedRequestsPerDay} request/hari.
       </p>
     </div>
   )

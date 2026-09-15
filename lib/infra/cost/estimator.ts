@@ -64,11 +64,15 @@ const ENDPOINT_OPERATIONS: Record<string, Array<{ kind: 'full_scan' | 'reads' | 
   'forms.list': [{ kind: 'full_scan', collection: 'forms' }],
 }
 
-function collectionSize(name: string): number {
+function collectionSize(name: string, overrides?: Record<string, number>): number {
+  if (overrides && typeof overrides[name] === 'number') return overrides[name]
   return ESTIMATED_COLLECTION_SIZES[name] ?? DEFAULT_COLLECTION_SIZE
 }
 
-export function estimateEndpointCost(endpointKey: string): CostEstimate {
+export function estimateEndpointCost(
+  endpointKey: string,
+  collectionSizeOverrides?: Record<string, number>,
+): CostEstimate {
   const ops = ENDPOINT_OPERATIONS[endpointKey] ?? []
   const breakdown: Record<string, number> = {}
   let reads = 0
@@ -77,7 +81,7 @@ export function estimateEndpointCost(endpointKey: string): CostEstimate {
 
   for (const op of ops) {
     if (op.kind === 'full_scan' && op.collection) {
-      const n = collectionSize(op.collection)
+      const n = collectionSize(op.collection, collectionSizeOverrides)
       reads += n
       breakdown[op.collection] = (breakdown[op.collection] ?? 0) + n
     } else if (op.kind === 'reads') {
@@ -100,7 +104,7 @@ export function estimateEndpointCost(endpointKey: string): CostEstimate {
     deletes,
     costUsd,
     breakdown,
-    collectionSizes: { ...ESTIMATED_COLLECTION_SIZES },
+    collectionSizes: { ...ESTIMATED_COLLECTION_SIZES, ...(collectionSizeOverrides || {}) },
   }
 }
 
@@ -135,8 +139,9 @@ export function estimateWithFreeTier(
   endpointKey: string,
   requestsPerDay: number,
   daysPerMonth = 30,
+  collectionSizeOverrides?: Record<string, number>,
 ): FreeTierResult {
-  const e = estimateEndpointCost(endpointKey)
+  const e = estimateEndpointCost(endpointKey, collectionSizeOverrides)
 
   const freeReadsPerDay = Math.min(e.reads * requestsPerDay, FIRESTORE_FREE_TIER_DAILY.read)
   const billableReadsPerDay = Math.max(e.reads * requestsPerDay - FIRESTORE_FREE_TIER_DAILY.read, 0)
