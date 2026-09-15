@@ -1,6 +1,5 @@
 'use client'
 
-import React from 'react'
 import type { BuilderState } from '@/lib/domain/forms/builder-state'
 import type { FormDocument } from '@/lib/domain/forms/types'
 import { FormBuilderWorkflow } from '././FormBuilderWorkflow'

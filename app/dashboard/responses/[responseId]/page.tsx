@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, use } from 'react'
+import { useState, use } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
 import Image from 'next/image'

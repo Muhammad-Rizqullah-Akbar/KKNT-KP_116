@@ -1,6 +1,5 @@
 'use client'
 
-import React from 'react'
 import type { FormMetadata, FormKind, FormStatus } from '@/lib/domain/forms/types'
 import { FORM_KINDS, FORM_STATUSES } from '@/lib/domain/forms/types'
 

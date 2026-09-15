@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { safeFetchJson } from '@/lib/infra/safe-fetch'
 import { getArticles } from '@/lib/repositories/articles.repo'
 import { Icon } from '@/components/ui/Icons'

@@ -1,6 +1,5 @@
 'use client'
 
-import React from 'react'
 import { Icon } from '@/components/ui/Icons'
 
 export type BuilderStepId = 1 | 2 | 3 | 4

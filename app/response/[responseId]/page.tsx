@@ -1,6 +1,6 @@
 'use client'
 
-import React, { use, useEffect, useState } from 'react'
+import { use, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Icon } from '@/components/ui/Icons'
 import { PublicCompletionReceipt } from '@/features/form-builder/components/preview/PublicCompletionReceipt'

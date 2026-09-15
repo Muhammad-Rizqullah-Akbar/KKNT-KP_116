@@ -26,11 +26,9 @@ import { usePermissionModal } from './use-permission-modal'
 import { useDistributionSelection } from './use-distribution-selection'
 
 export default function DistributionsDashboardPage() {
-  const router = useRouter()
   const { user, userData, userRole } = useAuth()
   const isGlobalRole = ['super_admin'].includes(userRole || '')
   const isPartnershipRole = userRole === 'partnership'
-  const isCadreRole = userRole === 'cadre'
   const toast = useToast()
 
   // ============ SERVER-STATE (TanStack Query) ============
@@ -76,15 +74,12 @@ export default function DistributionsDashboardPage() {
   const [selectedFormId, setSelectedFormId] = useState('')
   const [customTitle, setCustomTitle] = useState('')
   const [customDescription, setCustomDescription] = useState('')
-  const [ownerType, setOwnerType] = useState<'super_admin' | 'cadre' | 'partnership'>('super_admin')
+  const [ownerType] = useState<'super_admin' | 'cadre' | 'partnership'>('super_admin')
   const [versionMode, setVersionMode] = useState<'active' | 'pinned'>('active')
   const [pinnedVersionId, setPinnedVersionId] = useState('')
   const [expiresAt, setExpiresAt] = useState('')
   const [isCreating, setIsCreating] = useState(false)
 
-  // Form Selector Search & Filter States
-  const [formSearchQuery, setFormSearchQuery] = useState('')
-  const [formCategoryFilter, setFormCategoryFilter] = useState('all')
 
   // Detail & Edit Modal States
   const [selectedDetail, setSelectedDetail] = useState<DistributionDetail | null>(null)
@@ -92,7 +87,7 @@ export default function DistributionsDashboardPage() {
   const [isDetailLoading, setIsDetailLoading] = useState(false)
 
   const [editingDoc, setEditingDoc] = useState<DistributionDoc | null>(null)
-  const [isEditOpen, setIsEditOpen] = useState(false)
+  const [, setIsEditOpen] = useState(false)
   const [isSavingEdit, setIsSavingEdit] = useState(false)
   const [editTitle, setEditTitle] = useState('')
   const [editDescription, setEditDescription] = useState('')
@@ -206,7 +201,7 @@ export default function DistributionsDashboardPage() {
   }
 
   // Cost Control & Pagination States
-  const [pageSize, setPageSize] = useState<number>(10)
+  const [pageSize] = useState<number>(10)
   const [currentPage, setCurrentPage] = useState<number>(1)
 
   // Preserve loadData side-effect: reset selectedFormId + fetch its versions

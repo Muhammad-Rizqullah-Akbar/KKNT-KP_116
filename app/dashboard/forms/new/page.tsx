@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { FormBuilderV2 } from '@/features/form-builder/components/builder-core/FormBuilderV2'
 import type { BuilderState } from '@/lib/domain/forms/builder-state'

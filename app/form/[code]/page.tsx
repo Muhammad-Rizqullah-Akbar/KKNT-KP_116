@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState, useRef, use } from 'react'
+import { useEffect, useState, useRef, use } from 'react'
 import Link from 'next/link'
 import { PublicReviewScreen } from '@/features/form-builder/components/preview/PublicReviewScreen'
 import { PublicCompletionReceipt } from '@/features/form-builder/components/preview/PublicCompletionReceipt'
