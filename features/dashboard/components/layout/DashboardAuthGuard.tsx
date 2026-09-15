@@ -100,7 +100,7 @@ export function DashboardAuthGuard({ children }: { children: React.ReactNode }) 
           <Icon name="spinner" className="w-8 h-8 text-cyan-400 animate-spin" />
           <div className="text-center">
             <p className="text-sm font-semibold text-white/90">Memverifikasi Otorisasi Akun...</p>
-            <p className="text-xs text-white/40 mt-1">Menghubungkan ke Layanan Autentikasi KKPD-KP V1.5</p>
+            <p className="text-xs text-white/40 mt-1">Menghubungkan ke Layanan Autentikasi KKPD-KP </p>
           </div>
         </div>
       </div>

@@ -68,9 +68,9 @@ export function SidebarItem({
         <span
           className={clsx(
             'text-[10px] font-semibold px-2 py-0.5 rounded-md transition-colors shrink-0',
-            badge === 'V1.5' || badge === 'Baru'
+            badge === '' || badge === 'Baru'
               ? 'bg-gradient-to-r from-cyan-500/20 to-emerald-500/20 text-cyan-300 border border-cyan-500/30 font-bold'
-              : badge === 'V1.0' || badge === 'Lama'
+              : badge === '' || badge === 'Lama'
               ? 'bg-slate-800/80 text-slate-400 border border-slate-700/50'
               : badge === 'CMS'
               ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'

@@ -71,7 +71,7 @@ function AdminOverviewDashboard() {
       const transformedResponses = uniqueResponses.map((r: any) => {
         const form = findMatchingForm(r, formsData)
 
-        // Skor final: prefer result.percentage (authoritative, sudah di-compute via scoring engine canonical)
+        // Skor final: prefer result.percentage (authoritative, sudah di-compute via scoring engine formDocument)
         const storedScore =
           typeof r.result?.percentage === 'number' && r.result.percentage > 0
             ? r.result.percentage

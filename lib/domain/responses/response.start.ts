@@ -6,7 +6,7 @@ import {
   getFormAggregateFromDb,
   getFormVersionSnapshotsFromDb,
 } from '@/lib/repositories/form-versions.repo'
-import { toPublicFormProjection } from '@/lib/domain/forms/legacy-adapter'
+import { toPublicFormProjection } from '@/lib/domain/forms/form-adapter'
 import type {
   ResponseDoc,
   PublicResponseSessionDTO,
@@ -33,7 +33,7 @@ export async function startResponseWorkflow(
   let dist = await getDistributionByCodeDoc(normalized)
 
   if (!dist) {
-    // Direct Form ID / Legacy Form Code / Article Code fallback
+    // Direct Form ID / form code / article code fallback
     const rawCode = params.distributionCode.trim()
     const formAgg = await getFormAggregateFromDb(rawCode)
     if (formAgg) {
@@ -76,7 +76,7 @@ export async function startResponseWorkflow(
   // Version Resolution
   let resolvedVersionId = dist.pinnedVersionId || ''
   let resolvedVersionNumber = 1
-  let canonicalForm: any
+  let formDocument: any
 
   if (dist.versionMode === 'pinned' && dist.pinnedVersionId) {
     const snapshots = await getFormVersionSnapshotsFromDb(dist.formId)
@@ -88,7 +88,7 @@ export async function startResponseWorkflow(
 
     resolvedVersionId = snapshot.versionId
     resolvedVersionNumber = snapshot.versionNumber
-    canonicalForm = {
+    formDocument = {
       form: {
         formId: snapshot.formId,
         metadata: snapshot.metadata,
@@ -118,7 +118,7 @@ export async function startResponseWorkflow(
 
     resolvedVersionId = aggregate.activeVersionId || `v1-${dist.formId}`
     resolvedVersionNumber = aggregate.activeVersionNumber || 1
-    canonicalForm = {
+    formDocument = {
       form: {
         formId: aggregate.formId,
         metadata: aggregate.metadata,
@@ -163,7 +163,7 @@ export async function startResponseWorkflow(
   await createResponseDoc(responseDoc)
 
   // Public projection strips answer keys and scoring internals
-  const publicForm = toPublicFormProjection(canonicalForm)
+  const publicForm = toPublicFormProjection(formDocument)
 
   return {
     responseId,
@@ -172,8 +172,8 @@ export async function startResponseWorkflow(
     formId: dist.formId,
     versionId: resolvedVersionId,
     versionNumber: resolvedVersionNumber,
-    title: dist.title || canonicalForm.form.metadata.title,
-    description: dist.description || canonicalForm.form.metadata.description,
+    title: dist.title || formDocument.form.metadata.title,
+    description: dist.description || formDocument.form.metadata.description,
     ownerName: dist.ownerName,
     form: publicForm,
   }

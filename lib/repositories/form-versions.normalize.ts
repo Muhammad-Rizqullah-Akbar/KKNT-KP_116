@@ -69,7 +69,7 @@ export function normalizeFormAggregate(docId: string, data: any): FormAggregateD
     }
   }
 
-  // Extract & normalize questions array from any V1 / V1.5 form document structure
+  // Extract & normalize questions array from any V1 /  form document structure
   const rawQuestions = Array.isArray(data.questions) ? data.questions : []
   const questions = rawQuestions.map((q: any, idx: number) => {
     const qId = q.questionId || q.id || `q_${idx}_${Math.random().toString(36).substring(2, 6)}`
@@ -179,7 +179,7 @@ export function normalizeFormAggregate(docId: string, data: any): FormAggregateD
     }
   })
 
-  // Extract & normalize aspects array (supporting V1 data.stages and V1.5 data.aspects)
+  // Extract & normalize aspects array (supporting V1 data.stages and  data.aspects)
   let aspects: any[] = []
   if (Array.isArray(data.aspects) && data.aspects.length > 0) {
     aspects = data.aspects.map((asp: any, idx: number) => ({
@@ -189,7 +189,7 @@ export function normalizeFormAggregate(docId: string, data: any): FormAggregateD
       questionIds: asp.questionIds || [],
     }))
   } else if (Array.isArray(data.stages) && data.stages.length > 0) {
-    // V1 legacy stages mapping to V1.5 aspects
+    // Stored stages mapping to aspects
     aspects = data.stages.map((stg: any, idx: number) => ({
       aspectId: stg.id || stg.stageId || `stg_${idx}`,
       title: stg.name || stg.title || `Aspek ${idx + 1}`,

@@ -1,4 +1,4 @@
-import type { CanonicalForm } from '@/lib/domain/forms/types'
+import type { FormDocument } from '@/lib/domain/forms/types'
 import type { BuilderState } from '@/lib/domain/forms/builder-state'
 import type { FormAggregateDoc } from '@/lib/repositories/form-versions.repo'
 
@@ -39,9 +39,9 @@ export function formAggregateToBuilderState(doc: FormAggregateDoc): BuilderState
 }
 
 /**
- * Convert FormAggregateDoc to CanonicalForm for validation.
+ * Convert FormAggregateDoc to FormDocument for validation.
  */
-export function formAggregateToCanonicalForm(doc: FormAggregateDoc): CanonicalForm {
+export function formAggregateToFormDocument(doc: FormAggregateDoc): FormDocument {
   return {
     form: {
       formId: doc.formId || 'form-draft',
@@ -65,9 +65,9 @@ export function formAggregateToCanonicalForm(doc: FormAggregateDoc): CanonicalFo
 }
 
 /**
- * Convert BuilderState to CanonicalForm for local validation.
+ * Convert BuilderState to FormDocument for local validation.
  */
-export function builderStateToCanonicalForm(state: BuilderState): CanonicalForm {
+export function builderStateToFormDocument(state: BuilderState): FormDocument {
   return {
     form: {
       formId: 'draft',

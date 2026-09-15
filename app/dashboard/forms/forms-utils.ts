@@ -1,14 +1,14 @@
-import type { FormData as LegacyFormData } from '@/lib/repositories/forms.repo'
+import type { FormData as FormRecord } from '@/lib/repositories/forms.repo'
 
-export type LegacyStatusFilter = 'all' | 'published' | 'draft'
-export type LegacyViewMode = 'grid' | 'table'
+export type FormStatusFilter = 'all' | 'published' | 'draft'
+export type FormViewMode = 'grid' | 'table'
 
 export function filterForms(
-  forms: LegacyFormData[],
+  forms: FormRecord[],
   searchTerm: string,
-  statusFilter: LegacyStatusFilter,
+  statusFilter: FormStatusFilter,
   selectedGroupId: string
-): LegacyFormData[] {
+): FormRecord[] {
   return forms.filter((form) => {
     const term = searchTerm.toLowerCase()
     const matchesSearch =

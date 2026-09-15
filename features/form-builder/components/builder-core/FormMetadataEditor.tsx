@@ -14,10 +14,10 @@ export function FormMetadataEditor({ metadata, onChange }: FormMetadataEditorPro
     <div className="space-y-4 p-5 rounded-2xl bg-slate-900 border border-slate-800 shadow-md">
       <div className="flex items-center justify-between pb-3 border-b border-slate-800">
         <h3 className="text-sm font-semibold text-slate-100 flex items-center gap-2">
-          <span>Metadata Formulir V1.5</span>
+          <span>Metadata Formulir </span>
         </h3>
         <span className="text-[11px] font-mono text-cyan-400 bg-cyan-950/60 border border-cyan-500/30 px-2 py-0.5 rounded-full">
-          Canonical Form Metadata
+          FormDocument Form Metadata
         </span>
       </div>
 

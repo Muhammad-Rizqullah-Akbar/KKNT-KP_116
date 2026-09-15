@@ -14,7 +14,7 @@ export interface NormalizedOption {
 }
 
 /**
- * Normalizes raw option definitions (string | object) into a canonical shape.
+ * Normalizes raw option definitions (string | object) into a formDocument shape.
  */
 export function normalizeQuestionOptions(question: BuilderQuestion): NormalizedOption[] {
   const rawOptions = question.options || (question as any).presentation?.options || (question as any).config?.options || []
@@ -71,7 +71,7 @@ export function resolveCorrectOptionIds(question: BuilderQuestion, options: Norm
         }
       }
       if (matched) {
-        // Hanya simpan optionId canonical (jangan double-add label).
+        // Hanya simpan optionId formDocument (jangan double-add label).
         if (!correctOptionIds.includes(matched.optionId)) correctOptionIds.push(matched.optionId)
       } else {
         if (!correctOptionIds.includes(strItem)) correctOptionIds.push(strItem)

@@ -30,7 +30,7 @@ export interface DistributionOptionMeta {
 }
 
 /**
- * Retrieves all available forms and distribution groups across V1 and V1.5 for admin filter dropdowns.
+ * Retrieves all available forms and distribution groups across V1 and  for admin filter dropdowns.
  */
 export async function getFormAndDistributionOptions(): Promise<{
   forms: FormOptionMeta[]
@@ -61,7 +61,7 @@ export async function getFormAndDistributionOptions(): Promise<{
         formId: d.id,
         title: title.replace(/^form_[\w\-]+/g, 'Formulir Evaluasi Pangan'),
         versionNumber: 1.0,
-        versionLabel: 'V1.0 Legacy',
+        versionLabel: 'Formulir',
       })
     })
 

@@ -95,7 +95,7 @@ export async function saveFormAggregateToDb(
     const newDoc: FormAggregateDoc = {
       formId,
       metadata: cleanedPayload.metadata || {
-        title: 'Formulir Penilaian V1.5',
+        title: 'Formulir Penilaian ',
         kind: 'official',
         status: 'draft',
       },

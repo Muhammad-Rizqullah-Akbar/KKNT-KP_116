@@ -1,6 +1,6 @@
 'use client'
 
-// Per-question item analysis — menilai jawaban vs kunci jawaban (correctAnswer canonical).
+// Per-question item analysis — menilai jawaban vs kunci jawaban (correctAnswer formDocument).
 // Dipisah dari use-widgets-derivations.ts untuk menjaga file tetap < 500 LOC.
 
 export interface ItemAnalysisQuestion {

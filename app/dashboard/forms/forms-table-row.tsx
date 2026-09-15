@@ -2,15 +2,15 @@
 
 import Link from 'next/link'
 import { Icon } from '@/components/ui/Icons'
-import type { FormData as LegacyFormData } from '@/lib/repositories/forms.repo'
+import type { FormData as FormRecord } from '@/lib/repositories/forms.repo'
 
 type FormTableRowProps = {
-  form: LegacyFormData
+  form: FormRecord
   isDuplicating: boolean
   onCopyCode: (code: string) => void
   onToggleStatus: (formId?: string, currentStatus?: string) => void
-  onPreview: (form: LegacyFormData) => void
-  onDuplicate: (form: LegacyFormData) => void
+  onPreview: (form: FormRecord) => void
+  onDuplicate: (form: FormRecord) => void
   onDelete: (formId?: string, title?: string) => void
 }
 
@@ -20,7 +20,7 @@ export default function FormTableRow({ form, isDuplicating, onCopyCode, onToggle
   return (
     <tr key={form.id} className="hover:bg-slate-800/40 transition-colors">
       <td className="px-5 py-4 space-y-0.5 max-w-xs">
-        <div className="font-bold text-slate-100 text-sm truncate">{form.title || 'Formulir V1.0'}</div>
+        <div className="font-bold text-slate-100 text-sm truncate">{form.title || 'Formulir'}</div>
         <button
           type="button"
           onClick={() => onCopyCode(form.code || form.id || '')}
@@ -96,7 +96,7 @@ export default function FormTableRow({ form, isDuplicating, onCopyCode, onToggle
           <Link
             href={`/dashboard/form-builder?id=${form.id}`}
             className="p-2 rounded-xl bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white border border-slate-700 transition-colors"
-            title="Edit Form V1.0"
+            title="Edit Formulir"
           >
             <Icon name="pencil" className="w-4 h-4" />
           </Link>
@@ -106,7 +106,7 @@ export default function FormTableRow({ form, isDuplicating, onCopyCode, onToggle
             type="button"
             onClick={() => onDelete(form.id, form.title)}
             className="p-2 rounded-xl bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-300 border border-slate-700 hover:border-rose-800 transition-colors"
-            title="Hapus Form V1.0"
+            title="Hapus Formulir"
           >
             <Icon name="trash" className="w-4 h-4" />
           </button>

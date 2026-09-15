@@ -38,7 +38,7 @@ export async function fetchWidgetData(): Promise<WidgetCmsData> {
   const transformedResponses = uniqueResponses.map((r: any) => {
     const form = findMatchingForm(r, v10Data)
 
-    // Skor final: prefer result.percentage (authoritative, sudah di-compute via scoring engine canonical)
+    // Skor final: prefer result.percentage (authoritative, sudah di-compute via scoring engine formDocument)
     const storedScore =
       typeof r.result?.percentage === 'number' && r.result.percentage > 0
         ? r.result.percentage
@@ -156,7 +156,7 @@ export async function fetchWidgetData(): Promise<WidgetCmsData> {
 // HELPER TO RESOLVE OPTION CODE/ID TO HUMAN-READABLE TEXT LABEL
 function resolveOptionText(val: any, questionObj?: any): string {
   if (val === undefined || val === null || val === '') return ''
-  // Delegate to canonical normalizer (single source of truth).
+  // Delegate to formDocument normalizer (single source of truth).
   const resolved = resolveOptionLabel(questionObj, val)
   if (resolved && resolved !== String(val).trim()) return resolved
   return String(val).trim()

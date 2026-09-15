@@ -1,11 +1,11 @@
-import type { CanonicalForm, Question } from './types'
+import type { FormDocument, Question } from './types'
 import { QUESTION_TYPES } from './types'
 
 export type FormValidationIssue = { path: string; message: string; targetId?: string }
 
 const OPTION_TYPES = new Set<Question['type']>(['single-choice', 'multiple-choice', 'binary', 'dropdown'])
 
-export function validateCanonicalForm(candidate: CanonicalForm): FormValidationIssue[] {
+export function validateFormDocument(candidate: FormDocument): FormValidationIssue[] {
   const issues: FormValidationIssue[] = []
 
   if (!candidate.form.formId.trim()) {

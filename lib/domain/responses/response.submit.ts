@@ -17,6 +17,7 @@ import type {
   SubmitResponseParams,
 } from '@/lib/domain/responses/response-types'
 import type { ResponseResultDoc, RecommendationItem } from '@/lib/domain/scoring/scoring-types'
+import { ENGINE_VERSION_CURRENT } from '@/lib/domain/scoring/scoring-versions'
 
 /**
  * Resolves the authoritative version snapshot for an existing response,
@@ -160,7 +161,7 @@ export async function submitResponseWorkflow(
 
   const now = new Date().toISOString()
   const resultDoc: ResponseResultDoc = {
-    scoringEngineVersion: 'v1.5',
+    scoringEngineVersion: ENGINE_VERSION_CURRENT,
     calculatedAt: now,
     rawScore: scoreOutput.rawScore,
     maximumScore: scoreOutput.maximumScore,
@@ -234,7 +235,7 @@ export async function recalculateResponseResultWorkflow(
   )
 
   const recalculatedResult: ResponseResultDoc = {
-    scoringEngineVersion: 'v1.5',
+    scoringEngineVersion: ENGINE_VERSION_CURRENT,
     calculatedAt: new Date().toISOString(),
     rawScore: scoreOutput.rawScore,
     maximumScore: scoreOutput.maximumScore,

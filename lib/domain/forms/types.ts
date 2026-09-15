@@ -1,4 +1,4 @@
-/** Canonical, persistence-agnostic V1.5 form domain model. */
+/** FormDocument, persistence-agnostic  form domain model. */
 export const FORM_STATUSES = ['draft', 'published', 'archived'] as const
 export type FormStatus = (typeof FORM_STATUSES)[number]
 export const FORM_KINDS = ['official', 'user-created'] as const
@@ -66,11 +66,11 @@ export type ValidationConfig = { mode: 'all_required' | 'all_required_except' | 
 export type FormMetadata = { title: string; description?: string; target?: string; category?: string; kind: FormKind; status: FormStatus; allowCadreDistribution?: boolean }
 export type Form = { formId: string; metadata: FormMetadata; activeVersionId?: string; createdBy?: string; createdAt?: string; updatedAt?: string }
 export type FormVersion = { versionId: string; formId: string; versionNumber: number; status: FormStatus; aspects?: any[]; questions: Question[]; scoring: ScoringConfig; validation: ValidationConfig; createdAt?: string; createdBy?: string }
-export type CanonicalForm = { form: Form; version: FormVersion }
+export type FormDocument = { form: Form; version: FormVersion }
 export type PublicQuestion = Omit<Question, 'answerKey' | 'scoring'> & { aspectId?: string; answerType?: string; config?: any; answerKey?: any }
 export type PublicFormVersion = Omit<FormVersion, 'questions' | 'scoring' | 'validation'> & { questions: PublicQuestion[]; aspects?: any[] }
-export type PublicCanonicalForm = Omit<CanonicalForm, 'version'> & { version: PublicFormVersion; questions?: PublicQuestion[]; aspects?: any[] }
-export type PublicFormProjection = PublicCanonicalForm
+export type PublicFormDocument = Omit<FormDocument, 'version'> & { version: PublicFormVersion; questions?: PublicQuestion[]; aspects?: any[] }
+export type PublicFormProjection = PublicFormDocument
 export type PublicAspect = { aspectId: string; title: string; description?: string; questions?: PublicQuestion[] }
-/** Input contract for a future adapter around the protected legacy engine. */
-export type LegacyScoringAdapterInput = { questions: Question[]; scoring: ScoringConfig; validation: ValidationConfig }
+/** Input contract for the scoring adapter. */
+export type ScoringAdapterInput = { questions: Question[]; scoring: ScoringConfig; validation: ValidationConfig }

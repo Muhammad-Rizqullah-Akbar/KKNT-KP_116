@@ -40,7 +40,7 @@ export function normalizeJsonToArticle(
       })
     })
   } else if (json.content && typeof json.content === 'string') {
-    // If legacy HTML content provided
+    // If raw HTML content provided
     blocks.push(
       { id: 'b1', type: 'h2', value: '1. Pendahuluan' },
       { id: 'b2', type: 'p', value: json.content.replace(/<[^>]*>?/gm, '') }

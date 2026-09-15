@@ -36,7 +36,7 @@ describe('ScoringEngine Regression Matrix', () => {
     assert.ok(result.totalScore >= 0, 'Total score should be valid number')
   })
 
-  test('Calculate V1.5 score for indicator-table with text label answers', () => {
+  test('Calculate  score for indicator-table with text label answers', () => {
     const { calculateQuestionScore } = require('../../lib/domain/scoring/scoring-engine')
 
     const question = {
@@ -67,7 +67,7 @@ describe('ScoringEngine Regression Matrix', () => {
     assert.equal(scoreResult.percentage, 100, 'Percentage should be 100%')
   })
 
-  test('Calculate V1.5 aspect scores for Form Builder config indicator-table structure', () => {
+  test('Calculate  aspect scores for Form Builder config indicator-table structure', () => {
     const { calculateAspectScores } = require('../../lib/domain/scoring/scoring-engine')
 
     const aspects = [
@@ -108,7 +108,7 @@ describe('ScoringEngine Regression Matrix', () => {
     assert.equal(aspectScores[0].percentage, 100, 'Aspect percentage should be 100%')
   })
 
-  test('Calculate V1.5 score for indicator-table with numbered prefix scale labels', () => {
+  test('Calculate  score for indicator-table with numbered prefix scale labels', () => {
     const { calculateQuestionScore } = require('../../lib/domain/scoring/scoring-engine')
 
     const question = {
@@ -137,7 +137,7 @@ describe('ScoringEngine Regression Matrix', () => {
     assert.equal(scoreResult.percentage, 100, 'Percentage should be 100%')
   })
 
-  test('Calculate V1.5 score for legacy Pengetahuan (Knowledge) single-choice with config.correctAnswer label', () => {
+  test('Calculate  score for legacy Pengetahuan (Knowledge) single-choice with config.correctAnswer label', () => {
     const { calculateQuestionScore } = require('../../lib/domain/scoring/scoring-engine')
 
     const question = {
@@ -167,7 +167,7 @@ describe('ScoringEngine Regression Matrix', () => {
     assert.equal(resWrong.percentage, 0, 'Should score 0% for wrong answer')
   })
 
-  test('Calculate V1.5 score for legacy Pengetahuan question with numeric index correctAnswer', () => {
+  test('Calculate  score for legacy Pengetahuan question with numeric index correctAnswer', () => {
     const { calculateQuestionScore } = require('../../lib/domain/scoring/scoring-engine')
 
     const question = {

@@ -3,7 +3,7 @@
 import { Icon } from '@/components/ui/Icons'
 import { FormVersionHistoryModal } from '@/features/form-builder/components/versioning/FormVersionHistoryModal'
 import { FormPreviewModal } from '@/features/form-builder/components/preview/FormPreviewModal'
-import { formAggregateToCanonicalForm } from '@/lib/domain/forms/form-converters'
+import { formAggregateToFormDocument } from '@/lib/domain/forms/form-converters'
 import type { FormsListController } from './use-forms-list'
 
 // Modal create, distribution permission, edit confirm, edit title, version history, & preview.
@@ -23,7 +23,7 @@ export default function FormsListModals({ f }: { f: FormsListController }) {
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
                 <Icon name="plus" className="w-4 h-4 text-emerald-400" />
-                <span>Buat Draft Formulir V1.5 Baru</span>
+                <span>Buat Formulir Baru</span>
               </h3>
               <button
                 type="button"
@@ -85,7 +85,7 @@ export default function FormsListModals({ f }: { f: FormsListController }) {
       {f.previewFormDoc && (
         <FormPreviewModal
           isOpen={Boolean(f.previewFormDoc)}
-          canonicalForm={formAggregateToCanonicalForm(f.previewFormDoc)}
+          formDocument={formAggregateToFormDocument(f.previewFormDoc)}
           onClose={() => f.setPreviewFormDoc(null)}
         />
       )}

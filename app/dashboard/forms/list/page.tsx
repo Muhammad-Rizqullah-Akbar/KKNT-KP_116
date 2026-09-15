@@ -25,7 +25,7 @@ export default function V15FormsDashboardPage() {
             <h1 className="text-2xl font-extrabold text-slate-100 tracking-tight flex items-center gap-3">
               <span>Formulir</span>
               <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                V1.5 Lifecycle
+                Siklus Formulir
               </span>
             </h1>
             <p className="text-xs text-slate-400">
@@ -39,7 +39,7 @@ export default function V15FormsDashboardPage() {
               className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold shadow-lg shadow-purple-500/20 transition-all shrink-0"
             >
               <Icon name="sparkles" className="w-4 h-4 text-purple-200" />
-              <span>Buka Form Builder V1.5 Terbaru</span>
+              <span>Buka Form Builder</span>
             </Link>
 
             <Link
@@ -47,7 +47,7 @@ export default function V15FormsDashboardPage() {
               className="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 text-xs font-bold transition-all shrink-0"
             >
               <Icon name="filePlus" className="w-4 h-4 text-cyan-400" />
-              <span>Builder Legacy V1.0</span>
+              <span>Form Builder</span>
             </Link>
 
             <button

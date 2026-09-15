@@ -12,7 +12,6 @@ export {
 } from './form-matching'
 export {
   extractScore,
-  isV15Response,
   extractScoreDeterministic,
   getUniqueCount,
   isBiodataAspect,

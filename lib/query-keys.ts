@@ -18,7 +18,6 @@ export const queryKeys = {
   },
   forms: {
     list: ['forms', 'list'] as const,
-    legacy: ['forms', 'legacy'] as const,
     detail: (formId?: string) => ['form', formId] as const,
   },
   distributions: {

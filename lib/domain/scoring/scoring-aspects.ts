@@ -132,7 +132,7 @@ export function calculateAspectScores(
  * Calculates total response score, percentage, grade, and recommendations from snapshot.
  */
 export function calculateResponseScore(
-  canonicalSnapshot: {
+  formDocumentSnapshot: {
     aspects: FormAspect[]
     questions: BuilderQuestion[]
     scoring: ScoringConfig
@@ -149,7 +149,7 @@ export function calculateResponseScore(
   questionResults: QuestionScoreResult[]
   recommendedArticleIds: string[]
 } {
-  const { aspects, questions, scoring, thresholds, recommendations } = canonicalSnapshot
+  const { aspects, questions, scoring, thresholds, recommendations } = formDocumentSnapshot
 
   // 1. Calculate Aspect Scores
   const aspectResults = calculateAspectScores(aspects, questions, answers, scoring.stagePointDistribution)

@@ -2,15 +2,15 @@
 
 import Link from 'next/link'
 import { Icon } from '@/components/ui/Icons'
-import type { FormData as LegacyFormData } from '@/lib/repositories/forms.repo'
+import type { FormData as FormRecord } from '@/lib/repositories/forms.repo'
 
 type FormCardProps = {
-  form: LegacyFormData
+  form: FormRecord
   isDuplicating: boolean
   onCopyCode: (code: string) => void
   onToggleStatus: (formId?: string, currentStatus?: string) => void
-  onPreview: (form: LegacyFormData) => void
-  onDuplicate: (form: LegacyFormData) => void
+  onPreview: (form: FormRecord) => void
+  onDuplicate: (form: FormRecord) => void
   onDelete: (formId?: string, title?: string) => void
 }
 
@@ -50,7 +50,7 @@ export default function FormCard({ form, isDuplicating, onCopyCode, onToggleStat
         {/* Title & Description */}
         <div>
           <h3 className="text-base font-bold text-slate-100 group-hover:text-indigo-300 transition-colors line-clamp-2">
-            {form.title || 'Kuesioner V1.0 Tanpa Judul'}
+            {form.title || 'Formulir Tanpa Judul'}
           </h3>
           <p className="text-xs text-slate-400 mt-1 line-clamp-2">
             {form.description || 'Tidak ada deskripsi kuesioner.'}
@@ -113,7 +113,7 @@ export default function FormCard({ form, isDuplicating, onCopyCode, onToggleStat
           <Link
             href={`/dashboard/form-builder?id=${form.id}`}
             className="p-2 rounded-xl bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white border border-slate-700 transition-colors"
-            title="Buka Editor Form Builder V1.0"
+            title="Buka Editor Formulir"
           >
             <Icon name="pencil" className="w-4 h-4" />
           </Link>
@@ -123,7 +123,7 @@ export default function FormCard({ form, isDuplicating, onCopyCode, onToggleStat
             type="button"
             onClick={() => onDelete(form.id, form.title)}
             className="p-2 rounded-xl bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-300 border border-slate-700 hover:border-rose-800 transition-colors"
-            title="Hapus Kuesioner V1.0"
+            title="Hapus Formulir"
           >
             <Icon name="trash" className="w-4 h-4" />
           </button>

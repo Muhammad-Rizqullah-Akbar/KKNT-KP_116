@@ -105,7 +105,7 @@ export default function UserProfileProgressPage() {
     <div className="flex flex-col min-h-screen bg-[#070913] text-slate-100 font-sans">
       <Topbar
         title="Profil & Progress Aktivitas Pengguna"
-        subtitle="Pantau capaian pencapaian artikel edukasi, distribusi kuesioner V1.5, dan statistik kegiatan Anda"
+        subtitle="Pantau capaian pencapaian artikel edukasi, distribusi kuesioner , dan statistik kegiatan Anda"
       />
 
       <div className="flex-1 p-4 sm:p-6 space-y-6 max-w-7xl mx-auto w-full">
@@ -239,7 +239,7 @@ export default function UserProfileProgressPage() {
             }`}
           >
             <Icon name="send" className="w-4 h-4" />
-            <span>Distribusi Kuesioner V1.5 ({distStats.total})</span>
+            <span>Distribusi Kuesioner  ({distStats.total})</span>
           </button>
 
           <button

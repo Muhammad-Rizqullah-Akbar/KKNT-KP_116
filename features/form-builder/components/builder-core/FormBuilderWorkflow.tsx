@@ -11,8 +11,8 @@ import {
   DEFAULT_RECOMMENDATIONS,
   DEFAULT_DISTRIBUTION,
 } from '@/lib/domain/forms/builder-state'
-import type { CanonicalForm } from '@/lib/domain/forms/types'
-import { validateCanonicalForm } from '@/lib/domain/forms/validation'
+import type { FormDocument } from '@/lib/domain/forms/types'
+import { validateFormDocument } from '@/lib/domain/forms/validation'
 
 import { FormBuilderStepper, type BuilderStepId } from '././FormBuilderStepper'
 import { Step1Setup } from '../steps/Step1Setup'
@@ -75,9 +75,9 @@ export function FormBuilderWorkflow({
     setTimeout(() => setToast(null), 4000)
   }
 
-  // Canonical Form Construction for Validation & Engine
-  const canonicalForm: CanonicalForm = useMemo(() => {
-    const currentFormId = formId || `form_${state.metadata.title.toLowerCase().replace(/[^a-z0-9]/g, '_') || 'v1_5'}`
+  // FormDocument Form Construction for Validation & Engine
+  const formDocument: FormDocument = useMemo(() => {
+    const currentFormId = formId || `form_${state.metadata.title.toLowerCase().replace(/[^a-z0-9]/g, '_') || 'form'}`
     const vId = activeVersionId || `${currentFormId}_v${activeVersionNumber}`
 
     return {
@@ -104,8 +104,8 @@ export function FormBuilderWorkflow({
   // Step Navigation Helper
   const handleStepClick = (stepId: BuilderStepId) => {
     if (stepId > currentStep) {
-      // Validate canonical form before advancing forward
-      const issues = validateCanonicalForm(canonicalForm)
+      // Validate formDocument form before advancing forward
+      const issues = validateFormDocument(formDocument)
       if (issues.length > 0 && stepId >= 3) {
         showToast('error', `Terdapat ${issues.length} masalah yang harus diperbaiki sebelum ke langkah berikutnya.`)
       }
@@ -159,7 +159,7 @@ export function FormBuilderWorkflow({
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-base font-bold text-slate-100 max-w-xs sm:max-w-md truncate">
-                  {state.metadata.title || 'Kuesioner Evaluasi V1.5'}
+                  {state.metadata.title || 'Kuesioner Evaluasi '}
                 </h1>
                 <span
                   className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase ${
@@ -184,7 +184,7 @@ export function FormBuilderWorkflow({
               className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-semibold border border-slate-800 flex items-center gap-1.5 transition-colors"
             >
               <Icon name="arrowLeft" className="w-3.5 h-3.5 text-cyan-400" />
-              <span className="hidden sm:inline">Daftar Form V1.5</span>
+              <span className="hidden sm:inline">Daftar Form </span>
             </button>
 
             {onOpenVersionHistory && (
@@ -236,7 +236,7 @@ export function FormBuilderWorkflow({
         {currentStep === 3 && (
           <Step3Review
             state={state}
-            canonicalForm={canonicalForm}
+            formDocument={formDocument}
             onChangeState={setState}
             onNavigateToStep={(s) => setCurrentStep(s)}
             onContinue={handleStepContinue}

@@ -1,3 +1,5 @@
+import { ENGINE_VERSION_CURRENT } from '@/lib/domain/scoring/scoring-versions'
+
 // Extract score untuk statistik utama (score/percentage/result/totalScore)
 export function extractScore(r: any): number | null {
   if (typeof r.score === 'number' && !isNaN(r.score) && r.score > 0) {
@@ -15,17 +17,16 @@ export function extractScore(r: any): number | null {
   return null
 }
 
-export function isV15Response(r: any): boolean {
+export function isCurrentEngineResult(r: any): boolean {
   return (
-    r.scoringEngineVersion === 'v1.5' ||
-    r.result?.scoringEngineVersion === 'v1.5' ||
+    r.scoringEngineVersion === ENGINE_VERSION_CURRENT ||
+    r.result?.scoringEngineVersion === ENGINE_VERSION_CURRENT ||
     Boolean(r.versionId && String(r.versionId).trim() !== '') ||
-    Boolean(r.distributionCode && String(r.distributionCode).trim() !== '') ||
-    r.v15 === true
+    Boolean(r.distributionCode && String(r.distributionCode).trim() !== '')
   )
 }
 
-// Extract score deterministik untuk accounting stacks (termasuk evaluasi jawaban legacy)
+// Extract score deterministik untuk accounting stacks (termasuk evaluasi jawaban egacy)
 export function extractScoreDeterministic(r: any): number | null {
   // Direct numeric scores
   if (typeof r.score === 'number' && !isNaN(r.score) && r.score > 0) {
@@ -45,7 +46,7 @@ export function extractScoreDeterministic(r: any): number | null {
     if (!isNaN(pct)) return Math.min(100, Math.max(0, Math.round(pct)))
   }
 
-  // Answer evaluation for legacy or un-scored records
+  // Answer evaluation for un-scored records
   if (r.answers && typeof r.answers === 'object') {
     const entries = Object.entries(r.answers)
     if (entries.length > 0) {

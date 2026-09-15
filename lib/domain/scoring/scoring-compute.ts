@@ -4,7 +4,7 @@ import { expandScaleLabel } from './scoring-labels'
 import { getFirstDefined, normalizeQuestionOptions, resolveCorrectOptionIds } from './scoring-options'
 
 /**
- * Calculates score for a single question based on canonical V1.5 question definition and submitted answer.
+ * Calculates score for a single question based on formDocument  question definition and submitted answer.
  */
 export function calculateQuestionScore(
   question: BuilderQuestion,
@@ -159,7 +159,7 @@ export function calculateQuestionScore(
     // maxScore = jumlah opsi benar (1 poin per opsi benar)
     const maxScore = Math.max(1, correctOptionIds.length)
 
-    // Resolve selected → optionId (canonical), lalu hitung berapa yang benar
+    // Resolve selected → optionId (formDocument), lalu hitung berapa yang benar
     let score = 0
     selectedOptionIds.forEach((itemVal) => {
       const strVal = String(itemVal).trim()

@@ -31,7 +31,7 @@ export function DiagnosticAuditorBanner({ issues, onNavigateToStep }: Diagnostic
             </h4>
             <p className="text-[11px] text-slate-400 mt-0.5">
               {issues.length === 0
-                ? 'Struktur aspek, bobot total 100%, dan kunci jawaban telah memenuhi standar V1.5.'
+                ? 'Struktur aspek, bobot total 100%, dan kunci jawaban telah memenuhi standar .'
                 : 'Klik masalah di bawah ini untuk berpindah langsung ke bagian yang bermasalah.'}
             </p>
           </div>

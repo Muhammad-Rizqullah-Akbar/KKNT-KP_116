@@ -1,25 +1,25 @@
 'use client'
 
 import React, { useState, useMemo } from 'react'
-import type { CanonicalForm } from '@/lib/domain/forms/types'
-import { toPublicFormProjection } from '@/lib/domain/forms/legacy-adapter'
+import type { FormDocument } from '@/lib/domain/forms/types'
+import { toPublicFormProjection } from '@/lib/domain/forms/form-adapter'
 import { FormPublicRenderer } from '././FormPublicRenderer'
 import { Icon } from '@/components/ui/Icons'
 
 interface FormPreviewModalProps {
   isOpen: boolean
-  canonicalForm: CanonicalForm
+  formDocument: FormDocument
   onClose: () => void
 }
 
-export function FormPreviewModal({ isOpen, canonicalForm, onClose }: FormPreviewModalProps) {
+export function FormPreviewModal({ isOpen, formDocument, onClose }: FormPreviewModalProps) {
   const [userAnswers, setUserAnswers] = useState<Record<string, any>>({})
   const [isSubmitted, setIsSubmitted] = useState(false)
 
   // Public projection guarantees answer keys and scoring rules are completely removed
   const publicForm = useMemo(() => {
-    return toPublicFormProjection(canonicalForm)
-  }, [canonicalForm])
+    return toPublicFormProjection(formDocument)
+  }, [formDocument])
 
   if (!isOpen) return null
 

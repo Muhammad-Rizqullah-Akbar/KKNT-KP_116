@@ -1,6 +1,6 @@
 /**
  * ============================================================
- * KKPD-KP V1.5 — Cost Model (pricing constants)
+ * KKPD-KP  — Cost Model (pricing constants)
  * ============================================================
  * TUJUAN: membuat biaya Firestore bisa DIESTIMASI, bukan cuma hemat.
  *

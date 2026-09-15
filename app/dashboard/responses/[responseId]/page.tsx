@@ -203,7 +203,7 @@ export default function ResponseDetailPage({ params }: PageProps) {
                   TERVERIFIKASI ✓
                 </span>
                 <span className="text-xs font-mono font-bold px-3 py-1 rounded-lg uppercase border bg-purple-500/10 text-purple-300 border-purple-500/30 print:bg-purple-100 print:text-black">
-                  {responseDoc.distributionCode ? `V1.5 (v${responseDoc.versionNumber})` : 'V1.0 Legacy'}
+                  {responseDoc.distributionCode ? `(v${responseDoc.versionNumber})` : 'Formulir'}
                 </span>
               </div>
 

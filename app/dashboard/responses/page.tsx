@@ -121,7 +121,7 @@ export default function ResponsesDashboardPage() {
           formId: r.formId,
           title: r.formTitle || 'Formulir Evaluasi Pangan',
           versionNumber: r.versionNumber || 1.5,
-          versionLabel: r.versionNumber >= 1.5 ? `V1.5 (v${r.versionNumber})` : 'V1.0 Legacy',
+          versionLabel: r.versionNumber >= 1.5 ? `(v${r.versionNumber})` : 'Formulir',
         })
       }
     })

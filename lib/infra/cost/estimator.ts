@@ -1,6 +1,6 @@
 /**
  * ============================================================
- * KKPD-KP V1.5 — Cost Estimator (statis, zero-risk)
+ * KKPD-KP  — Cost Estimator (statis, zero-risk)
  * ============================================================
  * Mengestimasi biaya Firestore per request dari ukuran koleksi
  * dan pola baca/tulis yang SUDAH DIKETAHUI (hasil audit).
@@ -60,7 +60,7 @@ const ENDPOINT_OPERATIONS: Record<string, Array<{ kind: 'full_scan' | 'reads' | 
   ],
   'auth.login': [{ kind: 'full_scan', collection: 'users' }],
   'auth.users': [{ kind: 'full_scan', collection: 'users' }],
-  'v1_5.users': [{ kind: 'full_scan', collection: 'users' }],
+  'users.list': [{ kind: 'full_scan', collection: 'users' }],
   'forms.list': [{ kind: 'full_scan', collection: 'forms' }],
 }
 

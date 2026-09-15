@@ -2,7 +2,7 @@
 
 import React from 'react'
 import type { BuilderState } from '@/lib/domain/forms/builder-state'
-import type { CanonicalForm } from '@/lib/domain/forms/types'
+import type { FormDocument } from '@/lib/domain/forms/types'
 import { FormBuilderWorkflow } from '././FormBuilderWorkflow'
 
 export interface FormBuilderV2Props {
@@ -10,7 +10,7 @@ export interface FormBuilderV2Props {
   activeVersionId?: string
   activeVersionNumber?: number
   initialState?: BuilderState
-  onSaveDraft?: (canonical: CanonicalForm) => void
+  onSaveDraft?: (formDocument: FormDocument) => void
   onSaveDraftToServer?: (state: BuilderState) => Promise<void>
   onPublishVersion?: () => Promise<void>
   onCreateNewVersion?: () => Promise<void>

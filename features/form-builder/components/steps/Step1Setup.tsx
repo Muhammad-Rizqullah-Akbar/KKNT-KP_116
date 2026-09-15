@@ -3,9 +3,9 @@
 import React, { useState } from 'react'
 import type { BuilderState, FormAspect } from '@/lib/domain/forms/builder-state'
 import { addAspect, updateAspect, deleteAspect, reorderAspect, updateMetadata, updateScoring } from '@/lib/domain/forms/builder-state'
-import { builderStateToCanonicalForm } from '@/lib/domain/forms/form-converters'
+import { builderStateToFormDocument } from '@/lib/domain/forms/form-converters'
 import type { AssessmentOutputMode } from '@/lib/domain/forms/types'
-import { validateCanonicalForm } from '@/lib/domain/forms/validation'
+import { validateFormDocument } from '@/lib/domain/forms/validation'
 import { Icon } from '@/components/ui/Icons'
 import { AddAspectModal, ConfirmDeleteModal } from '../modals/FormBuilderModals'
 import { FormMetadataSection } from './FormMetadataSection'
@@ -144,7 +144,7 @@ export function Step1Setup({ state, onChange, onContinue }: Step1SetupProps) {
   )
   const isWeightValid = !isOverallRequired || scoredAspects.length === 0 || Math.round(totalWeightSum) === 100
 
-  const validationIssues = validateCanonicalForm(builderStateToCanonicalForm(state))
+  const validationIssues = validateFormDocument(builderStateToFormDocument(state))
 
   return (
     <div className="space-y-6 py-2">

@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict'
 import { test, describe } from 'node:test'
-import { toPublicFormProjection } from '../../lib/domain/forms/legacy-adapter'
+import { toPublicFormProjection } from '../../lib/domain/forms/form-adapter'
 
 describe('Security & Public Projection Boundaries', () => {
 
   test('toPublicFormProjection MUST NOT expose answerKey, scoring, or validation internals', () => {
-    const canonicalForm: any = {
+    const formDocument: any = {
       form: {
         formId: 'form_test_01',
         metadata: { title: 'Uji Kebersihan Pangan', status: 'published', category: 'Umum' },
@@ -32,7 +32,7 @@ describe('Security & Public Projection Boundaries', () => {
       },
     }
 
-    const publicProjection = toPublicFormProjection(canonicalForm)
+    const publicProjection = toPublicFormProjection(formDocument)
 
     // Verify version object has NO scoring or validation properties
     assert.equal((publicProjection.version as any).scoring, undefined, 'Public version MUST NOT contain scoring object')

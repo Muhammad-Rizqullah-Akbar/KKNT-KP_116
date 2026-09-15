@@ -5,7 +5,7 @@ export type FormStatus = z.infer<typeof formStatusSchema>
 
 export const formSchema = z.object({
   formId: z.string(),
-  schemaVersion: z.enum(['v1.0', 'v1.5']),
+  schemaVersion: z.string().optional(),
   metadata: z.object({
     title: z.string(),
     description: z.string().optional(),

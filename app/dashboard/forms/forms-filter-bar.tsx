@@ -1,17 +1,17 @@
 'use client'
 
 import { Icon } from '@/components/ui/Icons'
-import type { LegacyStatusFilter, LegacyViewMode } from './forms-utils'
+import type { FormStatusFilter, FormViewMode } from './forms-utils'
 
 type FormsFilterBarProps = {
   searchTerm: string
-  statusFilter: LegacyStatusFilter
+  statusFilter: FormStatusFilter
   selectedGroupId: string
-  viewMode: LegacyViewMode
+  viewMode: FormViewMode
   setSearchTerm: (v: string) => void
-  setStatusFilter: (v: LegacyStatusFilter) => void
+  setStatusFilter: (v: FormStatusFilter) => void
   setSelectedGroupId: (v: string) => void
-  setViewMode: (v: LegacyViewMode) => void
+  setViewMode: (v: FormViewMode) => void
 }
 
 export default function FormsFilterBar(props: FormsFilterBarProps) {
@@ -28,7 +28,7 @@ export default function FormsFilterBar(props: FormsFilterBarProps) {
           <Icon name="search" className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
           <input
             type="text"
-            placeholder="Cari judul V1.0 / kode..."
+            placeholder="Cari judul formulir atau kode..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10 pr-4 py-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500 w-full sm:w-64"

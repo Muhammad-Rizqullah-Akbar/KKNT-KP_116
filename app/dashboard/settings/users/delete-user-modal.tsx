@@ -27,7 +27,7 @@ export default function DeleteUserModal({ selectedUser, isSubmitting, onCancel, 
         </div>
 
         <p className="text-xs text-slate-300 leading-relaxed">
-          Apakah Anda yakin ingin menghapus akun <span className="font-mono font-bold text-rose-300">{selectedUser.email}</span> ({selectedUser.displayName}) secara permanen dari database sistem KKNT-KP V1.5?
+          Apakah Anda yakin ingin menghapus akun <span className="font-mono font-bold text-rose-300">{selectedUser.email}</span> ({selectedUser.displayName}) secara permanen dari database sistem KKNT-KP ?
         </p>
 
         <div className="flex items-center justify-end gap-3 pt-2">

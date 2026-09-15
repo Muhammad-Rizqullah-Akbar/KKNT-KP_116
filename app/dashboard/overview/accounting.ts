@@ -11,7 +11,7 @@ import {
 // COMPUTE DYNAMIC ACCOUNTING STACKS FOR DASHBOARD OVERVIEW
 export function computeAccountingStacks(accountingStacks: any[], responses: any[], forms: any[]) {
   return accountingStacks.map((stack) => {
-    // Semua response diperlakukan sama (tidak ada lagi pemisahan V1.0 vs V1.5)
+    // Semua response diperlakukan sama (tidak ada lagi pemisahan  vs )
     const targetResponsesByScheme = responses
 
     const matchFormId = (r: any, targetId: string) => matchFormIdWithForms(r, targetId, forms)

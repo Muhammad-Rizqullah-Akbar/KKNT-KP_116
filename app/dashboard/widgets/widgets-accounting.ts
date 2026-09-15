@@ -9,7 +9,7 @@ export function computeAccountingForStack(
   v15Forms: any[],
   users: any[]
 ): AccountingResult {
-  // Semua response diperlakukan sama (tidak ada lagi pemisahan V1.0 vs V1.5)
+  // Semua response diperlakukan sama (tidak ada lagi pemisahan  vs )
   const targetResponsesByScheme = responses
 
   const allKnownForms = [...forms, ...v15Forms]
@@ -51,7 +51,7 @@ export function computeAccountingForStack(
       if (!isNaN(pct)) return Math.min(100, Math.max(0, Math.round(pct)))
     }
 
-    // Answer evaluation for legacy or un-scored records
+    // Answer evaluation for un-scored records
     if (r.answers && typeof r.answers === 'object') {
       const entries = Object.entries(r.answers)
       if (entries.length > 0) {

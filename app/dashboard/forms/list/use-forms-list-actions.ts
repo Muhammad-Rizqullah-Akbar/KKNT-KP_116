@@ -148,7 +148,7 @@ export function useFormsListActions(data: FormsListData) {
         throw new Error(data.message || 'Gagal membuat formulir baru.')
       }
 
-      showToast('Formulir V1.5 baru berhasil dibuat!')
+      showToast('Formulir  baru berhasil dibuat!')
       setIsCreateModalOpen(false)
       data.setNewTitle('')
       data.setNewDescription('')

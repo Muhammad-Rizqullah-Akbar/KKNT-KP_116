@@ -1,14 +1,14 @@
 'use client'
 
 import type { BuilderState } from '@/lib/domain/forms/builder-state'
-import type { PublicCanonicalForm } from '@/lib/domain/forms/types'
+import type { PublicFormDocument } from '@/lib/domain/forms/types'
 import { Icon } from '@/components/ui/Icons'
 import { PreviewQuestionCard } from '././step3-preview-question-card'
 import type { SimulationPreset } from '././step3-simulation-preset-picker'
 
 interface RespondentPreviewProps {
   state: BuilderState
-  publicProjection: PublicCanonicalForm
+  publicProjection: PublicFormDocument
   previewAspectIdx: number
   onPreviewAspectIdxChange: (idx: number) => void
   simulatedAnswers: Record<string, any>

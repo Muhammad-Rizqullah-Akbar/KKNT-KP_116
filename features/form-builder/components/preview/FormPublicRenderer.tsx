@@ -70,7 +70,7 @@ export function FormPublicRenderer({
               </div>
             </div>
 
-            {/* Media Attachment if available (V1 & V1.5 Universal Renderer) */}
+            {/* Media Attachment if available (V1 &  Universal Renderer) */}
             {(() => {
               const mediaUrl =
                 question.presentation?.media?.url ||

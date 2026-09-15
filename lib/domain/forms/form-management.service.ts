@@ -10,18 +10,18 @@ import {
   type FormAggregateDoc,
   type FormVersionSnapshotDoc,
 } from '@/lib/repositories/form-versions.repo'
-import { validateCanonicalForm } from '@/lib/domain/forms/validation'
+import { validateFormDocument } from '@/lib/domain/forms/validation'
 import type { FormMetadata } from '@/lib/domain/forms/types'
 import type { BuilderState } from '@/lib/domain/forms/builder-state'
 import {
   builderStateToFormAggregate,
-  formAggregateToCanonicalForm,
+  formAggregateToFormDocument,
 } from '@/lib/domain/forms/form-converters'
 
 export {
   builderStateToFormAggregate,
   formAggregateToBuilderState,
-  formAggregateToCanonicalForm,
+  formAggregateToFormDocument,
 } from '@/lib/domain/forms/form-converters'
 
 import { registerNewMetadataEntry } from '@/lib/repositories/form-registry.repo'
@@ -150,8 +150,8 @@ export async function publishFormWorkflow(
     throw new Error(`Formulir dengan ID "${formId}" tidak ditemukan.`)
   }
 
-  const canonical = formAggregateToCanonicalForm(existing)
-  const validationIssues = validateCanonicalForm(canonical)
+  const formDocument = formAggregateToFormDocument(existing)
+  const validationIssues = validateFormDocument(formDocument)
 
   if (validationIssues.length > 0) {
     const errorList = validationIssues.map((i) => `[${i.path}] ${i.message}`).join(', ')

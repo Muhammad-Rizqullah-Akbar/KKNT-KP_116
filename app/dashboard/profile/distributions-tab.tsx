@@ -14,7 +14,7 @@ export default function DistributionsTab({ distributions }: DistributionsTabProp
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-extrabold text-slate-100 flex items-center gap-2">
           <Icon name="send" className="w-4 h-4 text-cyan-400" />
-          <span>Kode Distribusi Kuesioner V1.5 Milik Anda</span>
+          <span>Kode Distribusi Kuesioner  Milik Anda</span>
         </h3>
 
         <Link
@@ -29,7 +29,7 @@ export default function DistributionsTab({ distributions }: DistributionsTabProp
         {distributions.length === 0 ? (
           <div className="p-12 text-center text-slate-500 text-xs space-y-2">
             <Icon name="send" className="w-10 h-10 mx-auto text-slate-700" />
-            <p className="font-bold text-slate-300">Belum ada kode distribusi instrumen V1.5</p>
+            <p className="font-bold text-slate-300">Belum ada kode distribusi instrumen </p>
           </div>
         ) : (
           <div className="divide-y divide-slate-800/80">
@@ -48,7 +48,7 @@ export default function DistributionsTab({ distributions }: DistributionsTabProp
                   </div>
 
                   <h4 className="text-sm font-bold text-slate-100">{d.title}</h4>
-                  <p className="text-xs text-slate-400 line-clamp-1">{d.description || 'Distribusi kuesioner V1.5.'}</p>
+                  <p className="text-xs text-slate-400 line-clamp-1">{d.description || 'Distribusi kuesioner .'}</p>
                 </div>
 
                 <a

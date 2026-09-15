@@ -185,7 +185,7 @@ export function useWidgetsDerivations(input: DerivationsInput) {
       const formId = f.id || f.formId || 'unknown'
       const code = (f.code || f.formCode || f.distributionCode || f.pretestCode || f.posttestCode || '-').trim().toUpperCase()
       const title = f.title || f.metadata?.title || 'Formulir Tanpa Judul'
-      const version = '' // tidak ada lagi versi V1.0/V1.5 — single format
+      const version = '' // tidak ada lagi versi / — single format
       map.set(formId, {
         id: formId,
         code,
@@ -349,7 +349,7 @@ export function useWidgetsDerivations(input: DerivationsInput) {
   }, [accountingStacks, responses, forms, v15Forms, users, respondentAnswerDistribution.totalRes])
 
   // DYNAMIC PER-QUESTION ITEM ANALYSIS FOR ACTIVE STACK (SEPARATED PER FORM)
-  // Menilai jawaban pakai correctAnswer (kunci jawaban canonical), bukan heuristik substring.
+  // Menilai jawaban pakai correctAnswer (kunci jawaban formDocument), bukan heuristik substring.
   const itemQuestionAnalysis = useMemo(
     () => computeItemQuestionAnalysis(activeStackObj, forms, v15Forms, responses, itemAnalysisFormFilter),
     [activeStackObj, forms, v15Forms, responses, itemAnalysisFormFilter]

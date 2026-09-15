@@ -3,10 +3,10 @@
 import React, { useState, useMemo } from 'react'
 import type { BuilderState } from '@/lib/domain/forms/builder-state'
 import { updateQuestion } from '@/lib/domain/forms/builder-state'
-import type { CanonicalForm } from '@/lib/domain/forms/types'
-import { validateCanonicalForm, type FormValidationIssue } from '@/lib/domain/forms/validation'
+import type { FormDocument } from '@/lib/domain/forms/types'
+import { validateFormDocument, type FormValidationIssue } from '@/lib/domain/forms/validation'
 import { calculateResponseScore } from '@/lib/domain/scoring/scoring-engine'
-import { toPublicFormProjection } from '@/lib/domain/forms/legacy-adapter'
+import { toPublicFormProjection } from '@/lib/domain/forms/form-adapter'
 import { Icon } from '@/components/ui/Icons'
 import { GradeThresholdConfigurator } from '../config-panels/GradeThresholdConfigurator'
 import { AnswerKeyInspector } from '../question-editor/AnswerKeyInspector'
@@ -19,7 +19,7 @@ import { RespondentPreview } from '././step3-respondent-preview'
 
 interface Step3ReviewProps {
   state: BuilderState
-  canonicalForm: CanonicalForm
+  formDocument: FormDocument
   onChangeState?: (nextState: BuilderState) => void
   onNavigateToStep: (step: 1 | 2 | 3 | 4) => void
   onContinue: () => void
@@ -28,7 +28,7 @@ interface Step3ReviewProps {
 
 export function Step3Review({
   state,
-  canonicalForm,
+  formDocument,
   onChangeState,
   onNavigateToStep,
   onContinue,
@@ -63,8 +63,8 @@ export function Step3Review({
 
   // Diagnostic Validation Audit
   const validationIssues: FormValidationIssue[] = useMemo(() => {
-    return validateCanonicalForm(canonicalForm)
-  }, [canonicalForm])
+    return validateFormDocument(formDocument)
+  }, [formDocument])
 
   // Build Simulated Answers Based on Preset with Realistic Biodata Baseline
   const simulatedAnswers = useMemo(() => {
@@ -172,8 +172,8 @@ export function Step3Review({
 
   // Public Security Projection
   const publicProjection = useMemo(() => {
-    return toPublicFormProjection(canonicalForm)
-  }, [canonicalForm])
+    return toPublicFormProjection(formDocument)
+  }, [formDocument])
 
   const outputMode = state.scoring.outputMode || 'both'
   const isOverallVisible = outputMode === 'overall' || outputMode === 'both'

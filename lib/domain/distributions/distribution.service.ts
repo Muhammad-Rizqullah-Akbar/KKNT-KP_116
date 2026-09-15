@@ -15,7 +15,7 @@ import {
   getFormAggregateFromDb,
   getFormVersionSnapshotsFromDb,
 } from '@/lib/repositories/form-versions.repo'
-import { toPublicFormProjection } from '@/lib/domain/forms/legacy-adapter'
+import { toPublicFormProjection } from '@/lib/domain/forms/form-adapter'
 import type { AuthorizationContext } from '@/lib/domain/auth/authorization'
 import type {
   DistributionDoc,
@@ -71,7 +71,7 @@ export async function resolveDistributionWorkflow(
   let dist = await getDistributionByCodeDoc(normalized)
 
   if (!dist) {
-    // Direct Form ID / Legacy Form Code fallback
+    // Direct Form ID / form code fallback
     try {
       const formAgg = await getFormAggregateFromDb(distributionCode)
       if (formAgg) {
@@ -121,7 +121,7 @@ export async function resolveDistributionWorkflow(
   // Version Resolution Mode
   let resolvedVersionId = dist.pinnedVersionId || ''
   let resolvedVersionNumber = 1
-  let canonicalForm: any
+  let formDocument: any
 
   if (dist.versionMode === 'pinned' && dist.pinnedVersionId) {
     // Pinned version read: 1 snapshot read
@@ -134,7 +134,7 @@ export async function resolveDistributionWorkflow(
 
     resolvedVersionId = snapshot.versionId
     resolvedVersionNumber = snapshot.versionNumber
-    canonicalForm = {
+    formDocument = {
       form: {
         formId: snapshot.formId,
         metadata: snapshot.metadata,
@@ -162,7 +162,7 @@ export async function resolveDistributionWorkflow(
 
     resolvedVersionId = aggregate.activeVersionId
     resolvedVersionNumber = aggregate.activeVersionNumber
-    canonicalForm = {
+    formDocument = {
       form: {
         formId: aggregate.formId,
         metadata: aggregate.metadata,
@@ -184,13 +184,13 @@ export async function resolveDistributionWorkflow(
   }
 
   // SECURITY BOUNDARY: Strip answer keys & scoring internals using public projection
-  const publicFormProjection = toPublicFormProjection(canonicalForm)
+  const publicFormProjection = toPublicFormProjection(formDocument)
 
   return {
     code: dist.code,
     status: effectiveStatus,
-    title: dist.title || canonicalForm.form.metadata.title,
-    description: dist.description || canonicalForm.form.metadata.description,
+    title: dist.title || formDocument.form.metadata.title,
+    description: dist.description || formDocument.form.metadata.description,
     formId: dist.formId,
     versionMode: dist.versionMode,
     resolvedVersionId,

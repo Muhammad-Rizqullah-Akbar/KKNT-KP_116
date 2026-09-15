@@ -4,7 +4,7 @@ import { duplicateFormWorkflow } from '@/lib/domain/forms/form-management.servic
 
 /**
  * POST /api/forms/[formId]/duplicate
- * Duplicate a V1.5 form aggregate.
+ * Duplicate a  form aggregate.
  */
 export async function POST(
   request: Request,
@@ -22,7 +22,7 @@ export async function POST(
   } catch (error: any) {
     const status = error.status || 500
     return NextResponse.json(
-      { success: false, message: error.message || 'Gagal menduplikat formulir V1.5.' },
+      { success: false, message: error.message || 'Gagal menduplikat formulir .' },
       { status }
     )
   }

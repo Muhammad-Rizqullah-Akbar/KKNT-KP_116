@@ -28,7 +28,7 @@ export function expandScaleLabel(label: any): string {
 
 /**
  * Safely resolves the answer value for a question from the submitted answers map.
- * Supports modern V1.5 (questionId), legacy prompt text, legacy question labels, and index-based keys.
+ * Supports modern (questionId), stored prompt text, stored question labels, and index-based keys.
  */
 export function resolveQuestionAnswer(
   question: BuilderQuestion,
@@ -37,7 +37,7 @@ export function resolveQuestionAnswer(
 ): any {
   if (!answers || typeof answers !== 'object') return undefined
 
-  // 1. Direct V1.5 questionId lookup (Highest priority)
+  // 1. Direct  questionId lookup (Highest priority)
   if (answers[question.questionId] !== undefined) {
     return answers[question.questionId]
   }
@@ -81,10 +81,10 @@ export function resolveQuestionAnswer(
     }
   }
 
-  // 5. Legacy ID fallback if question has an id property different from questionId
-  const legacyId = (question as any).id
-  if (legacyId && answers[legacyId] !== undefined) {
-    return answers[legacyId]
+  // 5. Stored ID fallback if question has an id property different from questionId
+  const storedQuestionId = (question as any).id
+  if (storedQuestionId && answers[storedQuestionId] !== undefined) {
+    return answers[storedQuestionId]
   }
 
   return undefined

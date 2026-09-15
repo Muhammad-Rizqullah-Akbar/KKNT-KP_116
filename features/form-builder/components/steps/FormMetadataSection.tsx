@@ -45,7 +45,7 @@ export function FormMetadataSection({
             type="text"
             value={metadata.title}
             onChange={(e) => onMetadataChange('title', e.target.value)}
-            placeholder="Contoh: Audit Keamanan Pangan Kantin Sekolah V1.5"
+            placeholder="Contoh: Audit Keamanan Pangan Kantin Sekolah "
             className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 transition-all"
           />
         </div>

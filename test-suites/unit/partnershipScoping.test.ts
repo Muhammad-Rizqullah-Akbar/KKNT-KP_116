@@ -125,7 +125,7 @@ describe('Partnership Scoping & Access Boundary Tests', () => {
     assert.equal(visibleUsers.length, mockUsers.length)
   })
 
-  test('Mitra navigation menu only contains 5 allowed routes and no V1.0 or Dashboard', () => {
+  test('Mitra navigation menu only contains 5 allowed routes and no  or Dashboard', () => {
     const partnershipMenuItems = [
       '/dashboard/partnership',
       '/dashboard/monitoring',
@@ -136,8 +136,8 @@ describe('Partnership Scoping & Access Boundary Tests', () => {
 
     assert.equal(partnershipMenuItems.length, 5)
     assert.equal(partnershipMenuItems.includes('/dashboard/overview'), false, 'Dashboard must not be in Mitra menu')
-    assert.equal(partnershipMenuItems.includes('/dashboard/form-builder'), false, 'V1.0 Form Builder must not be in Mitra menu')
-    assert.equal(partnershipMenuItems.includes('/dashboard/forms'), false, 'V1.0 Forms must not be in Mitra menu')
-    assert.equal(partnershipMenuItems.includes('/dashboard/respondents'), false, 'V1.0 Respondents must not be in Mitra menu')
+    assert.equal(partnershipMenuItems.includes('/dashboard/form-builder'), false, ' Form Builder must not be in Mitra menu')
+    assert.equal(partnershipMenuItems.includes('/dashboard/forms'), false, ' Forms must not be in Mitra menu')
+    assert.equal(partnershipMenuItems.includes('/dashboard/respondents'), false, ' Respondents must not be in Mitra menu')
   })
 })

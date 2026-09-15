@@ -2,7 +2,7 @@ import type { BuilderQuestion } from '@/lib/domain/forms/builder-state'
 
 /**
  * CANONICAL ANSWER NORMALIZER — single source of truth for converting raw
- * submitted answers (legacy text-key + numeric-index values) into clean,
+ * submitted answers (stored text-key + numeric-index values) into clean,
  * human-readable values that reflect the real form options.
  *
  * This module resolves the long-standing "2 tipe data" bug where:
@@ -24,7 +24,7 @@ export function cleanString(s: string): string {
 }
 
 /**
- * Extracts the option list from any question shape (V1.0 legacy, V1.5 builder).
+ * Extracts the option list from any question shape (stored or builder).
  */
 export function getQuestionOptions(question: BuilderQuestion | any): NormalizedOption[] {
   const raw =
@@ -104,7 +104,7 @@ export function resolveOptionLabel(question: BuilderQuestion | any, rawValue: an
 }
 
 /**
- * Canonical normalizer: converts a raw answer to a clean human-readable value.
+ * FormDocument normalizer: converts a raw answer to a clean human-readable value.
  * - single value → label string
  * - array (multiple-choice) → array of labels
  * - object (indicator-table/likert) → { statement: scaleLabel }

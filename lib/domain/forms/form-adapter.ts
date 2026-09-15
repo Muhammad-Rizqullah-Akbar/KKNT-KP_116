@@ -1,13 +1,13 @@
-import type { AnswerKey, CanonicalForm, FormStatus, LegacyScoringAdapterInput, PublicCanonicalForm, PublicQuestion, Question, QuestionOption, QuestionType } from './types'
+import type { AnswerKey, FormDocument, FormStatus, ScoringAdapterInput, PublicFormDocument, PublicQuestion, Question, QuestionOption, QuestionType } from './types'
 import { QUESTION_TYPES } from './types'
 
-type LegacyQuestion = { id?: string; stageId?: string; aspectId?: string; type?: string; answerType?: string; question?: string; label?: string; description?: string; required?: boolean; options?: string[]; media?: { type?: string; url?: string; caption?: string }; config?: Record<string, unknown>; scoring?: { scheme?: string; weight?: number } }
-type LegacyForm = { id?: string; title?: string; code?: string; description?: string; target?: string; category?: string; status?: string; questions?: LegacyQuestion[]; scoring?: Record<string, unknown>; validation?: Record<string, unknown>; createdAt?: string; updatedAt?: string; createdBy?: string }
-export type LegacyAdaptationResult = { canonical: CanonicalForm; warnings: string[] }
+type QuestionRecord = { id?: string; stageId?: string; aspectId?: string; type?: string; answerType?: string; question?: string; label?: string; description?: string; required?: boolean; options?: string[]; media?: { type?: string; url?: string; caption?: string }; config?: Record<string, unknown>; scoring?: { scheme?: string; weight?: number } }
+type FormRecord = { id?: string; title?: string; code?: string; description?: string; target?: string; category?: string; status?: string; questions?: QuestionRecord[]; scoring?: Record<string, unknown>; validation?: Record<string, unknown>; createdAt?: string; updatedAt?: string; createdBy?: string }
+export type FormAdaptationResult = { formDocument: FormDocument; warnings: string[] }
 
 const isQuestionType = (value: string): value is QuestionType => QUESTION_TYPES.includes(value as QuestionType)
 const normalizeStatus = (value: unknown): FormStatus => value === 'published' || value === 'archived' ? value : 'draft'
-function fallbackId(formId: string, source: LegacyQuestion): string { const text = `${formId}|${source.answerType || source.type || ''}|${source.question || source.label || ''}`; let hash = 0; for (let index = 0; index < text.length; index += 1) hash = (hash * 31 + text.charCodeAt(index)) >>> 0; return `legacy-${formId}-${hash.toString(36)}` }
+function fallbackId(formId: string, source: QuestionRecord): string { const text = `${formId}|${source.answerType || source.type || ''}|${source.question || source.label || ''}`; let hash = 0; for (let index = 0; index < text.length; index += 1) hash = (hash * 31 + text.charCodeAt(index)) >>> 0; return `q-${formId}-${hash.toString(36)}` }
 function optionId(questionId: string, label: string, position: number): string { let hash = 0; for (let index = 0; index < label.length; index += 1) hash = (hash * 31 + label.charCodeAt(index)) >>> 0; return `${questionId}-option-${position + 1}-${hash.toString(36)}` }
 export function answerKey(raw: unknown, options: QuestionOption[]): AnswerKey {
   if (raw === undefined || raw === null || raw === '') return { kind: 'none' }
@@ -58,11 +58,11 @@ export function answerKey(raw: unknown, options: QuestionOption[]): AnswerKey {
   return correctOptionIds.length ? { kind: 'option', correctOptionIds } : { kind: 'none' }
 }
 
-function adaptQuestion(formId: string, source: LegacyQuestion, warnings: string[]): Question {
+function adaptQuestion(formId: string, source: QuestionRecord, warnings: string[]): Question {
   const rawType = source.answerType || source.type || ''
   const type: QuestionType = (rawType === 'indicator' || rawType === 'table') ? 'indicator-table' : (isQuestionType(rawType) ? rawType : 'short-text')
   const questionId = source.id || fallbackId(formId, source)
-  if (!source.id) warnings.push(`Question "${source.question || source.label || questionId}" has no legacy id; a read-only fallback identity was generated.`)
+  if (!source.id) warnings.push(`Question "${source.question || source.label || questionId}" has no stored id; a read-only fallback identity was generated.`)
 
   const config = source.config || {}
   const rawOptions = Array.isArray(config.options) ? config.options : source.options || []
@@ -126,7 +126,7 @@ function adaptQuestion(formId: string, source: LegacyQuestion, warnings: string[
 
   const parsedAnswerKey = answerKey(rawCorrectAnswer, options)
 
-  // Dynamic scheme inference learned from legacy version
+  // Dynamic scheme inference
   let defaultScheme: Question['scoring']['scheme'] = 'none'
   if (['single-choice', 'dropdown', 'binary', 'multiple-choice'].includes(type)) {
     defaultScheme = 'binary'
@@ -141,7 +141,7 @@ function adaptQuestion(formId: string, source: LegacyQuestion, warnings: string[
     : undefined
 
   // If correct answer exists for a choice question, FORCE binary scheme
-  // (legacy data stored scheme="none" but has a correctAnswer → must be scored).
+  // (stored data has scheme="none" but has a correctAnswer → must be scored).
   const hasCorrectAnswer =
     rawCorrectAnswer !== undefined &&
     rawCorrectAnswer !== null &&
@@ -179,15 +179,15 @@ function adaptQuestion(formId: string, source: LegacyQuestion, warnings: string[
     answerKey: parsedAnswerKey,
   }
 }
-/** Read-only conversion. It never writes, migrates, or mutates a legacy document. */
-export function adaptLegacyForm(legacy: LegacyForm): LegacyAdaptationResult {
-  const formId = legacy.id || legacy.code || 'legacy-form'
+/** Read-only conversion. It never writes, migrates, or mutates a stored document. */
+export function adaptFormRecord(source: FormRecord): FormAdaptationResult {
+  const formId = source.id || source.code || 'form-record'
   const warnings: string[] = []
-  const rawScoring = legacy.scoring || {}
-  const rawValidation = legacy.validation || {}
-  const versionId = `legacy-${formId}-v1`
+  const rawScoring = source.scoring || {}
+  const rawValidation = source.validation || {}
+  const versionId = `snapshot-${formId}-v1`
 
-  const rawStages: any[] = (legacy as any).stages || (legacy as any).aspects || []
+  const rawStages: any[] = (source as any).stages || (source as any).aspects || []
   const rawDistribution: Record<string, number> =
     typeof rawScoring.distribution === 'object' && rawScoring.distribution
       ? (rawScoring.distribution as Record<string, number>)
@@ -252,29 +252,29 @@ export function adaptLegacyForm(legacy: LegacyForm): LegacyAdaptationResult {
   }
 
   return {
-    canonical: {
+    formDocument: {
       form: {
         formId,
         metadata: {
-          title: legacy.title || '',
-          description: legacy.description,
-          target: legacy.target,
-          category: legacy.category,
+          title: source.title || '',
+          description: source.description,
+          target: source.target,
+          category: source.category,
           kind: 'official',
-          status: normalizeStatus(legacy.status),
+          status: normalizeStatus(source.status),
         },
         activeVersionId: versionId,
-        createdBy: legacy.createdBy,
-        createdAt: legacy.createdAt,
-        updatedAt: legacy.updatedAt,
+        createdBy: source.createdBy,
+        createdAt: source.createdAt,
+        updatedAt: source.updatedAt,
       },
       version: {
         versionId,
         formId,
         versionNumber: 1,
-        status: normalizeStatus(legacy.status),
+        status: normalizeStatus(source.status),
         aspects: adaptedAspects as any,
-        questions: (legacy.questions || []).map((question) => adaptQuestion(formId, question, warnings)),
+        questions: (source.questions || []).map((question) => adaptQuestion(formId, question, warnings)),
         scoring: {
           totalPoints: typeof rawScoring.totalPoints === 'number' ? rawScoring.totalPoints : 100,
           mode: rawScoring.mode === 'hybrid' || rawScoring.mode === 'manual' ? rawScoring.mode : 'auto',
@@ -287,8 +287,8 @@ export function adaptLegacyForm(legacy: LegacyForm): LegacyAdaptationResult {
           exceptionQuestionIds: Array.isArray(rawValidation.exceptions) ? rawValidation.exceptions.filter((id): id is string => typeof id === 'string') : [],
           allowOverride: typeof rawValidation.allowOverride === 'boolean' ? rawValidation.allowOverride : true,
         },
-        createdAt: legacy.createdAt,
-        createdBy: legacy.createdBy,
+        createdAt: source.createdAt,
+        createdBy: source.createdBy,
       },
     },
     warnings,
@@ -364,31 +364,31 @@ function toPublicQuestion(question: any): PublicQuestion {
     }
   }
 }
-export function toPublicFormProjection(canonical: CanonicalForm): PublicCanonicalForm {
-  const rawQuestions = Array.isArray(canonical.version?.questions) ? canonical.version.questions : []
+export function toPublicFormProjection(formDocument: FormDocument): PublicFormDocument {
+  const rawQuestions = Array.isArray(formDocument.version?.questions) ? formDocument.version.questions : []
   return {
     form: {
-      formId: canonical.form.formId,
+      formId: formDocument.form.formId,
       metadata: {
-        title: canonical.form.metadata?.title || 'Formulir Evaluasi',
-        description: canonical.form.metadata?.description || '',
-        target: canonical.form.metadata?.target || '',
-        category: canonical.form.metadata?.category || '',
-        kind: canonical.form.metadata?.kind || 'official',
-        status: canonical.form.metadata?.status || 'published',
-        allowCadreDistribution: canonical.form.metadata?.allowCadreDistribution ?? true,
+        title: formDocument.form.metadata?.title || 'Formulir Evaluasi',
+        description: formDocument.form.metadata?.description || '',
+        target: formDocument.form.metadata?.target || '',
+        category: formDocument.form.metadata?.category || '',
+        kind: formDocument.form.metadata?.kind || 'official',
+        status: formDocument.form.metadata?.status || 'published',
+        allowCadreDistribution: formDocument.form.metadata?.allowCadreDistribution ?? true,
       },
-      activeVersionId: canonical.form.activeVersionId,
-      createdAt: canonical.form.createdAt,
+      activeVersionId: formDocument.form.activeVersionId,
+      createdAt: formDocument.form.createdAt,
     },
     version: {
-      versionId: canonical.version?.versionId || 'v1',
-      formId: canonical.version?.formId || canonical.form.formId,
-      versionNumber: canonical.version?.versionNumber || 1,
-      status: canonical.version?.status || 'published',
+      versionId: formDocument.version?.versionId || 'v1',
+      formId: formDocument.version?.formId || formDocument.form.formId,
+      versionNumber: formDocument.version?.versionNumber || 1,
+      status: formDocument.version?.status || 'published',
       questions: rawQuestions.map(toPublicQuestion),
     }
   }
 }
-/** Boundary only: later infrastructure can map this input to the legacy engine without changing formulas. */
-export function toLegacyScoringAdapterInput(canonical: CanonicalForm): LegacyScoringAdapterInput { return { questions: canonical.version.questions, scoring: canonical.version.scoring, validation: canonical.version.validation } }
+/** Boundary only: later infrastructure can map this input to the scoring engine without changing formulas. */
+export function toScoringAdapterInput(formDocument: FormDocument): ScoringAdapterInput { return { questions: formDocument.version.questions, scoring: formDocument.version.scoring, validation: formDocument.version.validation } }

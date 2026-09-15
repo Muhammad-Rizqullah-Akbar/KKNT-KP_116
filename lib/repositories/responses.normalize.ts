@@ -68,10 +68,10 @@ function extractRespondentInfo(rawData: any) {
 }
 
 /**
- * Helper: Normalizes legacy V1 or modern V1.5 response document on the fly.
+ * Helper: Normalizes stored or modern response document on the fly.
  */
 export function normalizeResponseDoc(rawData: any, docId?: string): ResponseDoc {
-  const responseId = rawData.responseId || rawData.id || docId || 'resp_legacy'
+  const responseId = rawData.responseId || rawData.id || docId || 'unknown'
   const distributionCode = rawData.distributionCode || rawData.formCode || rawData.formId || 'V1-LEGACY'
   const status = rawData.status || 'submitted'
   const extracted = extractRespondentInfo(rawData)
@@ -101,10 +101,10 @@ export function normalizeResponseDoc(rawData: any, docId?: string): ResponseDoc 
 
   return {
     responseId,
-    distributionId: rawData.distributionId || 'dist_legacy',
+    distributionId: rawData.distributionId || 'unknown',
     distributionCode,
-    formId: rawData.formId || 'form_legacy',
-    versionId: rawData.versionId || 'v1.5_init',
+    formId: rawData.formId || 'unknown',
+    versionId: rawData.versionId || 'init',
     versionNumber: rawData.versionNumber || 1.5,
     ownerType: rawData.ownerType || 'cadre',
     ownerId: rawData.ownerId || rawData.createdBy || 'cadre_system',
@@ -237,8 +237,8 @@ export function calculateScoreWithV1Engine(
   })
 
   const engine = new ScoringEngine(questionsWithScoring, scoring as any, validation as any, stages as any)
-  const legacyResult = engine.calculateScore(mappedAnswers)
-  return { mappedAnswers, legacyResult }
+  const computedResult = engine.calculateScore(mappedAnswers)
+  return { mappedAnswers, computedResult }
 }
 
 export function mapAnswersToHumanReadable(rawAnswers: Record<string, any>, form: any): Record<string, any> {

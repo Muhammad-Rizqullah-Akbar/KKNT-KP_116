@@ -37,7 +37,7 @@ export const findMatchingForm = (response: any, formsList: FormData[]): FormData
     if (match) return match
   }
 
-  // Tier 3: Question Content / Prompt Overlap Matching (100% Deterministic for legacy or ambiguous records)
+  // Tier 3: Question Content Matching (deterministic for ambiguous records)
   if (response.answers && typeof response.answers === 'object') {
     const answerKeys = Object.keys(response.answers)
     if (answerKeys.length > 0) {
@@ -276,7 +276,7 @@ export const getStatusByScore = (score: number): string => {
 
 // Helper: 5-Tier Fallback Extractor for Per-Aspect Scores (100% Reliable for Any Form)
 export const getRespondentAspects = (r: any, forms: FormData[]): AspectScore[] => {
-  // 1. Authoritative V1.5 result.aspects
+  // 1. Authoritative  result.aspects
   if (r.result?.aspects && Array.isArray(r.result.aspects) && r.result.aspects.length > 0) {
     const valid = r.result.aspects.filter((asp: any) => {
       const t = (asp.title || asp.name || '').trim()
@@ -293,7 +293,7 @@ export const getRespondentAspects = (r: any, forms: FormData[]): AspectScore[] =
     }
   }
 
-  // 2. V1.0 scoringPerStage
+  // 2.  scoringPerStage
   if (r.scoringPerStage && typeof r.scoringPerStage === 'object') {
     const entries = Object.entries(r.scoringPerStage).filter(([id, st]: any) => {
       const name = (st.name || st.title || id).trim()
