@@ -63,6 +63,14 @@ export async function GET(request: Request) {
  */
 export async function DELETE(request: Request) {
   try {
+    const authContext = await getAuthorizationContext()
+    if (!authContext) {
+      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
+    }
+    if (authContext.role !== 'super_admin') {
+      return NextResponse.json({ success: false, message: 'Forbidden' }, { status: 403 })
+    }
+
     const { searchParams } = new URL(request.url)
     const singleId = searchParams.get('id')
 
