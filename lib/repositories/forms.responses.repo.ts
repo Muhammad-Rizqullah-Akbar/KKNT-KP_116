@@ -135,10 +135,16 @@ export const submitFormResponse = async (
   }
 }
 
-export const getAllResponses = async (limitCount: number = 1000): Promise<FormResponse[]> => {
+/**
+ * CATATAN BIAYA: batas default diturunkan dari 1000 -> 200.
+ * Pemanggil yang butuh lebih harus menyebutkan jumlah eksplisit,
+ * agar tidak terjadi full-scan diam-diam saat data membesar.
+ */
+export const getAllResponses = async (limitCount: number = 200): Promise<FormResponse[]> => {
   try {
+    const safeLimit = Math.max(1, Math.min(Number(limitCount) || 200, 1000))
     const responsesRef = collection(firestore, 'responses')
-    const q = query(responsesRef, orderBy('submittedAt', 'desc'), limit(limitCount))
+    const q = query(responsesRef, orderBy('submittedAt', 'desc'), limit(safeLimit))
     const snapshot = await getDocs(q)
     const list = snapshot.docs.map((doc) => ({
       id: doc.id,

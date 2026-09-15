@@ -165,7 +165,15 @@ export async function submitResponseDoc(
 
 /**
  * Lists response documents with role and parameter filtering.
+ *
+ * CATATAN BIAYA PENTING:
+ * Fungsi ini masih membaca koleksi (perlu untuk enrichment/scope), jadi
+ * jumlah dokumen DIBATASI KERAS agar tidak pernah unbounded. Untuk skala
+ * besar, gunakan `listResponsesPaged()` (query terfilter) atau endpoint
+ * ringkasan `/api/responses/analytics` yang memakai count aggregation.
  */
+const MAX_LIST_DOCS = 500
+
 export async function listResponsesDoc(
   options?: ResponseFilterOptions & {
     ownerType?: string
@@ -173,7 +181,9 @@ export async function listResponsesDoc(
   }
 ): Promise<ResponseDoc[]> {
   const rawDocs = await safeGetCollectionDocs(RESPONSES_COLLECTION)
-  let docs = rawDocs.map((d) => normalizeResponseDoc(d.data, d.id))
+  // HARD CAP: cegah full-scan tak terbatas ketika data bertambah besar.
+  const capped = rawDocs.length > MAX_LIST_DOCS ? rawDocs.slice(0, MAX_LIST_DOCS) : rawDocs
+  let docs = capped.map((d) => normalizeResponseDoc(d.data, d.id))
 
   if (options?.distributionId) {
     docs = docs.filter((d) => d.distributionId === options.distributionId)

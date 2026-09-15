@@ -36,6 +36,66 @@ export async function safeGetCollectionDocs(collectionName: string): Promise<{ i
   }
 }
 
+/**
+ * Query terfilter + berbatas. HANYA memakai equality `where` + `limit`
+ * (tanpa `orderBy` pada field berbeda), sehingga cukup memakai index
+ * single-field otomatis Firestore dan TIDAK membutuhkan composite index.
+ *
+ * Ini jalur HEMAT untuk list: membaca sejumlah `limit` dokumen saja,
+ * bukan seluruh koleksi.
+ */
+export async function safeQueryDocs(
+  collectionName: string,
+  filters: Array<{ field: string; value: any }> = [],
+  limitCount = 25,
+): Promise<{ id: string; data: any }[]> {
+  const safeLimit = Math.max(1, Math.min(Number(limitCount) || 25, 100))
+  try {
+    let q: any = adminFirestore.collection(collectionName)
+    for (const f of filters) {
+      if (f && f.field) q = q.where(f.field, '==', f.value)
+    }
+    q = q.limit(safeLimit)
+    const snapshot: any = await withTimeout(q.get() as Promise<any>, 3000)
+    return snapshot.docs.map((d: any) => ({ id: d.id, data: d.data() }))
+  } catch (adminErr: any) {
+    console.warn(`[safeFirestore] filtered read failed for "${collectionName}":`, adminErr?.message || adminErr)
+    try {
+      const { query, collection: col, where, limit: lim, getDocs: gd } = await import('firebase/firestore')
+      const refs: any[] = []
+      for (const f of filters) {
+        if (f && f.field) refs.push(where(f.field, '==', f.value))
+      }
+      const snap = await gd(query(col(firestore, collectionName), ...refs, lim(safeLimit)))
+      return snap.docs.map((d: any) => ({ id: d.id, data: d.data() }))
+    } catch (clientErr: any) {
+      console.error(`[safeFirestore] filtered fallback failed for "${collectionName}":`, clientErr?.message || clientErr)
+      return []
+    }
+  }
+}
+
+/**
+ * Hitung jumlah dokumen tanpa membaca dokumennya (count aggregation).
+ * Biaya: 1 read per 1000 dokumen yang dihitung (jauh lebih murah dari full scan).
+ */
+export async function safeCountDocs(
+  collectionName: string,
+  filters: Array<{ field: string; value: any }> = [],
+): Promise<number> {
+  try {
+    let q: any = adminFirestore.collection(collectionName)
+    for (const f of filters) {
+      if (f && f.field) q = q.where(f.field, '==', f.value)
+    }
+    const snap: any = await withTimeout(q.count().get() as Promise<any>, 3000)
+    return Number(snap.data().count) || 0
+  } catch (err: any) {
+    console.warn(`[safeFirestore] count failed for "${collectionName}":`, err?.message || err)
+    return 0
+  }
+}
+
 export async function safeGetDoc(collectionName: string, docId: string): Promise<{ id: string; data: any } | null> {
   try {
     const docSnap = await withTimeout(adminFirestore.collection(collectionName).doc(docId).get(), 1500)
