@@ -27,7 +27,6 @@ export function ElementToolbar({ onAddElement, isMobile = false }: ElementToolba
     }
   }, [activeCategory])
 
-  const quickCategories = ['all', 'Input', 'Pilihan', 'Skala', 'Tabel']
 
   const handleDragStart = (e: React.DragEvent, element: FormElement) => {
     e.dataTransfer.setData('elementType', element.type)

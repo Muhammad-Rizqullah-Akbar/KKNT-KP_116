@@ -28,7 +28,7 @@ export function MitraProgressModal({ mitra, isOpen, onClose }: MitraProgressModa
   const [cadres, setCadres] = useState<UserProfile[]>([])
   const [distributions, setDistributions] = useState<any[]>([])
   const [articles, setArticles] = useState<any[]>([])
-  const [responsesCount, setResponsesCount] = useState<number>(0)
+  const [, setResponsesCount] = useState<number>(0)
   const [isLoading, setIsLoading] = useState(true)
 
   const loadMitraAnalytics = async () => {

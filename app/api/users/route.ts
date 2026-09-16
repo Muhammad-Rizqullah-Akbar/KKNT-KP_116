@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireRole } from '@/lib/domain/auth/authorization'
 import { safeGetCollectionDocs } from '@/lib/repositories/safe-firestore'
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const authContext = await requireRole(['super_admin', 'partnership'])
 

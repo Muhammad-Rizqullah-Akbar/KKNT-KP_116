@@ -16,8 +16,8 @@ type FormsFilterBarProps = {
 
 export default function FormsFilterBar(props: FormsFilterBarProps) {
   const {
-    searchTerm, statusFilter, selectedGroupId, viewMode,
-    setSearchTerm, setStatusFilter, setSelectedGroupId, setViewMode,
+    searchTerm, statusFilter, viewMode,
+    setSearchTerm, setStatusFilter, setViewMode,
   } = props
 
   return (

@@ -1,6 +1,5 @@
 'use client'
 
-import React from 'react'
 import type { IndicatorScale, Indicator } from '@/lib/domain/forms/types'
 import { Icon } from '@/components/ui/Icons'
 
@@ -48,7 +47,7 @@ export function LikertScaleEditor({
     onChangeScales(updated)
   }
 
-  const removeScalePoint = (index: number) => {
+  const removeScalePoint = (_index: number) => {
     if (currentScales.length <= 2) return
     const updated = currentScales.slice(0, currentScales.length - 1)
     onChangeScales(updated)

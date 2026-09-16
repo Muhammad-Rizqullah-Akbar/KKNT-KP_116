@@ -14,14 +14,14 @@ export function useFormsListActions(data: FormsListData) {
     setIsUpdatingTitle, setIsTogglingCadrePerm, setIsCreatingNewVersion,
     selectedFormIds, setSelectedFormIds,
     formToDelete, setFormToDelete,
-    isBulkDeleteModalOpen, setIsBulkDeleteModalOpen,
+    setIsBulkDeleteModalOpen,
     setIsDeletingForm,
     distributionModalForm, setDistributionModalForm,
     editConfirmForm, setEditConfirmForm,
     newTitle, newDescription, newCategory, newTarget, newKind,
     setIsCreateModalOpen, setIsCreating,
-    duplicatingFormId, setDuplicatingFormId,
-    activeMenuFormId, setActiveMenuFormId,
+    setDuplicatingFormId,
+    setActiveMenuFormId,
   } = data
 
   const queryClient = useQueryClient()

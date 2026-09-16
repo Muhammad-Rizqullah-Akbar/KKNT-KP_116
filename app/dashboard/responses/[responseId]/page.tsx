@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, use } from 'react'
+import { use } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -18,8 +18,6 @@ interface PageProps {
 
 export default function ResponseDetailPage({ params }: PageProps) {
   const { responseId } = use(params)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [filterType, setFilterType] = useState<'all' | 'low_score' | 'indicators'>('all')
 
   const {
     data: responseDoc,
@@ -57,10 +55,6 @@ export default function ResponseDetailPage({ params }: PageProps) {
       }
     },
   })
-
-  const handlePrint = () => {
-    window.print()
-  }
 
   if (isLoading) {
     return (
@@ -113,18 +107,6 @@ export default function ResponseDetailPage({ params }: PageProps) {
   })
 
   const lowScoreIndicators = allIndicators.filter((ind) => ind.max > 0 && (ind.score / ind.max) < 0.6)
-
-  // Filtered Question Results
-  const filteredQuestionResults = (result?.questions || []).filter((q: any) => {
-    const matchesSearch =
-      q.prompt.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      q.questionId.toLowerCase().includes(searchQuery.toLowerCase())
-
-    if (!matchesSearch) return false
-    if (filterType === 'low_score') return q.percentage < 60
-    if (filterType === 'indicators') return !!q.details?.indicators?.length
-    return true
-  })
 
   return (
     <div className="flex flex-col min-h-screen bg-slate-950 text-slate-100 font-sans print:bg-white print:text-black">

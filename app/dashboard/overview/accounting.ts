@@ -195,7 +195,7 @@ export function computeRespondentAnswerDistribution(activeOverviewStackObj: any,
 // PER-STACKING RESPONDENT PARTITION & CONSOLIDATED DETAILED BREAKDOWN (ALL STACKS)
 export function computePerStackPartitionBreakdown(
   computedAccountingStacks: any[],
-  responses: any[],
+  _responses: any[],
   globalTotal: number,
 ) {
   const safeGlobalTotal = globalTotal || 1

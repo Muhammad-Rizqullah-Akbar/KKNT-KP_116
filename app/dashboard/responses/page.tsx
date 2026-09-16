@@ -5,7 +5,6 @@ import { useQuery } from '@tanstack/react-query'
 import { Topbar } from '@/features/dashboard/components/layout/Topbar'
 import { Icon } from '@/components/ui/Icons'
 import type { ResponseDoc } from '@/lib/domain/responses/response-types'
-import { useAuth } from '@/context/AuthContext'
 import { safeFetchJson } from '@/lib/infra/safe-fetch'
 import { SkeletonCard, SkeletonTable } from '@/components/ui/Skeleton'
 import { queryKeys } from '@/lib/query-keys'
@@ -22,7 +21,6 @@ import BulkDeleteModal from './bulk-delete-modal'
 import { useResponseDelete } from './use-response-delete'
 
 export default function ResponsesDashboardPage() {
-  const { user } = useAuth()
 
   // Respondent Preview Modal State
   const [selectedRespondent, setSelectedRespondent] = useState<ResponseDoc | null>(null)

@@ -183,7 +183,6 @@ export default function PartnershipDomainPage() {
     setCadrePhone,
     cadreOrganization,
     setCadreOrganization,
-    cadrePartnershipType,
     isSubmittingCadre,
     openCreateCadreModal,
     handleCreateCadre,
@@ -289,8 +288,6 @@ export default function PartnershipDomainPage() {
   }, [filteredCadres, partnersList])
 
   // Pagination Math
-  const activeListLength = activeTab === 'mitra' ? filteredMitra.length : filteredCadres.length
-  const totalPages = Math.ceil(activeListLength / pageSize) || 1
   const paginatedMitra = useMemo(() => {
     const start = (currentPage - 1) * pageSize
     return filteredMitra.slice(start, start + pageSize)

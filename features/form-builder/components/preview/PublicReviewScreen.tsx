@@ -170,7 +170,6 @@ function formatAnswerDisplay(question: PublicQuestion, val: any): React.ReactNod
 
 export function PublicReviewScreen({
   code,
-  title,
   aspects,
   questions,
   answers,

@@ -70,8 +70,8 @@ export function FormSettingsModal({
   
   const [activeTab, setActiveTab] = useState<TabType>('info')
   const [draggedStageIndex, setDraggedStageIndex] = useState<number | null>(null)
-  const [showWeightWarning, setShowWeightWarning] = useState<boolean>(false)
-  const [showBalanceWarning, setShowBalanceWarning] = useState<boolean>(false)
+  const [, setShowWeightWarning] = useState<boolean>(false)
+  const [, setShowBalanceWarning] = useState<boolean>(false)
   
   // Reset tab saat modal dibuka
   useEffect(() => {

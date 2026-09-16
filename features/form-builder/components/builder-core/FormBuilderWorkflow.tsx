@@ -67,7 +67,7 @@ export function FormBuilderWorkflow({
   )
 
   const [isSaving, setIsSaving] = useState(false)
-  const [lastSaved, setLastSaved] = useState<string | null>(null)
+  const [, setLastSaved] = useState<string | null>(null)
   const [toast, setToast] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null)
 
   const showToast = (type: 'success' | 'error' | 'info', text: string) => {

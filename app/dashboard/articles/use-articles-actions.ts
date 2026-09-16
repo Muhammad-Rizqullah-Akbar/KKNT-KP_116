@@ -29,8 +29,7 @@ export function useArticlesActions(data: ArticlesData) {
     isEditing, setIsEditing,
     detectedMarkers, setDetectedMarkers,
     attachedLocalFiles, setAttachedLocalFiles,
-    extraCategories, setExtraCategories,
-    isAddCategoryOpen, setIsAddCategoryOpen,
+    setExtraCategories, setIsAddCategoryOpen,
     newCatName, setNewCatName,
     setIsPreviewOpen, setIsImageMatcherOpen, setIsJsonImportOpen,
     setIsDeleteModalOpen, setArticleToDeleteId,
@@ -155,7 +154,7 @@ export function useArticlesActions(data: ArticlesData) {
     }
   }
 
-  const handleApplyImportedArticle = (payload: any, uploadedUrls?: string[]) => {
+  const handleApplyImportedArticle = (payload: any, _uploadedUrls?: string[]) => {
     setFormData({
       title: payload.title || '',
       category: payload.category || 'Keamanan Pangan',

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import type { ScoringConfig, ValidationConfig } from '@/lib/domain/forms/types'
 import type { FormAspect, BuilderQuestion, GradeThreshold, RecommendationConfig } from '@/lib/domain/forms/builder-state'
 import { Icon } from '@/components/ui/Icons'

@@ -276,7 +276,7 @@ test.describe('Real Browser Golden Flow E2E Suite', () => {
     await page.waitForLoadState('domcontentloaded')
     await page.waitForTimeout(1000)
 
-    const dashboardHtml = await page.content()
+    await page.content()
     expect(page.url()).toContain('/dashboard/responses')
     console.log('[E2E Browser] Step 18: Response dashboard loaded successfully')
 

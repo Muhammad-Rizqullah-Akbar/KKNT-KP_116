@@ -13,7 +13,7 @@ interface ResizableToolbarProps {
   isMobile?: boolean
 }
 
-export function ResizableToolbar({ onAddElement, onAddPageBreak, isMobile = false }: ResizableToolbarProps) {
+export function ResizableToolbar({ onAddElement, isMobile = false }: ResizableToolbarProps) {
   const [activeCategory, setActiveCategory] = useState('all')
   const [height, setHeight] = useState(160)
   const [isDragging, setIsDragging] = useState(false)
@@ -80,7 +80,6 @@ export function ResizableToolbar({ onAddElement, onAddPageBreak, isMobile = fals
     }
   }, [isDragging, height])
 
-  const quickCategories = ['all', 'Input', 'Pilihan', 'Skala', 'Tabel']
 
   const toggleExpand = () => {
     if (isExpanded) {

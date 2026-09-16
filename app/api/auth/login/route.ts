@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { adminAuth } from '@/lib/infra/firebase-admin'
 import { safeGetCollectionDocs } from '@/lib/repositories/safe-firestore'
 
-const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24
 
 export async function POST(request: NextRequest) {
   try {

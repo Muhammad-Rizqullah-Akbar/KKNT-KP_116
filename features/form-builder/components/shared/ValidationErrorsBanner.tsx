@@ -1,6 +1,5 @@
 'use client'
 
-import React from 'react'
 import type { FormValidationIssue } from '@/lib/domain/forms/validation'
 import { Icon } from '@/components/ui/Icons'
 

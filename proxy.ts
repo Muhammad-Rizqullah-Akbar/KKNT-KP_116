@@ -9,48 +9,6 @@ const RATE_LIMIT_MAX_REQUESTS = 100 // Max requests per window
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>()
 
 /**
- * Clean up expired rate limit entries
- */
-function cleanupRateLimitStore() {
-  const now = Date.now()
-  for (const [key, value] of rateLimitStore.entries()) {
-    if (now > value.resetTime) {
-      rateLimitStore.delete(key)
-    }
-  }
-}
-
-/**
- * Check rate limit for an IP address
- */
-function checkRateLimit(ip: string): { allowed: boolean; remaining: number; resetIn: number } {
-  const now = Date.now()
-  const record = rateLimitStore.get(ip)
-
-  if (!record || now > record.resetTime) {
-    // New window
-    rateLimitStore.set(ip, { count: 1, resetTime: now + RATE_LIMIT_WINDOW_MS })
-    cleanupRateLimitStore()
-    return { allowed: true, remaining: RATE_LIMIT_MAX_REQUESTS - 1, resetIn: RATE_LIMIT_WINDOW_MS }
-  }
-
-  if (record.count >= RATE_LIMIT_MAX_REQUESTS) {
-    return { 
-      allowed: false, 
-      remaining: 0, 
-      resetIn: record.resetTime - now 
-    }
-  }
-
-  record.count++
-  return { 
-    allowed: true, 
-    remaining: RATE_LIMIT_MAX_REQUESTS - record.count, 
-    resetIn: record.resetTime - now 
-  }
-}
-
-/**
  * Get client IP from request
  */
 function getClientIP(request: NextRequest): string {

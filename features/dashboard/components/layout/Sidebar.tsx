@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { usePathname } from 'next/navigation'
 import { Icon, type IconName } from '@/components/ui/Icons'
 import { SidebarItem } from './SidebarItem'
 import { clsx } from 'clsx'
@@ -31,8 +30,7 @@ export function Sidebar({ userRole }: SidebarProps) {
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(false)
-  const pathname = usePathname()
-  const { user, userData, logout } = useAuth()
+  const { user, userData } = useAuth()
 
   // Load saved sidebar collapse preference
   useEffect(() => {

@@ -7,7 +7,7 @@ import { duplicateFormWorkflow } from '@/lib/domain/forms/form-management.servic
  * Duplicate a  form aggregate.
  */
 export async function POST(
-  request: Request,
+  _request: Request,
   { params }: { params: Promise<{ formId: string }> }
 ) {
   try {

@@ -112,14 +112,6 @@ export default function ArticlesPage() {
     return filteredArticles.slice(start, start + itemsPerPage)
   }, [filteredArticles, currentPage, itemsPerPage])
 
-  // Formatting View Counter & Date
-  const formatViews = (views: number) => views >= 1000 ? `${(views / 1000).toFixed(1)}K` : (views || 0).toString()
-  
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return ''
-    return new Date(dateStr).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
-  }
-
   return (
     <div className="min-h-screen bg-[#06060E] text-white">
       {/* ====== NAVBAR ====== */}

@@ -31,8 +31,6 @@ export function FlexibleElementProperties({
   formCode,
   validationMode = 'all_required',
   validationExceptions = [],
-  allowScoringOverride = true,
-  onScoringOverride,
 }: FlexibleElementPropertiesProps) {
   const [localElement, setLocalElement] = useState<FlexibleQuestion | null>(null)
   const [showConfirm, setShowConfirm] = useState(false)

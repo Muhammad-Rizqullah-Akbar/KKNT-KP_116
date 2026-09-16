@@ -99,7 +99,6 @@ export const mapAnswersToQuestionIds = (
   const questionByCleanLabel: Record<string, any> = {}
 
   form.questions.forEach((q: any) => {
-    const qId = q.id || q.questionId
     if (q.id) questionById[q.id] = q
     if (q.questionId) questionById[q.questionId] = q
 

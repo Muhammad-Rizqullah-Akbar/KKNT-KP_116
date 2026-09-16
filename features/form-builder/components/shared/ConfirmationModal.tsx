@@ -1,6 +1,5 @@
 'use client'
 
-import React from 'react'
 import { Icon } from '@/components/ui/Icons'
 
 interface ConfirmationModalProps {

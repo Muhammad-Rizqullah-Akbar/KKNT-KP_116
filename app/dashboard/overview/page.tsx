@@ -23,7 +23,7 @@ import StackingSection from './stacking-section'
 import WidgetsGrid from './widgets-grid'
 
 export default function OverviewPage() {
-  const { user, userData, userRole } = useAuth()
+  const { userData, userRole } = useAuth()
   const effectiveRole = userRole || userData?.role
 
   if (effectiveRole === 'cadre') {

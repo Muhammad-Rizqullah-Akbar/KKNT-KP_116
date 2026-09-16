@@ -24,15 +24,6 @@ export function BasicTab({
     return validationExceptions.includes(questionId)
   }
 
-  // ===== CEK APAKAH PERTANYAAN WAJIB =====
-  const isQuestionRequired = (): boolean => {
-    if (validationMode === 'free') return false
-    if (validationMode === 'all_required_except') {
-      return !isException(element.id)
-    }
-    return element.required
-  }
-
   // ===== APAKAH USER BISA MENGUBAH STATUS WAJIB? =====
   const canChangeRequired = (): boolean => {
     if (validationMode === 'all_required') return false
@@ -75,7 +66,6 @@ export function BasicTab({
     }
   }
 
-  const isRequired = isQuestionRequired()
   const canChange = canChangeRequired()
   const isExceptionQuestion = isException(element.id)
 

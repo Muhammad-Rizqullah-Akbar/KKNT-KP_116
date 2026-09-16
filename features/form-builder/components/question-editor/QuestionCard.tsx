@@ -1,6 +1,5 @@
 'use client'
 
-import React from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import type { BuilderQuestion, FormAspect } from '@/lib/domain/forms/builder-state'

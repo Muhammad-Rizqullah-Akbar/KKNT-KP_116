@@ -42,9 +42,9 @@ export function PreviewModal({
   // ===== ALL HOOKS =====
   const [previewAnswers, setPreviewAnswers] = useState<Record<string, any>>({})
   const [filePreviews, setFilePreviews] = useState<Record<string, string>>({})
-  const [lightboxImage, setLightboxImage] = useState<{ src: string; alt: string } | null>(null)
-  const [pdfViewer, setPdfViewer] = useState<{ src: string; fileName: string } | null>(null)
-  const [videoPlayer, setVideoPlayer] = useState<{ src: string; caption?: string } | null>(null)
+  const [, setLightboxImage] = useState<{ src: string; alt: string } | null>(null)
+  const [, setPdfViewer] = useState<{ src: string; fileName: string } | null>(null)
+  const [, setVideoPlayer] = useState<{ src: string; caption?: string } | null>(null)
   const [currentStageIndex, setCurrentStageIndex] = useState(0)
   const [showResult, setShowResult] = useState(false)
   const [scoringResult, setScoringResult] = useState<ScoringResult | null>(null)
@@ -68,9 +68,9 @@ export function PreviewModal({
     ? elements.filter(el => stageMode === 'single' || stages.length <= 1 ? true : el.stageId === currentStage.id)
     : elements
 
+
   // Cari stage asli untuk cek includeInScoring
   const currentStageData = stages.find(s => s.id === currentStage?.id)
-  const isStageScored = currentStageData?.includeInScoring !== false
 
   const progress = totalStages > 1 ? ((currentStageIndex + 1) / totalStages) * 100 : 100
   const isFirstStage = currentStageIndex === 0

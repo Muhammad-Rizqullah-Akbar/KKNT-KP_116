@@ -32,8 +32,8 @@ export function ProfileProgressModal({ isOpen, onClose, userOverride }: ProfileP
   const [articles, setArticles] = useState<ArticleData[]>([])
   const [distributions, setDistributions] = useState<any[]>([])
   const [myResponses, setMyResponses] = useState<any[]>([])
-  const [myResponsesCount, setMyResponsesCount] = useState<number>(0)
-  const [totalSystemResponsesCount, setTotalSystemResponsesCount] = useState<number>(0)
+  const [, setMyResponsesCount] = useState<number>(0)
+  const [, setTotalSystemResponsesCount] = useState<number>(0)
   const [isLoading, setIsLoading] = useState(true)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
 

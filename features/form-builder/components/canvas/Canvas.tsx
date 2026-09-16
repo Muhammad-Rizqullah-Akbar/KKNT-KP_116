@@ -91,7 +91,7 @@ export function Canvas({
   }
 
   const handleDragOver = (event: DragOverEvent) => {
-    const { active, over } = event
+    const { over } = event
     if (!over) return
     
     const overId = over.id as string

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import { useState } from 'react'
 import type { QuestionType, BiodataKey } from '@/lib/domain/forms/types'
 import type { FormAspect, BuilderQuestion } from '@/lib/domain/forms/builder-state'
 import { LikertScaleEditor } from '././LikertScaleEditor'

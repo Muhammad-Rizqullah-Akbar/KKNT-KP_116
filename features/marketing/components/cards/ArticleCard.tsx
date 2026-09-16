@@ -66,7 +66,7 @@ const CATEGORY_ACCENTS: Record<string, { badge: string; border: string; glow: st
   },
 }
 
-export function ArticleCard({ article, onClick, index = 0 }: ArticleCardProps) {
+export function ArticleCard({ article, index = 0 }: ArticleCardProps) {
   const cardRef = useRef<HTMLDivElement>(null)
   const [rotX, setRotX] = useState(0)
   const [rotY, setRotY] = useState(0)

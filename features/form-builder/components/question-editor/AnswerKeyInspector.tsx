@@ -24,7 +24,6 @@ export function AnswerKeyInspector({
   aspects = [],
   scoring,
   onUpdateQuestion,
-  onUpdateScoring,
   onSelectQuestion,
 }: AnswerKeyInspectorProps) {
   const [search, setSearch] = useState('')

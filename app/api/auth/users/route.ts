@@ -14,7 +14,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
     }
     const { searchParams } = new URL(request.url)
-    const partnershipOnly = searchParams.get('partnershipOnly') === 'true'
     const forceRefresh = searchParams.get('refresh') === 'true'
 
     const now = Date.now()

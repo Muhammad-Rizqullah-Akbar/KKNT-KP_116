@@ -1,6 +1,5 @@
 'use client'
 
-import React from 'react'
 import type { BuilderQuestion, FormAspect } from '@/lib/domain/forms/builder-state'
 import { Icon } from '@/components/ui/Icons'
 

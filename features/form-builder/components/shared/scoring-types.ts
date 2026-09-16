@@ -151,7 +151,7 @@ export const generateManualDistribution = (
   const perQuestion = Math.floor(totalPoints / count)
   let remainder = totalPoints - (perQuestion * count)
 
-  questions.forEach((q, index) => {
+  questions.forEach((q) => {
     let points = perQuestion
     if (remainder > 0) {
       points += 1

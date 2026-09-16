@@ -37,13 +37,11 @@ export async function getAuthorizationContext(): Promise<AuthorizationContext | 
   if (!session) return null
 
   let uid = ''
-  let email = ''
   let token: DecodedIdToken
 
   try {
     token = await adminAuth.verifySessionCookie(session, true)
     uid = token.uid
-    email = token.email || ''
   } catch {
     // Fail-closed: invalid, expired, or tampered session cookie MUST NOT yield an authenticated user.
     return null

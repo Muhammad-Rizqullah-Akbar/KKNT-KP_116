@@ -1,4 +1,4 @@
-import { safeGetDoc, safeGetCollectionDocs, safeSetDoc, safeDeleteDoc } from './safe-firestore'
+import { safeGetDoc, safeGetCollectionDocs, safeSetDoc, safeDeleteDoc, safeQueryDocs, safeCountDocs } from './safe-firestore'
 import type { ResponseDoc, ResponseFilterOptions } from '@/lib/domain/responses/response-types'
 import { normalizeResponseDoc } from './responses.normalize'
 import { enrichResponsesWithFormScoring } from './responses.enrich'
@@ -161,6 +161,57 @@ export async function submitResponseDoc(
 
   await safeSetDoc(RESPONSES_COLLECTION, responseId, updatedData)
   return updatedData
+}
+
+/**
+ * Halaman response dengan query terfilter server-side (BIAYA TERKENDALI).
+ *
+ * Memakai filter equality (`where`) + `limit` sehingga cukup index otomatis
+ * dan membaca maksimal `limit` dokumen — bukan seluruh koleksi.
+ *
+ * Filter didukung: formId, formCode, status, distributionCode.
+ */
+export interface ResponsePageOptions {
+  formId?: string
+  formCode?: string
+  status?: string
+  distributionCode?: string
+  limit?: number
+}
+
+export async function listResponsesPagedDoc(
+  options: ResponsePageOptions = {},
+): Promise<{ items: ResponseDoc[]; hasMore: boolean }> {
+  const limitCount = Math.max(1, Math.min(Number(options.limit) || 25, 100))
+
+  const filters: Array<{ field: string; value: any }> = []
+  if (options.formId) filters.push({ field: 'formId', value: options.formId })
+  if (options.formCode) filters.push({ field: 'formCode', value: options.formCode })
+  if (options.status && options.status !== 'all') filters.push({ field: 'status', value: options.status })
+  if (options.distributionCode) filters.push({ field: 'distributionCode', value: options.distributionCode })
+
+  // Ambil limitCount + 1 untuk mendeteksi apakah masih ada halaman berikutnya.
+  const raw = await safeQueryDocs(RESPONSES_COLLECTION, filters, limitCount + 1)
+  const hasMore = raw.length > limitCount
+  const page = hasMore ? raw.slice(0, limitCount) : raw
+
+  const docs = page.map((d) => normalizeResponseDoc(d.data, d.id))
+  const enriched = await enrichResponsesWithFormScoring(docs)
+  return { items: enriched, hasMore }
+}
+
+/**
+ * Hitung jumlah response dengan filter (count aggregation — 1 read per 1000 dokumen).
+ */
+export async function countResponsesDoc(
+  filters: { formId?: string; formCode?: string; status?: string; distributionCode?: string } = {},
+): Promise<number> {
+  const f: Array<{ field: string; value: any }> = []
+  if (filters.formId) f.push({ field: 'formId', value: filters.formId })
+  if (filters.formCode) f.push({ field: 'formCode', value: filters.formCode })
+  if (filters.status) f.push({ field: 'status', value: filters.status })
+  if (filters.distributionCode) f.push({ field: 'distributionCode', value: filters.distributionCode })
+  return safeCountDocs(RESPONSES_COLLECTION, f)
 }
 
 /**

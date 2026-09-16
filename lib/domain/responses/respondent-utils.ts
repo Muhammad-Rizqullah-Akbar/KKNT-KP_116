@@ -145,7 +145,7 @@ export function extractRespondentName(response: any, form?: any): string {
     }
 
     // 6. PRIORITY D: Any valid string value in answers that is not an ID/image/number
-    for (const [key, val] of Object.entries(answers)) {
+    for (const [, val] of Object.entries(answers)) {
       if (isValidName(val)) {
         const strVal = String(val).trim()
         if (/[a-zA-Z]/.test(strVal) && strVal.length >= 2) {
@@ -158,7 +158,7 @@ export function extractRespondentName(response: any, form?: any): string {
   return 'Responden'
 }
 
-export function extractRespondentEmail(response: any, form?: any): string {
+export function extractRespondentEmail(response: any, _form?: any): string {
   if (!response) return ''
 
   if (response.respondentEmail && typeof response.respondentEmail === 'string' && response.respondentEmail.trim()) {

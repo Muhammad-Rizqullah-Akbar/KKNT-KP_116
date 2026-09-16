@@ -60,7 +60,7 @@ export function calculateAspectScores(
   const scoredAspectsList = effectiveAspects.filter((a: any) => a.isScored !== false && !isBiodataAspect(a.title))
   const autoWeight = scoredAspectsList.length > 0 ? Math.floor(100 / scoredAspectsList.length) : 100
 
-  effectiveAspects.forEach((asp, idx) => {
+  effectiveAspects.forEach((asp) => {
     const aspQuestions = questionsByAspect.get(asp.aspectId) || []
     const questionResults: QuestionScoreResult[] = []
 

@@ -15,18 +15,16 @@ export type { ScoringResult, AnswerMap } from './preview-types'
 export class ScoringEngine {
   private questions: any[]
   private scoring: FormScoring
-  private validation: FormValidation
   private stages: FormStage[]
 
   constructor(
     questions: any[],
     scoring: FormScoring,
-    validation: FormValidation,
+    _validation: FormValidation,
     stages: FormStage[]
   ) {
     this.questions = questions
     this.scoring = scoring
-    this.validation = validation
     this.stages = stages
   }
 

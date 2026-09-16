@@ -262,7 +262,6 @@ export function CreateCadreModal({
   cadreName,
   cadrePhone,
   onClose,
-  onOrganizationChange,
   onOrganizationSelect,
   onEmailChange,
   onPasswordChange,
