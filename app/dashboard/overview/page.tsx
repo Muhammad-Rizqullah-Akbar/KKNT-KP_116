@@ -1,12 +1,11 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Topbar } from '@/features/dashboard/components/layout/Topbar'
 import { useAuth } from '@/context/AuthContext'
 import { queryKeys } from '@/lib/query-keys'
 import {
-  findMatchingForm,
   matchSelectedForm,
   extractScore,
 } from './helpers'
@@ -38,81 +37,77 @@ function AdminOverviewDashboard() {
   const [widgets, setWidgets] = useState<any[]>([])
   const [accountingStacks, setAccountingStacks] = useState<any[]>([])
 
-  // Fetch Database Responses & Forms
+  // Muat preferensi widget & stacking dari penyimpanan browser.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const savedWidgets = localStorage.getItem('dashboard_widgets_cms_config_v5') || localStorage.getItem('dashboard_widgets_config')
+      if (savedWidgets) {
+        const parsed = JSON.parse(savedWidgets)
+        if (Array.isArray(parsed)) setWidgets(parsed.filter((w: any) => w.enabled))
+      }
+    } catch { /* abaikan */ }
+    try {
+      const savedStacks = localStorage.getItem('dashboard_accounting_stack_v5')
+      if (savedStacks) {
+        const parsed = JSON.parse(savedStacks)
+        if (Array.isArray(parsed)) setAccountingStacks(parsed.filter((s: any) => s.enabled !== false))
+      }
+    } catch { /* abaikan */ }
+  }, [])
+
+  // Fetch forms + daftar response TERBATAS (proyeksi ringan).
+  // BIAYA: tidak lagi membaca seluruh koleksi response. Statistik memakai
+  // endpoint ringkasan (count aggregation), daftar memakai paged + limit.
   const { data: overviewData, isLoading: loading } = useQuery({
     queryKey: queryKeys.dashboard.overview.admin,
+    staleTime: 5 * 60 * 1000,
     queryFn: async () => {
-      // COST: hanya SATU sumber response. Sebelumnya `getAllResponses()` dan
-      // `/api/responses` dipanggil bersamaan, sehingga setiap response dibaca 2x
-      // dari Firestore. Kini cukup lewat API server-side (satu jalur, role-scoped).
       const { getForms } = await import('@/lib/repositories/forms.repo')
-      const { safeFetchJson } = await import('@/lib/infra/safe-fetch')
-      const [formsData, v15RespRes] = await Promise.all([
-        getForms().catch(() => []),
-        safeFetchJson('/api/responses'),
-      ])
-
-      const rawCombined: any[] =
-        v15RespRes.ok && v15RespRes.data && Array.isArray(v15RespRes.data.responses)
-          ? [...v15RespRes.data.responses]
-          : []
-
-      const responseMap = new Map<string, any>()
-      rawCombined.forEach((r) => {
-        const id = r.responseId || r.id || r.docId
-        if (id && !responseMap.has(id)) {
-          responseMap.set(id, r)
-        } else if (!id) {
-          responseMap.set(JSON.stringify(r.answers || {}) + (r.submittedAt || ''), r)
-        }
-      })
-      const uniqueResponses = Array.from(responseMap.values())
-
-      const transformedResponses = uniqueResponses.map((r: any) => {
-        const form = findMatchingForm(r, formsData)
-
-        // Skor final: prefer result.percentage (authoritative, sudah di-compute via scoring engine formDocument)
-        const storedScore =
-          typeof r.result?.percentage === 'number' && r.result.percentage > 0
-            ? r.result.percentage
-            : typeof r.score === 'number' && r.score > 0
-            ? r.score
-            : typeof r.totalScore === 'number' && r.totalScore > 0
-            ? r.totalScore
-            : null
-
-        const finalScore = storedScore !== null ? Math.round(storedScore) : 0
-
-        return {
-          ...r,
-          score: finalScore,
-          matchedForm: form,
-        }
-      })
-
-      if (typeof window !== 'undefined') {
-        const savedWidgets = localStorage.getItem('dashboard_widgets_cms_config_v5') || localStorage.getItem('dashboard_widgets_config')
-        if (savedWidgets) {
-          try {
-            const parsed = JSON.parse(savedWidgets)
-            if (Array.isArray(parsed)) setWidgets(parsed.filter((w: any) => w.enabled))
-          } catch {}
-        }
-
-        const savedStacks = localStorage.getItem('dashboard_accounting_stack_v5')
-        if (savedStacks) {
-          try {
-            const parsed = JSON.parse(savedStacks)
-            if (Array.isArray(parsed)) setAccountingStacks(parsed.filter((s: any) => s.enabled !== false))
-          } catch {}
-        }
-      }
-
-      return { responses: transformedResponses, forms: formsData }
+      const formsData = await getForms().catch(() => [])
+      return { responses: [], forms: formsData }
     },
   })
 
-  const responses = overviewData?.responses ?? []
+  // RINGKASAN HEMAT BIAYA (count aggregation + limit kecil).
+  // Statistik TIDAK dihitung dari daftar response penuh, tetapi dari
+  // endpoint ringkasan yang memakai count query. Ini memotong biaya baca
+  // secara drastis saat data bertambah besar.
+  const { data: summary } = useQuery({
+    queryKey: [...queryKeys.dashboard.overview.admin, 'summary'],
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { safeFetchJson } = await import('@/lib/infra/safe-fetch')
+      const res = await safeFetchJson<any>('/api/responses/analytics')
+      if (!res.ok || !res.data?.data) return null
+      return res.data.data as {
+        total: number
+        submitted: number
+        inProgress: number
+        formsCount: number
+        breakdown: { id: string; title: string; total: number; submitted: number }[]
+      }
+    },
+  })
+
+  // Daftar response terbatas (proyeksi ringan) untuk widget & stacking.
+  // Paged + limit 100 — bukan seluruh koleksi.
+  const { data: pagedResponses } = useQuery({
+    queryKey: [...queryKeys.dashboard.overview.admin, 'paged'],
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { safeFetchJson } = await import('@/lib/infra/safe-fetch')
+      const res = await safeFetchJson<any>('/api/responses?paged=true&limit=100&status=all')
+      if (!res.ok || !res.data || !Array.isArray(res.data.responses)) return []
+      return res.data.responses as any[]
+    },
+  })
+
+  const responses = useMemo(() => {
+    const paged = pagedResponses ?? []
+    const base = overviewData?.responses ?? []
+    return base.length > 0 ? base : paged
+  }, [overviewData, pagedResponses])
   const forms = overviewData?.forms ?? []
 
   // Filter responses dynamically based on selectedFormId
@@ -121,22 +116,43 @@ function AdminOverviewDashboard() {
     return responses.filter((r) => matchSelectedForm(r, selectedFormId))
   }, [responses, selectedFormId, forms])
 
-  // System Stats integrated with filter
+  // System Stats — pakai ringkasan (murah) bila tersedia, fallback ke hitung lokal.
   const stats = useMemo(() => {
     const totalForms = forms.length
     const activeForms = forms.filter((f) => f.status === 'published').length
-    const totalRespondents = filteredResponses.length
 
+    if (summary) {
+      const selected = selectedFormId === 'all'
+        ? summary
+        : summary.breakdown.find((b) => b.id === selectedFormId) || { total: 0, submitted: 0, inProgress: 0 }
+      const evaluated = filteredResponses
+        .map(extractScore)
+        .filter((s): s is number => s !== null)
+      const scoresList = evaluated.length > 0 ? evaluated : []
+      const avgScore = scoresList.length > 0
+        ? Math.round(scoresList.reduce((a, b) => a + b, 0) / scoresList.length)
+        : 0
+      const passCount = scoresList.filter((s) => s >= 80).length
+      const passRate = scoresList.length > 0 ? Math.round((passCount / scoresList.length) * 100) : 0
+      return {
+        totalForms,
+        activeForms,
+        totalRespondents: selected.total,
+        avgScore,
+        passRate,
+        evaluatedCount: scoresList.length,
+      }
+    }
+
+    const totalRespondents = filteredResponses.length
     const scoresList = filteredResponses.map(extractScore).filter((s): s is number => s !== null)
     const avgScore = scoresList.length > 0
       ? Math.round(scoresList.reduce((sum, s) => sum + s, 0) / scoresList.length)
       : 0
-
     const passCount = scoresList.filter((s) => s >= 80).length
     const passRate = scoresList.length > 0 ? Math.round((passCount / scoresList.length) * 100) : 0
-
     return { totalForms, activeForms, totalRespondents, avgScore, passRate, evaluatedCount: scoresList.length }
-  }, [forms, filteredResponses])
+  }, [forms, filteredResponses, summary, selectedFormId])
 
   // COMPUTE DYNAMIC ACCOUNTING STACKS FOR DASHBOARD OVERVIEW
   const computedAccountingStacks = useMemo(
