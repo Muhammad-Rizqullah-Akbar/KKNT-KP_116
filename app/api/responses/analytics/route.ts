@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthorizationContext } from '@/lib/domain/auth/authorization'
 import { safeCountDocs, safeGetCollectionDocs } from '@/lib/repositories/safe-firestore'
+import { getReferenceData } from '@/lib/repositories/reference-data.cache'
 
 /**
  * GET /api/responses/analytics
@@ -46,10 +47,16 @@ export async function GET(request: Request) {
       safeCountDocs('responses', [...baseFilters, { field: 'status', value: 'in_progress' }]),
     ])
 
-    // 2. Rincian per grup (dipecah per form yang aktif saja — jumlah form kecil)
-    const forms = formId
-      ? await safeGetCollectionDocs('forms').then((all) => all.filter((f) => f.id === formId))
-      : await safeGetCollectionDocs('forms')
+    // 2. Rincian per grup (memakai cache data referensi — hemat pembacaan)
+    const { forms: allForms } = await getReferenceData(async () => {
+      const [f, d, u] = await Promise.all([
+        safeGetCollectionDocs('forms'),
+        safeGetCollectionDocs('distributions'),
+        safeGetCollectionDocs('users'),
+      ])
+      return { forms: f, distributions: d, users: u }
+    })
+    const forms = formId ? allForms.filter((f) => f.id === formId) : allForms
 
     const breakdown = await Promise.all(
       forms.map(async (f) => {

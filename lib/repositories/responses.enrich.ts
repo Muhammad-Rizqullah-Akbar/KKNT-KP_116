@@ -1,4 +1,5 @@
 import { safeGetCollectionDocs } from './safe-firestore'
+import { getReferenceData } from './reference-data.cache'
 import type { ResponseDoc } from '@/lib/domain/responses/response-types'
 import { cleanString, mapAnswersToHumanReadable } from './responses.normalize'
 import { ENGINE_VERSION_CURRENT, ENGINE_VERSION_ARCHIVED } from '@/lib/domain/scoring/scoring-versions'
@@ -17,11 +18,17 @@ import { ENGINE_VERSION_CURRENT, ENGINE_VERSION_ARCHIVED } from '@/lib/domain/sc
  */
 export async function enrichResponsesWithFormScoring(docs: ResponseDoc[]): Promise<ResponseDoc[]> {
   try {
-    const [rawForms, rawDistributions, rawUsers] = await Promise.all([
-      safeGetCollectionDocs('forms'),
-      safeGetCollectionDocs('distributions'),
-      safeGetCollectionDocs('users'),
-    ])
+    // BIAYA: forms/distributions/users dibaca lewat cache (TTL 1 menit).
+    // Sebelumnya 3 koleksi penuh dibaca ULANG pada setiap permintaan daftar.
+    const { forms: rawForms, distributions: rawDistributions, users: rawUsers } =
+      await getReferenceData(async () => {
+        const [f, d, u] = await Promise.all([
+          safeGetCollectionDocs('forms'),
+          safeGetCollectionDocs('distributions'),
+          safeGetCollectionDocs('users'),
+        ])
+        return { forms: f, distributions: d, users: u }
+      })
 
     const userMap: Record<string, string> = {}
     rawUsers.forEach((u) => {

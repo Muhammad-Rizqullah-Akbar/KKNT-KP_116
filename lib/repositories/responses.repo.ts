@@ -1,4 +1,5 @@
 import { safeGetDoc, safeGetCollectionDocs, safeSetDoc, safeDeleteDoc, safeQueryDocs, safeCountDocs } from './safe-firestore'
+import { getReferenceData, invalidateReferenceData } from './reference-data.cache'
 import type { ResponseDoc, ResponseFilterOptions } from '@/lib/domain/responses/response-types'
 import { normalizeResponseDoc } from './responses.normalize'
 import { enrichResponsesWithFormScoring } from './responses.enrich'
@@ -11,6 +12,14 @@ const RESPONSES_COLLECTION = 'responses'
 export async function createResponseDoc(docData: ResponseDoc): Promise<ResponseDoc> {
   await safeSetDoc(RESPONSES_COLLECTION, docData.responseId, docData)
   return docData
+}
+
+/**
+ * Kosongkan cache data referensi. Panggil setiap kali form, distribusi,
+ * atau pengguna berubah agar daftar response memakai data terbaru.
+ */
+export function invalidateReferenceCache(): void {
+  invalidateReferenceData()
 }
 
 export interface FormOptionMeta {
@@ -37,11 +46,16 @@ export async function getFormAndDistributionOptions(): Promise<{
   distributions: DistributionOptionMeta[]
 }> {
   try {
-    const [rawForms, rawDistributions, rawUsers] = await Promise.all([
-      safeGetCollectionDocs('forms'),
-      safeGetCollectionDocs('distributions'),
-      safeGetCollectionDocs('users'),
-    ])
+    // BIAYA: memakai cache data referensi (TTL 1 menit).
+    const { forms: rawForms, distributions: rawDistributions, users: rawUsers } =
+      await getReferenceData(async () => {
+        const [f, d, u] = await Promise.all([
+          safeGetCollectionDocs('forms'),
+          safeGetCollectionDocs('distributions'),
+          safeGetCollectionDocs('users'),
+        ])
+        return { forms: f, distributions: d, users: u }
+      })
 
     const userMap: Record<string, string> = {}
     rawUsers.forEach((u) => {
