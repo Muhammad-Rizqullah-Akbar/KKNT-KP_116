@@ -2,6 +2,7 @@ import 'server-only'
 
 import { adminFirestore } from '@/lib/infra/firebase-admin'
 import { firestore } from '@/lib/infra/firebase-client'
+import { recordQuery } from '@/lib/infra/observability/query-metrics'
 import { collection, getDocs, doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore'
 
 /**
@@ -48,8 +49,10 @@ export async function safeQueryDocs(
   collectionName: string,
   filters: Array<{ field: string; value: any }> = [],
   limitCount = 25,
+  endpoint = 'unknown',
 ): Promise<{ id: string; data: any }[]> {
   const safeLimit = Math.max(1, Math.min(Number(limitCount) || 25, 100))
+  const startedAt = Date.now()
   try {
     let q: any = adminFirestore.collection(collectionName)
     for (const f of filters) {
@@ -57,9 +60,23 @@ export async function safeQueryDocs(
     }
     q = q.limit(safeLimit)
     const snapshot: any = await withTimeout(q.get() as Promise<any>, 3000)
+    recordQuery({
+      endpoint: `${endpoint}:${collectionName}`,
+      collection: collectionName,
+      reads: snapshot.size ?? snapshot.docs?.length ?? 0,
+      ms: Date.now() - startedAt,
+      ok: true,
+    })
     return snapshot.docs.map((d: any) => ({ id: d.id, data: d.data() }))
   } catch (adminErr: any) {
     console.warn(`[safeFirestore] filtered read failed for "${collectionName}":`, adminErr?.message || adminErr)
+    recordQuery({
+      endpoint: `${endpoint}:${collectionName}`,
+      collection: collectionName,
+      reads: 0,
+      ms: Date.now() - startedAt,
+      ok: false,
+    })
     try {
       const { query, collection: col, where, limit: lim, getDocs: gd } = await import('firebase/firestore')
       const refs: any[] = []
@@ -82,16 +99,27 @@ export async function safeQueryDocs(
 export async function safeCountDocs(
   collectionName: string,
   filters: Array<{ field: string; value: any }> = [],
+  endpoint = 'count',
 ): Promise<number> {
+  const startedAt = Date.now()
   try {
     let q: any = adminFirestore.collection(collectionName)
     for (const f of filters) {
       if (f && f.field) q = q.where(f.field, '==', f.value)
     }
     const snap: any = await withTimeout(q.count().get() as Promise<any>, 3000)
+    recordQuery({
+      endpoint: `${endpoint}:${collectionName}`,
+      collection: collectionName,
+      // count aggregation: 1 read per 1000 dokumen
+      reads: Math.max(1, Math.ceil((snap.data().count || 0) / 1000)),
+      ms: Date.now() - startedAt,
+      ok: true,
+    })
     return Number(snap.data().count) || 0
   } catch (err: any) {
     console.warn(`[safeFirestore] count failed for "${collectionName}":`, err?.message || err)
+    recordQuery({ endpoint: `${endpoint}:${collectionName}`, collection: collectionName, reads: 0, ms: Date.now() - startedAt, ok: false })
     return 0
   }
 }
