@@ -20,23 +20,48 @@ export async function GET(request: Request) {
     const versionId = searchParams.get('versionId') || undefined
     const status = searchParams.get('status') || 'submitted'
     const search = searchParams.get('search') || undefined
+    const formCode = searchParams.get('formCode') || undefined
+    const limitRaw = searchParams.get('limit')
+    const paged = searchParams.get('paged') === 'true' || limitRaw !== null
 
     let responses: any[] = []
     let optionsMeta: { forms: any[]; distributions: any[] } = { forms: [], distributions: [] }
+    let hasMore = false
+    let total: number | undefined
 
     try {
-      const [respList, meta] = await Promise.all([
-        listResponsesWorkflow(authContext, {
-          distributionId,
-          formId,
-          versionId,
-          status,
-          search,
-        }),
-        getFormAndDistributionOptions(),
-      ])
-      responses = respList
-      optionsMeta = meta
+      if (paged) {
+        // JALUR HEMAT: query terfilter + limit, proyeksi ringan.
+        const { listResponsesPagedDoc, countResponsesDoc } = await import('@/lib/repositories/responses.repo')
+        const [pageRes, meta, count] = await Promise.all([
+          listResponsesPagedDoc({
+            formId,
+            formCode,
+            status,
+            distributionCode: distributionId,
+            limit: limitRaw ? Number(limitRaw) : 25,
+          }),
+          getFormAndDistributionOptions(),
+          countResponsesDoc({ formId, formCode, status }),
+        ])
+        responses = pageRes.items
+        hasMore = pageRes.hasMore
+        total = count
+        optionsMeta = meta
+      } else {
+        const [respList, meta] = await Promise.all([
+          listResponsesWorkflow(authContext, {
+            distributionId,
+            formId,
+            versionId,
+            status,
+            search,
+          }),
+          getFormAndDistributionOptions(),
+        ])
+        responses = respList
+        optionsMeta = meta
+      }
     } catch (err) {
       console.warn('Responses list warning:', err)
       responses = []
@@ -45,6 +70,8 @@ export async function GET(request: Request) {
     return NextResponse.json({
       success: true,
       responses,
+      hasMore,
+      total,
       availableForms: optionsMeta.forms,
       availableDistributions: optionsMeta.distributions,
     })

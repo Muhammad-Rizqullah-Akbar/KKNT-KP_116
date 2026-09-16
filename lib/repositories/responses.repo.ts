@@ -164,6 +164,69 @@ export async function submitResponseDoc(
 }
 
 /**
+ * PROYEKSI LIST — ringankan payload untuk daftar.
+ *
+ * Dokumen response penuh ~7,7 KB, tetapi halaman daftar hanya butuh
+ * ~225 byte (nama, form, kode, status, skor, tanggal). Fungsi ini
+ * membuang field berat: `answers`, `result.questions`, `biodata`,
+ * `metadata`, `submissionToken`.
+ *
+ * Detail penuh tetap diambil lewat endpoint detail (`/api/responses/[id]`).
+ */
+export function projectResponseForList(doc: ResponseDoc): ResponseDoc {
+  const result = doc.result as any
+  const lightResult = result
+    ? {
+        percentage: result.percentage,
+        grade: result.grade,
+        thresholdTitle: result.thresholdTitle,
+        rawScore: result.rawScore,
+        maximumScore: result.maximumScore,
+        engineVersion: result.scoringEngineVersion,
+        // aspects dipakai untuk kolom per-aspek di tabel (jumlah kecil)
+        aspects: Array.isArray(result.aspects)
+          ? result.aspects.map((a: any) => ({
+              aspectId: a.aspectId,
+              title: a.title,
+              rawScore: a.rawScore,
+              maximumScore: a.maximumScore,
+              percentage: a.percentage,
+              weightPercentage: a.weightPercentage,
+            }))
+          : [],
+      }
+    : undefined
+
+  return {
+    responseId: doc.responseId,
+    distributionId: doc.distributionId,
+    distributionCode: doc.distributionCode,
+    formId: doc.formId,
+    versionId: doc.versionId,
+    versionNumber: doc.versionNumber,
+    ownerType: doc.ownerType,
+    ownerId: doc.ownerId,
+    respondent: {
+      name: doc.respondent?.name,
+      email: doc.respondent?.email,
+      institution: doc.respondent?.institution,
+    },
+    // answers dikosongkan pada list — hanya tersedia di endpoint detail
+    answers: {},
+    status: doc.status,
+    startedAt: doc.startedAt,
+    updatedAt: doc.updatedAt,
+    submittedAt: doc.submittedAt,
+    submissionToken: '',
+    result: lightResult,
+    formTitle: doc.formTitle,
+    ownerName: doc.ownerName,
+    groupName: doc.groupName,
+    distributionTitle: doc.distributionTitle,
+  }
+}
+
+/**
  * Halaman response dengan query terfilter server-side (BIAYA TERKENDALI).
  *
  * Memakai filter equality (`where`) + `limit` sehingga cukup index otomatis
@@ -197,7 +260,8 @@ export async function listResponsesPagedDoc(
 
   const docs = page.map((d) => normalizeResponseDoc(d.data, d.id))
   const enriched = await enrichResponsesWithFormScoring(docs)
-  return { items: enriched, hasMore }
+  // Proyeksi: buang payload berat (answers, result.questions) dari list.
+  return { items: enriched.map(projectResponseForList), hasMore }
 }
 
 /**
