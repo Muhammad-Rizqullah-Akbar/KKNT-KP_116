@@ -243,7 +243,7 @@ export interface ResponsePageOptions {
 }
 
 export async function listResponsesPagedDoc(
-  options: ResponsePageOptions = {},
+  options: ResponsePageOptions & { includeAnswers?: boolean } = {},
 ): Promise<{ items: ResponseDoc[]; hasMore: boolean }> {
   const limitCount = Math.max(1, Math.min(Number(options.limit) || 25, 100))
 
@@ -260,8 +260,12 @@ export async function listResponsesPagedDoc(
 
   const docs = page.map((d) => normalizeResponseDoc(d.data, d.id))
   const enriched = await enrichResponsesWithFormScoring(docs)
-  // Proyeksi: buang payload berat (answers, result.questions) dari list.
-  return { items: enriched.map(projectResponseForList), hasMore }
+  // Untuk grafik/analisis yang butuh jawaban, kembalikan dokumen utuh.
+  // Untuk daftar biasa, pakai proyeksi ringan (tanpa answers/result.questions).
+  return {
+    items: options.includeAnswers ? enriched : enriched.map(projectResponseForList),
+    hasMore,
+  }
 }
 
 /**

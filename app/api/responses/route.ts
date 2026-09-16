@@ -23,6 +23,7 @@ export async function GET(request: Request) {
     const formCode = searchParams.get('formCode') || undefined
     const limitRaw = searchParams.get('limit')
     const paged = searchParams.get('paged') === 'true' || limitRaw !== null
+    const includeAnswers = searchParams.get('includeAnswers') === 'true'
 
     let responses: any[] = []
     let optionsMeta: { forms: any[]; distributions: any[] } = { forms: [], distributions: [] }
@@ -40,6 +41,7 @@ export async function GET(request: Request) {
             status,
             distributionCode: distributionId,
             limit: limitRaw ? Number(limitRaw) : 25,
+            includeAnswers,
           }),
           getFormAndDistributionOptions(),
           countResponsesDoc({ formId, formCode, status }),

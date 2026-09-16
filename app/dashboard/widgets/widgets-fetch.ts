@@ -6,6 +6,12 @@ import type { WidgetItem, WidgetCmsData, ChartData } from './widgets-types'
 import { COLOR_SCHEMES } from './widgets-types'
 import { findMatchingForm } from './widgets-form-matcher'
 
+/**
+ * Batas jumlah response yang dianalisis widget. Grafik tetap akurat untuk
+ * pola umum, tetapi tidak membaca seluruh koleksi saat data membesar.
+ */
+const WIDGET_RESPONSE_LIMIT = 100
+
 // Fetch & transform all widget CMS data from database (was previously inline loadWidgetData)
 export async function fetchWidgetData(): Promise<WidgetCmsData> {
   // COST: satu sumber response saja. Sebelumnya `getAllResponses()` dan
@@ -14,7 +20,9 @@ export async function fetchWidgetData(): Promise<WidgetCmsData> {
     getForms().catch(() => []),
     safeFetchJson('/api/forms'),
     safeFetchJson('/api/auth/users'),
-    safeFetchJson('/api/responses'),
+    // BIAYA: pakai jalur terfilter + limit, bukan seluruh koleksi.
+    // `includeAnswers=true` karena grafik membutuhkan jawaban responden.
+    safeFetchJson(`/api/responses?paged=true&limit=${WIDGET_RESPONSE_LIMIT}&status=all&includeAnswers=true`),
   ])
 
   const rawCombined: any[] =
@@ -214,6 +222,22 @@ export function getWidgetChartData(widget: WidgetItem, responses: any[], forms: 
 
   if (labels.length === 0) {
     return { labels: ['Belum Ada Respon Terdaftar'], values: [0], isMock: false }
+  }
+
+  // BATAS KATEGORI: grafik hanya menampilkan maksimal 12 kategori terbesar;
+  // sisanya digabung menjadi "Lainnya". Ini menjaga payload & render tetap
+  // ringan saat jumlah jawaban unik bertambah besar.
+  const MAX_CATEGORIES = 12
+  if (labels.length > MAX_CATEGORIES) {
+    const pairs = labels.map((l, i) => ({ label: l, value: values[i] }))
+    pairs.sort((a, b) => b.value - a.value)
+    const top = pairs.slice(0, MAX_CATEGORIES - 1)
+    const restTotal = pairs.slice(MAX_CATEGORIES - 1).reduce((sum, p) => sum + p.value, 0)
+    return {
+      labels: [...top.map((p) => p.label), `Lainnya (${pairs.length - MAX_CATEGORIES + 1} kategori)`],
+      values: [...top.map((p) => p.value), restTotal],
+      isMock: false,
+    }
   }
 
   return { labels, values, isMock: false }
