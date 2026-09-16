@@ -115,8 +115,12 @@ for (const p of plan) {
       distribution: form.distribution || legacy.distribution || {},
       createdAt: form.createdAt || legacy.createdAt || new Date().toISOString(),
       createdBy: form.createdBy || legacy.createdBy || 'migration',
-      publishedAt: form.publishedAt || legacy.publishedAt,
-      publishedBy: form.publishedBy || legacy.publishedBy,
+    }
+    if (form.publishedAt || legacy.publishedAt) {
+      snapshot.publishedAt = form.publishedAt || legacy.publishedAt
+    }
+    if (form.publishedBy || legacy.publishedBy) {
+      snapshot.publishedBy = form.publishedBy || legacy.publishedBy
     }
     await formRef.collection('versions').doc(p.versionId).set(snapshot, { merge: true })
     written++
