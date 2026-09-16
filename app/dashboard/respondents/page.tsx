@@ -6,11 +6,11 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { Topbar } from '@/features/dashboard/components/layout/Topbar'
 import {
-  getAllResponses,
   getForms,
   deleteResponse,
   type FormResponse,
 } from '@/lib/repositories/forms.repo'
+import { CACHE_LIST } from '@/lib/infra/cache-policy'
 import { extractRespondentName, extractRespondentEmail } from '@/lib/domain/responses/respondent-utils'
 import { queryKeys } from '@/lib/query-keys'
 import { useToast } from '@/lib/hooks'
@@ -73,13 +73,18 @@ export default function RespondentsPage() {
   const queryClient = useQueryClient()
 
   // ============ LOAD DATA (TanStack Query) ============
+  // BIAYA: memakai query terfilter server-side (paged + limit + proyeksi ringan),
+  // bukan membaca seluruh koleksi response. Cache mengikuti kebijakan CACHE_LIST.
   const { data: respondentsData, isLoading: loading } = useQuery({
     queryKey: queryKeys.dashboard.respondents,
+    ...CACHE_LIST,
     queryFn: async () => {
-      const [responsesData, formsData] = await Promise.all([
-        getAllResponses(),
-        getForms(),
-      ])
+      const { safeFetchJson } = await import('@/lib/infra/safe-fetch')
+      const formsData = await getForms()
+
+      const res = await safeFetchJson<any>('/api/responses?paged=true&limit=100&status=all')
+      const responsesData: any[] =
+        res.ok && res.data && Array.isArray(res.data.responses) ? res.data.responses : []
 
       const transformedRespondents: Respondent[] = await Promise.all(
         responsesData.map(async (response: FormResponse) => {
@@ -247,7 +252,25 @@ export default function RespondentsPage() {
       toast.show('Tidak ada data untuk diexport')
       return
     }
-    await exportRespondentsToExcel(filteredData, selectedForms, forms)
+    // Detail jawaban diambil saat ekspor (daftar hanya membawa data ringan).
+    let exportData = filteredData
+    try {
+      const { safeFetchJson } = await import('@/lib/infra/safe-fetch')
+      const detailResults = await Promise.all(
+        filteredData.slice(0, 100).map(async (r: any) => {
+          const res = await safeFetchJson<any>(`/api/responses/${r.id}`)
+          return res.ok && res.data?.response ? res.data.response : null
+        }),
+      )
+      const detailMap = new Map(detailResults.filter(Boolean).map((d: any) => [d.responseId || d.id, d]))
+      exportData = filteredData.map((r) => {
+        const detail = detailMap.get(r.id)
+        return detail ? { ...r, answers: detail.answers || {}, score: detail.result?.percentage ?? r.score } : r
+      })
+    } catch {
+      // jatuh ke data ringan bila detail gagal diambil
+    }
+    await exportRespondentsToExcel(exportData, selectedForms, forms)
     toast.show(`${filteredData.length} data berhasil diexport ke Excel!`)
   }
 

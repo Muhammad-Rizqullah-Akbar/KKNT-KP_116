@@ -14,6 +14,7 @@ import {
   type WidgetEditorConfig,
 } from './widgets-utils'
 import { useWidgetsDerivations } from './use-widgets-derivations'
+import { CACHE_LIST } from '@/lib/infra/cache-policy'
 
 export function useWidgetsPage() {
   const { userData, userRole, loading: authLoading } = useAuth()
@@ -84,8 +85,8 @@ export function useWidgetsPage() {
   } = useQuery<WidgetCmsData>({
     queryKey: queryKeys.widgets.cmsData,
     queryFn: fetchWidgetData,
-    staleTime: 5 * 60 * 1000, // 5 menit: cache data, hindari refetch berulang (cost optimization)
-    gcTime: 30 * 60 * 1000, // 30 menit garbage collection
+    staleTime: CACHE_LIST.staleTime,
+    gcTime: CACHE_LIST.gcTime,
   })
 
   // Hydrate widget/stacks from localStorage (or fall back to dynamically-generated widgets)
